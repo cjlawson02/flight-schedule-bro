@@ -7,6 +7,7 @@ import {
   type Env,
 } from "./types.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
+import { formatIsoDate, startOfUtcDay } from "../shared/util/utcDate.js";
 
 const SNAPSHOT_KEY = "availability_snapshot";
 
@@ -186,8 +187,7 @@ export async function initializeSnapshot(
   daysAhead: number
 ): Promise<void> {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayISO = today.toISOString().split("T")[0];
+  const todayISO = formatIsoDate(startOfUtcDay(now));
 
   const metadata: Metadata = {
     lastSearchDate: todayISO,

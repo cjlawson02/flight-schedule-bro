@@ -308,13 +308,12 @@ describe("Worker Index - Helper Functions", () => {
   });
 
   describe("Date Normalization Edge Cases", () => {
-    it("FAILS: actual source code uses setHours instead of setUTCHours", () => {
-      // This test checks the ACTUAL source code files to verify the bug exists
-      // We read the real files and check if they use the buggy setHours
+    it("uses shared UTC date helpers in worker code", () => {
+      // This test checks the actual source files to ensure Worker date handling
+      // stays UTC-safe and doesn't regress to local-time normalization.
 
       const projectRoot = process.cwd();
 
-      // Read the actual source code files
       const indexCode = readFileSync(
         join(projectRoot, "src/worker/index.ts"),
         "utf-8",
@@ -324,27 +323,21 @@ describe("Worker Index - Helper Functions", () => {
         "utf-8",
       );
 
-      // Check if the code uses setHours (buggy) or setUTCHours (correct)
-      // Use regex to match the pattern with flexible whitespace
+      const usesUtcHelperImport =
+        /from "\.\.\/shared\/util\/utcDate\.js"/.test(indexCode) &&
+        /from "\.\.\/shared\/util\/utcDate\.js"/.test(setupCode);
+      const indexUsesStartOfUtcDay = /startOfUtcDay\(/.test(indexCode);
+      const setupUsesStartOfUtcDay = /startOfUtcDay\(/.test(setupCode);
       const indexUsesSetHours =
         /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(indexCode);
-      const indexUsesSetUTCHours =
-        /today\.setUTCHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(
-          indexCode,
-        );
       const setupUsesSetHours =
         /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(setupCode);
-      const setupUsesSetUTCHours =
-        /today\.setUTCHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(
-          setupCode,
-        );
 
-      // This test FAILS because the actual code uses setHours (buggy)
-      // It will pass once we fix the code to use setUTCHours
-      expect(indexUsesSetHours).toBe(false); // Should NOT use setHours
-      expect(indexUsesSetUTCHours).toBe(true); // Should use setUTCHours
-      expect(setupUsesSetHours).toBe(false); // Should NOT use setHours
-      expect(setupUsesSetUTCHours).toBe(true); // Should use setUTCHours
+      expect(usesUtcHelperImport).toBe(true);
+      expect(indexUsesStartOfUtcDay).toBe(true);
+      expect(setupUsesStartOfUtcDay).toBe(true);
+      expect(indexUsesSetHours).toBe(false);
+      expect(setupUsesSetHours).toBe(false);
     });
   });
 

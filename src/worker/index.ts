@@ -1,8 +1,13 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { addDays } from "date-fns";
 import { createConfig } from "../shared/util/config.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import { isValidBlock } from "../shared/util/dates.js";
+import {
+  addUtcDays,
+  endOfUtcDay,
+  formatIsoDate,
+  startOfUtcDay,
+} from "../shared/util/utcDate.js";
 import {
   fetchAuth,
   getOperatorId,
@@ -44,11 +49,7 @@ function findNewSlots(
   const previousSlotKeys = new Set(previousSlots.map(createSlotKey));
 
   // Calculate the maximum date that was being tracked in the last search
-  const maxTrackedDate = addDays(lastSearchDate, daysAhead);
-
-  // Normalize to end of day in UTC for comparison (strip time component)
-  const maxTrackedDateOnly = new Date(maxTrackedDate);
-  maxTrackedDateOnly.setUTCHours(23, 59, 59, 999);
+  const maxTrackedDateOnly = endOfUtcDay(addUtcDays(lastSearchDate, daysAhead));
 
   // Filter to find genuinely new slots (not in previous snapshot)
   // and within the previously tracked window (to avoid notifying about new future days)
@@ -90,13 +91,10 @@ export default {
 
       const { metadata } = snapshot;
       const lastSearchDate = new Date(metadata.lastSearchDate);
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+      const today = startOfUtcDay(new Date());
 
       console.log(
-        `Last search date: ${metadata.lastSearchDate}, Today: ${
-          today.toISOString().split("T")[0]
-        }`,
+        `Last search date: ${metadata.lastSearchDate}, Today: ${formatIsoDate(today)}`,
       );
 
       // Step 1: Clean up past slots
@@ -183,8 +181,8 @@ export default {
       const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
       for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-        const day = addDays(today, offset);
-        const dayISO = day.toISOString().split("T")[0];
+        const day = addUtcDays(today, offset);
+        const dayISO = formatIsoDate(day);
 
         bookablePromises.push(
           ...instructorChunks.map((instructors) =>
@@ -270,7 +268,7 @@ export default {
       // This prevents duplicate notifications if setSnapshot fails
       // Update lastSearchDate to today so the rolling window advances
       const updatedMetadata = {
-        lastSearchDate: today.toISOString().split("T")[0],
+        lastSearchDate: formatIsoDate(today),
         lastUpdate: new Date().toISOString(),
         daysAhead: config.DAYS_AHEAD,
       };

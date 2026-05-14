@@ -208,21 +208,22 @@ describe("Worker Setup", () => {
 
   describe("Date Range Calculation", () => {
     it("calculates correct date range for DAYS_AHEAD", () => {
-      const today = new Date("2024-01-15T00:00:00.000Z");
+      const today = new Date("2024-01-15T12:00:00.000Z");
 
       const daysAhead = 60;
       const dates: string[] = [];
 
       for (let offset = 0; offset <= daysAhead; offset++) {
         const day = new Date(today);
-        day.setDate(day.getDate() + offset);
+        day.setUTCHours(0, 0, 0, 0);
+        day.setUTCDate(day.getUTCDate() + offset);
         const dayISO = day.toISOString().split("T")[0];
         dates.push(dayISO);
       }
 
       expect(dates).toHaveLength(61); // 0 to 60 inclusive
       expect(dates[0]).toBe("2024-01-15");
-      expect(dates[60]).toBe("2024-03-14"); // 60 days after Jan 15
+      expect(dates[60]).toBe("2024-03-15"); // 60 days after Jan 15 in a leap year
     });
   });
 

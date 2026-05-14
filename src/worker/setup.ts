@@ -1,8 +1,12 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { addDays } from "date-fns";
 import { createConfig } from "../shared/util/config.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import { isValidBlock } from "../shared/util/dates.js";
+import {
+  addUtcDays,
+  formatIsoDate,
+  startOfUtcDay,
+} from "../shared/util/utcDate.js";
 import {
   fetchAuth,
   getOperatorId,
@@ -56,8 +60,7 @@ export async function runSetup(env: Env): Promise<Response> {
       `Loaded ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`
     );
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const today = startOfUtcDay(new Date());
 
     const allInstructorIds = metadata.instructors.map((i) => i.instructorId);
 
@@ -102,8 +105,8 @@ export async function runSetup(env: Env): Promise<Response> {
     const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
     for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-      const day = addDays(today, offset);
-      const dayISO = day.toISOString().split("T")[0];
+      const day = addUtcDays(today, offset);
+      const dayISO = formatIsoDate(day);
 
       bookablePromises.push(
         ...instructorChunks.map((instructors) =>
