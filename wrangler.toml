@@ -1,0 +1,39 @@
+name = "flight-schedule-bro-worker"
+main = "src/worker/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Observability configuration for better debugging
+[observability]
+enabled = true
+head_sampling_rate = 1 # optional. default = 1.
+
+# Smart placement for optimal performance
+[placement]
+mode = "smart"
+
+# Cron trigger - runs every 30 minutes
+[triggers]
+crons = ["*/30 * * * *"]
+
+# KV namespace for storing availability snapshots
+# Note: You'll need to create the namespace and update the IDs
+# Run: wrangler kv:namespace create "FSP_AVAILABILITY_KV"
+# Then: wrangler kv:namespace create "FSP_AVAILABILITY_KV" --preview
+[[kv_namespaces]]
+binding = "FSP_AVAILABILITY_KV"
+id = "bbfa3eaaa6c24c26bbbd55836a87d2c9"
+preview_id = "c248023ca5fe4c6cab64d89c25972ada"
+
+# Environment variables (non-sensitive)
+[vars]
+DAYS_AHEAD = "14"  # Reduced to stay under subrequest limit (8 days * instructor chunks < 50)
+AIRCRAFT_REGEX = "172S|172N"
+WEEKDAY_MIN_HOUR = "15"
+MAX_HOUR = "19"
+NOTIFICATION_AIRCRAFT = "N65411,N734UZ"  # Comma-separated aircraft tail numbers for Discord notifications
+
+# Secrets (set these via wrangler CLI):
+# wrangler secret put FSP_EMAIL
+# wrangler secret put FSP_PASSWORD
+# wrangler secret put DISCORD_WEBHOOK_URL

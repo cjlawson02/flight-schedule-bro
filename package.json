@@ -1,0 +1,43 @@
+{
+  "name": "flight-schedule-bro",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "src/cli/index.ts",
+  "scripts": {
+    "exec": "tsx src/cli/index.ts",
+    "start": "tsx src/cli/index.ts",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy",
+    "worker:tail": "wrangler tail",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260511.1",
+    "@tsconfig/node24": "^24.0.4",
+    "@types/node": "^25.7.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/ui": "^4.1.6",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6",
+    "wrangler": "^4.90.1",
+    "zod": "^4.4.3"
+  },
+  "dependencies": {
+    "@inquirer/checkbox": "^5.1.5",
+    "@inquirer/confirm": "^6.0.13",
+    "@inquirer/prompts": "^8.4.3",
+    "@inquirer/select": "^5.1.5",
+    "@types/cli-progress": "^3.11.6",
+    "cli-progress": "^3.12.0",
+    "date-fns": "^4.1.0",
+    "discord-api-types": "^0.38.47",
+    "dotenv": "^17.4.2"
+  }
+}

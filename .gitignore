@@ -1,0 +1,13 @@
+node_modules
+cache
+cache-test
+test-cache
+coverage
+.DS_Store
+
+# Environment variables (contains secrets)
+.env
+.dev.vars
+
+# Wrangler local state
+.wrangler/
