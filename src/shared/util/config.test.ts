@@ -96,4 +96,27 @@ describe("config", () => {
     expect(config.DAYS_AHEAD).toBe(90);
     expect(config.AIRCRAFT_REGEX.test("172S")).toBe(true);
   });
+
+  it("rejects invalid IANA timezone values", () => {
+    const invalidEnv = {
+      FSP_EMAIL: "test@example.com",
+      FSP_PASSWORD: "password123",
+      TIMEZONE: "America/Los_Angles",
+    };
+
+    expect(() => createConfig(invalidEnv)).toThrow(
+      "TIMEZONE must be a valid IANA timezone",
+    );
+  });
+
+  it("accepts valid IANA timezone values", () => {
+    const validEnv = {
+      FSP_EMAIL: "test@example.com",
+      FSP_PASSWORD: "password123",
+      TIMEZONE: "America/Chicago",
+    };
+
+    const config = createConfig(validEnv);
+    expect(config.TIMEZONE).toBe("America/Chicago");
+  });
 });
