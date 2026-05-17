@@ -26,7 +26,8 @@ const envSchema = z.object({
     .string()
     .min(1)
     .refine((value) => isValidIanaTimeZone(value), {
-      message: "TIMEZONE must be a valid IANA timezone (e.g. America/Los_Angeles)",
+      message:
+        "TIMEZONE must be a valid IANA timezone (e.g. America/Los_Angeles)",
     })
     .default(DEFAULT_TIMEZONE),
 

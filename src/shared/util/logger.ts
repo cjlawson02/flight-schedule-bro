@@ -32,9 +32,9 @@ function detectRuntime(): LogRuntime {
   return "cli";
 }
 
-function defaultConfig(runtime: LogRuntime): Required<
-  Pick<LoggerConfig, "runtime" | "type" | "minLevel">
-> {
+function defaultConfig(
+  runtime: LogRuntime,
+): Required<Pick<LoggerConfig, "runtime" | "type" | "minLevel">> {
   const envLevel =
     typeof process !== "undefined"
       ? parseLogLevel(process.env.LOG_LEVEL)
