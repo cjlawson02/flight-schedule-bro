@@ -53,6 +53,7 @@ describe("config", () => {
     const { CONFIG } = await import("./config.js");
 
     expect(CONFIG.DAYS_AHEAD).toBe(60); // Default
+    expect(CONFIG.TIMEZONE).toBe("America/Los_Angeles");
   });
 
   it("parses regex pattern correctly", async () => {

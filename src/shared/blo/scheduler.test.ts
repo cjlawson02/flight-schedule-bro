@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { SchedulerBLO } from "./scheduler.js";
+import { parseFspLocal } from "../util/flightTime.js";
+
+const LA = "America/Los_Angeles";
 import * as instructorsDAO from "../dao/instructors.js";
 import * as reservationTypesDAO from "../dao/reservationTypes.js";
 import * as aircraftDAO from "../dao/aircraft.js";
@@ -364,8 +367,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "ac-1",
         instructorId: "inst-1",
-        startTime: new Date("2024-07-15T10:00:00"),
-        endTime: new Date("2024-07-15T12:00:00"),
+        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
+        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
         reservationTypeId: "type-1",
         locationId: 1,
       };
@@ -394,8 +397,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "ac-1",
         instructorId: "inst-1",
-        startTime: new Date("2024-07-15T14:30:45"), // With seconds
-        endTime: new Date("2024-07-15T16:30:45"),
+        startTime: parseFspLocal("2024-07-15T14:30:45", LA),
+        endTime: parseFspLocal("2024-07-15T16:30:45", LA),
         reservationTypeId: "type-1",
         locationId: 1,
       };
@@ -416,8 +419,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "ac-1",
         instructorId: "inst-1",
-        startTime: new Date("2024-07-15T10:00:00"),
-        endTime: new Date("2024-07-15T12:00:00"),
+        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
+        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
         reservationTypeId: "type-1",
         locationId: 1,
       };
@@ -444,8 +447,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "ac-1",
         instructorId: "inst-1",
-        startTime: new Date("2024-07-15T10:00:00"),
-        endTime: new Date("2024-07-15T12:00:00"),
+        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
+        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
         reservationTypeId: "type-1",
         locationId: 1,
       };

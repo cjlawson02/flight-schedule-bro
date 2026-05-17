@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_TIMEZONE } from "./flightTime.js";
 
 // Define schema for environment variables
 const envSchema = z.object({
@@ -9,6 +10,7 @@ const envSchema = z.object({
   // Scheduling preferences (with defaults)
   DAYS_AHEAD: z.coerce.number().int().positive().default(60),
   AIRCRAFT_REGEX: z.string().default("172S|172N"),
+  TIMEZONE: z.string().min(1).default(DEFAULT_TIMEZONE),
 
   // Weekday hours (with defaults)
   WEEKDAY_MIN_HOUR: z.coerce.number().int().min(0).max(23).default(15),
@@ -22,6 +24,7 @@ export interface ConfigType {
   PASSWORD: string;
   AIRCRAFT_REGEX: RegExp;
   DAYS_AHEAD: number;
+  TIMEZONE: string;
 }
 
 /**
@@ -60,6 +63,7 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
     // Scheduling preferences
     AIRCRAFT_REGEX: new RegExp(env.AIRCRAFT_REGEX, "i"),
     DAYS_AHEAD: env.DAYS_AHEAD,
+    TIMEZONE: env.TIMEZONE,
   };
 }
 

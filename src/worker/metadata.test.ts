@@ -113,11 +113,12 @@ describe("Worker Metadata", () => {
       ];
       const mockAircraft = {
         results: [
-          { aircraftId: "ac1", tailNumber: "N12345" },
-          { aircraftId: "ac2", tailNumber: "N67890" },
+          { aircraftId: "ac1", tailNumber: "N12345", model: "172S" },
+          { aircraftId: "ac2", tailNumber: "N67890", model: "172N" },
           {
             aircraftId: "00000000-0000-0000-0000-000000000000",
             tailNumber: "",
+            model: "",
           }, // Should be filtered
         ],
       };
@@ -128,7 +129,7 @@ describe("Worker Metadata", () => {
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
         mockReservationTypes,
       );
-      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
+      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
 
@@ -142,13 +143,14 @@ describe("Worker Metadata", () => {
     it("filters out invalid aircraft IDs", async () => {
       const mockAircraft = {
         results: [
-          { aircraftId: "ac1", tailNumber: "N12345" },
+          { aircraftId: "ac1", tailNumber: "N12345", model: "172S" },
           {
             aircraftId: "00000000-0000-0000-0000-000000000000",
             tailNumber: "Invalid",
+            model: "",
           },
-          { aircraftId: "ac2", tailNumber: "  " }, // Empty after trim
-          { aircraftId: "ac3", tailNumber: "N67890" },
+          { aircraftId: "ac2", tailNumber: "  ", model: "" }, // Empty after trim
+          { aircraftId: "ac3", tailNumber: "N67890", model: "172N" },
         ],
       };
 
@@ -156,7 +158,7 @@ describe("Worker Metadata", () => {
         results: [],
       });
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
-      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
+      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
 
@@ -169,14 +171,16 @@ describe("Worker Metadata", () => {
 
     it("trims aircraft tail numbers", async () => {
       const mockAircraft = {
-        results: [{ aircraftId: "ac1", tailNumber: "  N12345  " }],
+        results: [
+          { aircraftId: "ac1", tailNumber: "  N12345  ", model: "172S" },
+        ],
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
       });
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
-      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
+      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
 
@@ -214,7 +218,7 @@ describe("Worker Metadata", () => {
         { reservationTypeId: "rt1", reservationTypeName: "Dual" },
       ];
       const mockAircraft = {
-        results: [{ aircraftId: "ac1", tailNumber: "N12345" }],
+        results: [{ aircraftId: "ac1", tailNumber: "N12345", model: "172S" }],
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
@@ -223,7 +227,7 @@ describe("Worker Metadata", () => {
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
         mockReservationTypes,
       );
-      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
+      vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await getOrFetchMetadata(123, mockKV);
 

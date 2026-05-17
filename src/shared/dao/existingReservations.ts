@@ -1,11 +1,19 @@
 import { z } from "zod";
+import {
+  createOperatorDateKey,
+  DEFAULT_TIMEZONE,
+  getFspTimeZoneBias,
+  parseFspDateTime,
+} from "../util/flightTime.js";
 import { safeFetch } from "./api_wrapper.js";
 
 // Minimal schema - only extract what we need for conflict detection
 const ExistingReservationSchema = z.object({
   reservationId: z.uuid(),
-  start: z.string(), // Local time like "2025-11-04T17:00:00"
-  end: z.string(), // Local time like "2025-11-04T19:00:00"
+  start: z.string(),
+  end: z.string(),
+  startUtc: z.string().optional(),
+  endUtc: z.string().optional(),
   instructor: z.string().optional(),
   resource: z.string().optional(), // Aircraft tail number
 });
@@ -17,16 +25,39 @@ const ExistingReservationsResponseSchema = z.object({
 
 export type ExistingReservation = z.infer<typeof ExistingReservationSchema>;
 
+/** UTC instant for an existing reservation. */
+export function getReservationStart(
+  reservation: ExistingReservation,
+  timeZone: string = DEFAULT_TIMEZONE,
+): Date {
+  return parseFspDateTime(
+    { local: reservation.start, utc: reservation.startUtc },
+    timeZone,
+  );
+}
+
+export function getReservationEnd(
+  reservation: ExistingReservation,
+  timeZone: string = DEFAULT_TIMEZONE,
+): Date {
+  return parseFspDateTime(
+    { local: reservation.end, utc: reservation.endUtc },
+    timeZone,
+  );
+}
+
 /**
  * Fetch existing reservations for the user
  * @param operatorId - The operator ID
- * @param timeZoneBias - Timezone offset in minutes (e.g., -420 for PST)
+ * @param timeZone - The timezone of the operator
  * @returns Promise<ExistingReservation[]> - Array of existing reservations
  */
 export async function getExistingReservations(
   operatorId: number,
-  timeZoneBias = -420,
+  timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<ExistingReservation[]> {
+  const timeZoneBias = getFspTimeZoneBias(timeZone);
+
   const response = await safeFetch(
     `https://api-external.flightschedulepro.com/api/V2/Reservation?dateTypeFilter=1&operatorId=${operatorId}&pageIndex=0&pageSize=100&timeZoneBias=${timeZoneBias}`,
     "GET",
@@ -40,26 +71,21 @@ export async function getExistingReservations(
 }
 
 /**
- * Check if a time slot is on the same day as any existing reservation
- * Uses local date components (year, month, day) to avoid timezone issues
+ * Check if a time slot is on the same operator calendar day as any existing reservation.
  * @param slotStart - Start time of the slot to check
  * @param existingReservations - Array of existing reservations
- * @returns boolean - True if there's a reservation on the same day
+ * @param timeZone - The timezone of the operator
+ * @returns boolean - True if the time slot is on the same operator calendar day as any existing reservation
  */
 export function hasReservationOnSameDay(
   slotStart: Date,
   existingReservations: ExistingReservation[],
+  timeZone: string = DEFAULT_TIMEZONE,
 ): boolean {
-  const slotYear = slotStart.getFullYear();
-  const slotMonth = slotStart.getMonth();
-  const slotDay = slotStart.getDate();
+  const slotDateKey = createOperatorDateKey(slotStart, timeZone);
 
   return existingReservations.some((reservation) => {
-    const resStart = new Date(reservation.start);
-    const resYear = resStart.getFullYear();
-    const resMonth = resStart.getMonth();
-    const resDay = resStart.getDate();
-
-    return slotYear === resYear && slotMonth === resMonth && slotDay === resDay;
+    const resStart = getReservationStart(reservation, timeZone);
+    return createOperatorDateKey(resStart, timeZone) === slotDateKey;
   });
 }

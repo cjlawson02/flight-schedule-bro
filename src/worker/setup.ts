@@ -3,10 +3,10 @@ import { createConfig } from "../shared/util/config.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import { isValidBlock } from "../shared/util/dates.js";
 import {
-  addUtcDays,
-  formatIsoDate,
-  startOfUtcDay,
-} from "../shared/util/utcDate.js";
+  addOperatorDays,
+  formatOperatorIsoDate,
+  startOfOperatorDay,
+} from "../shared/util/flightTime.js";
 import {
   fetchAuth,
   getOperatorId,
@@ -41,6 +41,7 @@ export async function runSetup(env: Env): Promise<Response> {
       AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
       WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
       MAX_HOUR: env.MAX_HOUR ?? "19",
+      TIMEZONE: env.TIMEZONE,
     });
 
     // Authenticate
@@ -60,7 +61,7 @@ export async function runSetup(env: Env): Promise<Response> {
       `Loaded ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`,
     );
 
-    const today = startOfUtcDay(new Date());
+    const today = startOfOperatorDay(new Date(), config.TIMEZONE);
 
     const allInstructorIds = metadata.instructors.map((i) => i.instructorId);
 
@@ -99,14 +100,14 @@ export async function runSetup(env: Env): Promise<Response> {
     console.log(`Fetching availability for ${config.DAYS_AHEAD} days ahead...`);
 
     // Create scheduler for availability fetching
-    const scheduler = new SchedulerBLO(operatorId);
+    const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
 
     // Collect all bookable availability
     const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
     for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-      const day = addUtcDays(today, offset);
-      const dayISO = formatIsoDate(day);
+      const day = addOperatorDays(today, offset, config.TIMEZONE);
+      const dayISO = formatOperatorIsoDate(day, config.TIMEZONE);
 
       bookablePromises.push(
         ...instructorChunks.map((instructors) =>
@@ -130,20 +131,19 @@ export async function runSetup(env: Env): Promise<Response> {
     console.log(`Found ${allBookableResults.length} total bookable results`);
 
     // Filter valid results using the existing validation logic
-    const validResults = allBookableResults.filter((result) => {
-      const isWeekend = [0, 6].includes(result.startDateTime.getDay());
-      return isValidBlock(
-        result.startDateTime,
-        result.endDateTime,
-        isWeekend,
-        config,
-      );
-    });
+    const validResults = allBookableResults.filter((result) =>
+      isValidBlock(result.startDateTime, result.endDateTime, config),
+    );
 
     console.log(`Filtered to ${validResults.length} valid time slots`);
 
     // Initialize snapshot in KV
-    await initializeSnapshot(env, validResults, config.DAYS_AHEAD);
+    await initializeSnapshot(
+      env,
+      validResults,
+      config.DAYS_AHEAD,
+      config.TIMEZONE,
+    );
 
     const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots for the next ${config.DAYS_AHEAD} days.`;
     console.log(successMessage);

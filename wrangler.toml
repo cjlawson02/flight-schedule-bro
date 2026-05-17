@@ -29,6 +29,7 @@ preview_id = "c248023ca5fe4c6cab64d89c25972ada"
 [vars]
 DAYS_AHEAD = "14"  # Reduced to stay under subrequest limit (8 days * instructor chunks < 50)
 AIRCRAFT_REGEX = "172S|172N"
+TIMEZONE = "America/Los_Angeles"
 WEEKDAY_MIN_HOUR = "15"
 MAX_HOUR = "19"
 NOTIFICATION_AIRCRAFT = "N65411,N734UZ,N713RE"  # Comma-separated aircraft tail numbers for Discord notifications

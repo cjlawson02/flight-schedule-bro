@@ -137,6 +137,7 @@ export interface Env {
   AIRCRAFT_REGEX: string;
   WEEKDAY_MIN_HOUR?: string;
   MAX_HOUR?: string;
+  TIMEZONE?: string;
   NOTIFICATION_AIRCRAFT?: string; // Comma-separated aircraft tail numbers for Discord notifications
 }
 

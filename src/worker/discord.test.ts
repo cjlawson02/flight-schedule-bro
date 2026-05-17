@@ -364,9 +364,11 @@ describe("Discord Integration", () => {
 
       const existingReservations = [
         {
-          reservationId: "abc123",
+          reservationId: "7fd24fb6-977f-4b4a-89ac-dc949030d234",
           start: "2024-01-15T15:00:00",
           end: "2024-01-15T17:00:00",
+          startUtc: "2024-01-15T23:00:00",
+          endUtc: "2024-01-16T01:00:00",
           instructor: "Jane Smith",
           resource: "N67890",
         },
@@ -377,6 +379,7 @@ describe("Discord Integration", () => {
         [newSlot],
         metadata,
         existingReservations,
+        "America/Los_Angeles",
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();
@@ -424,6 +427,7 @@ describe("Discord Integration", () => {
         [newSlot],
         metadata,
         existingReservations,
+        "America/Los_Angeles",
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();
@@ -467,6 +471,7 @@ describe("Discord Integration", () => {
         [newSlot],
         metadata,
         existingReservations,
+        "America/Los_Angeles",
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();

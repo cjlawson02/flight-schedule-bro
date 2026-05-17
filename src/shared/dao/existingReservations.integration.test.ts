@@ -6,6 +6,8 @@ const ExistingReservationSchema = z.object({
   reservationId: z.uuid(),
   start: z.string(),
   end: z.string(),
+  startUtc: z.string().optional(),
+  endUtc: z.string().optional(),
   instructor: z.string().optional(),
   resource: z.string().optional(),
 });
@@ -135,14 +137,15 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
       reservationId: "7fd24fb6-977f-4b4a-89ac-dc949030d234",
       start: "2025-11-04T17:00:00",
       end: "2025-11-04T19:00:00",
+      startUtc: "2025-11-05T01:00:00",
+      endUtc: "2025-11-05T03:00:00",
       instructor: "Doug Libal",
       resource: "N65411",
     });
 
-    // Verify all extra fields are stripped
+    // Verify unrelated API fields are stripped
     expect(firstReservation).not.toHaveProperty("flightRecordId");
     expect(firstReservation).not.toHaveProperty("organizationId");
-    expect(firstReservation).not.toHaveProperty("startUtc");
     expect(firstReservation).not.toHaveProperty("aircraftMake");
     expect(firstReservation).not.toHaveProperty("pilotFirstName");
 
@@ -151,6 +154,8 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
       reservationId: "7e63e451-783a-4323-98ba-10b556d12d07",
       start: "2025-11-06T17:00:00",
       end: "2025-11-06T19:00:00",
+      startUtc: "2025-11-07T01:00:00",
+      endUtc: "2025-11-07T03:00:00",
       instructor: "Jason Hull",
       resource: "N734UZ",
     });
@@ -160,6 +165,8 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
       reservationId: "a2ddc5dc-7fda-440f-8ec9-f940e74c7af6",
       start: "2025-11-07T17:00:00",
       end: "2025-11-07T19:00:00",
+      startUtc: "2025-11-08T01:00:00",
+      endUtc: "2025-11-08T03:00:00",
       instructor: "Jason Hull",
       resource: "N734UZ",
     });

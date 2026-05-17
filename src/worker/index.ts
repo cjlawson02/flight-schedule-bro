@@ -3,11 +3,11 @@ import { createConfig } from "../shared/util/config.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import { isValidBlock } from "../shared/util/dates.js";
 import {
-  addUtcDays,
-  endOfUtcDay,
-  formatIsoDate,
-  startOfUtcDay,
-} from "../shared/util/utcDate.js";
+  addOperatorDays,
+  formatOperatorIsoDate,
+  startOfOperatorDay,
+} from "../shared/util/flightTime.js";
+import { findNewSlots } from "../shared/util/slots.js";
 import {
   fetchAuth,
   getOperatorId,
@@ -27,43 +27,6 @@ import { runSetup } from "./setup.js";
 import { refreshMetadata, getMetadataFromKV } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
 import type { Env } from "./types.js";
-
-/**
- * Create a unique key for an availability slot for comparison
- */
-function createSlotKey(slot: BookableAvailability): string {
-  return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
-}
-
-/**
- * Find new slots that aren't in the existing snapshot
- * Implements the rolling window algorithm to exclude newly added future days
- */
-function findNewSlots(
-  currentSlots: BookableAvailability[],
-  previousSlots: BookableAvailability[],
-  lastSearchDate: Date,
-  daysAhead: number,
-): BookableAvailability[] {
-  // Create a set of existing slot keys for fast lookup
-  const previousSlotKeys = new Set(previousSlots.map(createSlotKey));
-
-  // Calculate the maximum date that was being tracked in the last search
-  const maxTrackedDateOnly = endOfUtcDay(addUtcDays(lastSearchDate, daysAhead));
-
-  // Filter to find genuinely new slots (not in previous snapshot)
-  // and within the previously tracked window (to avoid notifying about new future days)
-  const newSlots = currentSlots.filter((slot) => {
-    const slotKey = createSlotKey(slot);
-    const isNew = !previousSlotKeys.has(slotKey);
-    // Compare dates by checking if slot is on or before the last tracked day
-    const isWithinTrackedWindow = slot.startDateTime <= maxTrackedDateOnly;
-
-    return isNew && isWithinTrackedWindow;
-  });
-
-  return newSlots;
-}
 
 /**
  * Main scheduled handler - runs every 30 minutes
@@ -90,22 +53,8 @@ export default {
       }
 
       const { metadata } = snapshot;
-      const lastSearchDate = new Date(metadata.lastSearchDate);
-      const today = startOfUtcDay(new Date());
 
-      console.log(
-        `Last search date: ${metadata.lastSearchDate}, Today: ${formatIsoDate(today)}`,
-      );
-
-      // Step 1: Clean up past slots
-      console.log("Cleaning past slots...");
-      const cleanedSnapshot = cleanPastSlotsFromSnapshot(snapshot, today);
-
-      // Step 2: Get previous slots from cleaned snapshot for comparison
-      const previousSlots = getSlotsFromSnapshot(cleanedSnapshot);
-      console.log(`Previous snapshot has ${previousSlots.length} slots`);
-
-      // Step 3: Create config and authenticate
+      // Step 1: Create config and authenticate
       const config = createConfig({
         FSP_EMAIL: env.FSP_EMAIL,
         FSP_PASSWORD: env.FSP_PASSWORD,
@@ -113,7 +62,26 @@ export default {
         AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
         WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
         MAX_HOUR: env.MAX_HOUR ?? "19",
+        TIMEZONE: env.TIMEZONE,
       });
+
+      const today = startOfOperatorDay(new Date(), config.TIMEZONE);
+
+      console.log(
+        `Last search date: ${metadata.lastSearchDate}, Today: ${formatOperatorIsoDate(today, config.TIMEZONE)}`,
+      );
+
+      // Step 2: Clean up past slots
+      console.log("Cleaning past slots...");
+      const cleanedSnapshot = cleanPastSlotsFromSnapshot(
+        snapshot,
+        today,
+        config.TIMEZONE,
+      );
+
+      // Step 3: Get previous slots from cleaned snapshot for comparison
+      const previousSlots = getSlotsFromSnapshot(cleanedSnapshot);
+      console.log(`Previous snapshot has ${previousSlots.length} slots`);
 
       console.log("Authenticating...");
       await fetchAuth(config.EMAIL, config.PASSWORD);
@@ -122,7 +90,10 @@ export default {
 
       // Fetch existing reservations to provide context
       console.log("Fetching existing reservations...");
-      const existingReservations = await getExistingReservations(operatorId);
+      const existingReservations = await getExistingReservations(
+        operatorId,
+        config.TIMEZONE,
+      );
       console.log(`Found ${existingReservations.length} existing reservations`);
 
       // Load FSP metadata from KV (saves 3 API calls!)
@@ -169,7 +140,7 @@ export default {
       }
 
       // Create scheduler for availability fetching
-      const scheduler = new SchedulerBLO(operatorId);
+      const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
 
       // Step 5: Fetch current availability for the SAME date range as original search
       const totalDays = config.DAYS_AHEAD + 1;
@@ -181,8 +152,8 @@ export default {
       const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
       for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-        const day = addUtcDays(today, offset);
-        const dayISO = formatIsoDate(day);
+        const day = addOperatorDays(today, offset, config.TIMEZONE);
+        const dayISO = formatOperatorIsoDate(day, config.TIMEZONE);
 
         bookablePromises.push(
           ...instructorChunks.map((instructors) =>
@@ -210,15 +181,9 @@ export default {
       console.log(`Found ${allBookableResults.length} total bookable results`);
 
       // Step 6: Filter valid results
-      const validResults = allBookableResults.filter((result) => {
-        const isWeekend = [0, 6].includes(result.startDateTime.getDay());
-        return isValidBlock(
-          result.startDateTime,
-          result.endDateTime,
-          isWeekend,
-          config,
-        );
-      });
+      const validResults = allBookableResults.filter((result) =>
+        isValidBlock(result.startDateTime, result.endDateTime, config),
+      );
 
       console.log(`Filtered to ${validResults.length} valid time slots`);
 
@@ -226,8 +191,9 @@ export default {
       const newSlots = findNewSlots(
         validResults,
         previousSlots,
-        lastSearchDate,
+        metadata.lastSearchDate,
         config.DAYS_AHEAD,
+        config.TIMEZONE,
       );
 
       console.log(`Found ${newSlots.length} new slots within tracked window`);
@@ -268,7 +234,7 @@ export default {
       // This prevents duplicate notifications if setSnapshot fails
       // Update lastSearchDate to today so the rolling window advances
       const updatedMetadata = {
-        lastSearchDate: formatIsoDate(today),
+        lastSearchDate: formatOperatorIsoDate(today, config.TIMEZONE),
         lastUpdate: new Date().toISOString(),
         daysAhead: config.DAYS_AHEAD,
       };
@@ -285,6 +251,7 @@ export default {
             slotsToNotify,
             fspMetadata,
             existingReservations,
+            config.TIMEZONE,
           );
         } catch (error) {
           console.error("Failed to send Discord notification:", error);
@@ -336,6 +303,7 @@ export default {
           AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
           WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR,
           MAX_HOUR: env.MAX_HOUR,
+          TIMEZONE: env.TIMEZONE,
         });
 
         await fetchAuth(config.EMAIL, config.PASSWORD);

@@ -323,19 +323,23 @@ describe("Worker Index - Helper Functions", () => {
         "utf-8",
       );
 
-      const usesUtcHelperImport =
-        indexCode.includes('from "../shared/util/utcDate.js"') &&
-        setupCode.includes('from "../shared/util/utcDate.js"');
-      const indexUsesStartOfUtcDay = indexCode.includes("startOfUtcDay(");
-      const setupUsesStartOfUtcDay = setupCode.includes("startOfUtcDay(");
+      const usesFlightTimeImport =
+        indexCode.includes('from "../shared/util/flightTime.js"') &&
+        setupCode.includes('from "../shared/util/flightTime.js"');
+      const indexUsesStartOfOperatorDay = indexCode.includes(
+        "startOfOperatorDay(",
+      );
+      const setupUsesStartOfOperatorDay = setupCode.includes(
+        "startOfOperatorDay(",
+      );
       const indexUsesSetHours =
         /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(indexCode);
       const setupUsesSetHours =
         /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(setupCode);
 
-      expect(usesUtcHelperImport).toBe(true);
-      expect(indexUsesStartOfUtcDay).toBe(true);
-      expect(setupUsesStartOfUtcDay).toBe(true);
+      expect(usesFlightTimeImport).toBe(true);
+      expect(indexUsesStartOfOperatorDay).toBe(true);
+      expect(setupUsesStartOfOperatorDay).toBe(true);
       expect(indexUsesSetHours).toBe(false);
       expect(setupUsesSetHours).toBe(false);
     });

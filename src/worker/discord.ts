@@ -7,7 +7,16 @@ import {
 } from "./types.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import type { ExistingReservation } from "../shared/dao/existingReservations.js";
-import { format } from "date-fns";
+import {
+  getReservationEnd,
+  getReservationStart,
+} from "../shared/dao/existingReservations.js";
+import {
+  createOperatorDateKey,
+  DEFAULT_TIMEZONE,
+  isOperatorWeekend,
+} from "../shared/util/flightTime.js";
+import { formatInTimeZone } from "date-fns-tz";
 
 /**
  * Color codes for Discord embeds (based on day of week)
@@ -23,24 +32,8 @@ const COLORS = {
  * @param date - Date object
  * @returns Discord color code
  */
-function getColorForDay(date: Date): number {
-  const dayOfWeek = date.getDay();
-  return dayOfWeek === 0 || dayOfWeek === 6 ? COLORS.WEEKEND : COLORS.WEEKDAY;
-}
-
-/**
- * Create a date key string in YYYY-MM-DD format from a Date object
- * Uses local date components (not UTC) for consistency
- * @param date - Date object
- * @returns Date key string in YYYY-MM-DD format
- */
-function createDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  // Optimized: avoid String() and padStart() overhead
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${year}-${pad(month)}-${pad(day)}`;
+function getColorForDay(instant: Date, timeZone: string): number {
+  return isOperatorWeekend(instant, timeZone) ? COLORS.WEEKEND : COLORS.WEEKDAY;
 }
 
 /**
@@ -52,6 +45,7 @@ function createDateKey(date: Date): string {
 function createLookupMaps(
   metadata: FspMetadata,
   existingReservations: ExistingReservation[],
+  timeZone: string,
 ): {
   aircraftMap: Map<string, string>;
   instructorMap: Map<string, string>;
@@ -73,8 +67,8 @@ function createLookupMaps(
   // Date key format: "YYYY-MM-DD" (using local date components)
   const reservationsByDate = new Map<string, ExistingReservation>();
   for (const reservation of existingReservations) {
-    const resStart = new Date(reservation.start);
-    const dateKey = createDateKey(resStart);
+    const resStart = getReservationStart(reservation, timeZone);
+    const dateKey = createOperatorDateKey(resStart, timeZone);
     reservationsByDate.set(dateKey, reservation);
   }
 
@@ -94,13 +88,14 @@ function formatSlotField(
   aircraftMap: Map<string, string>,
   instructorMap: Map<string, string>,
   reservationsByDate: Map<string, ExistingReservation>,
+  timeZone: string,
 ): {
   name: string;
   value: string;
   inline: boolean;
 } {
   // Format: "Wed, Jan 15"
-  const dateStr = format(slot.startDateTime, "EEE, MMM d");
+  const dateStr = formatInTimeZone(slot.startDateTime, timeZone, "EEE, MMM d");
 
   // Format: "5:00 PM - 7:00 PM"
   // Use pre-formatted strings from slot to avoid timezone issues and extra formatting
@@ -115,18 +110,15 @@ function formatSlotField(
     instructorMap.get(slot.instructorId) ?? slot.instructorId;
 
   // Check if there's an existing booking on the same day using map (O(1) lookup)
-  const dateKey = createDateKey(slot.startDateTime);
+  const dateKey = createOperatorDateKey(slot.startDateTime, timeZone);
   const conflictingReservation = reservationsByDate.get(dateKey);
 
   // Build conflict info if reservation exists
   let conflictInfo = "";
   if (conflictingReservation) {
-    const existingStart = new Date(conflictingReservation.start);
-    const existingEnd = new Date(conflictingReservation.end);
-    const existingTimeStr = `${format(existingStart, "h:mm a")} - ${format(
-      existingEnd,
-      "h:mm a",
-    )}`;
+    const existingStart = getReservationStart(conflictingReservation, timeZone);
+    const existingEnd = getReservationEnd(conflictingReservation, timeZone);
+    const existingTimeStr = `${formatInTimeZone(existingStart, timeZone, "h:mm a")} - ${formatInTimeZone(existingEnd, timeZone, "h:mm a")}`;
     conflictInfo = `\n⚠️ *You have: ${existingTimeStr}*`;
     if (conflictingReservation.instructor) {
       conflictInfo += `\n   *with ${conflictingReservation.instructor}*`;
@@ -154,6 +146,7 @@ function createAvailabilityEmbeds(
   slots: BookableAvailability[],
   metadata: FspMetadata,
   existingReservations: ExistingReservation[],
+  timeZone: string,
 ): DiscordEmbed[] {
   if (slots.length === 0) {
     return [];
@@ -163,6 +156,7 @@ function createAvailabilityEmbeds(
   const { aircraftMap, instructorMap, reservationsByDate } = createLookupMaps(
     metadata,
     existingReservations,
+    timeZone,
   );
 
   // Create embeds (max 10 fields per embed for Discord API limits)
@@ -184,9 +178,15 @@ function createAvailabilityEmbeds(
               slots.length > 1 ? "s" : ""
             } for scheduling:`
           : undefined,
-      color: getColorForDay(firstSlot.startDateTime),
+      color: getColorForDay(firstSlot.startDateTime, timeZone),
       fields: chunk.map((slot) =>
-        formatSlotField(slot, aircraftMap, instructorMap, reservationsByDate),
+        formatSlotField(
+          slot,
+          aircraftMap,
+          instructorMap,
+          reservationsByDate,
+          timeZone,
+        ),
       ),
       timestamp: new Date().toISOString(),
       footer: {
@@ -213,6 +213,7 @@ export async function sendAvailabilityNotification(
   slots: BookableAvailability[],
   metadata: FspMetadata,
   existingReservations: ExistingReservation[] = [],
+  timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   if (slots.length === 0) {
     console.log("No new slots to notify about");
@@ -223,6 +224,7 @@ export async function sendAvailabilityNotification(
     slots,
     metadata,
     existingReservations,
+    timeZone,
   );
 
   const payload: DiscordPayload = {

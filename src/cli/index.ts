@@ -1,6 +1,10 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { addDays } from "date-fns";
 import { CONFIG } from "../shared/util/config.js";
+import {
+  addOperatorDays,
+  formatOperatorIsoDate,
+  startOfOperatorDay,
+} from "../shared/util/flightTime.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
 import { isValidBlock } from "../shared/util/dates.js";
@@ -26,12 +30,11 @@ async function main() {
   await fetchAuth(CONFIG.EMAIL, CONFIG.PASSWORD);
 
   const operatorId = getOperatorId();
-  const scheduler = new SchedulerBLO(operatorId);
+  const scheduler = new SchedulerBLO(operatorId, CONFIG.TIMEZONE);
 
   await scheduler.initialize();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfOperatorDay(new Date(), CONFIG.TIMEZONE);
 
   const allInstructorIds: string[] = scheduler.getInstructorIds();
   const cli = new InteractiveCLI();
@@ -74,8 +77,8 @@ async function main() {
     const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
     for (let offset = 0; offset <= CONFIG.DAYS_AHEAD; offset++) {
-      const day = addDays(today, offset);
-      const dayISO = day.toISOString().split("T")[0];
+      const day = addOperatorDays(today, offset, CONFIG.TIMEZONE);
+      const dayISO = formatOperatorIsoDate(day, CONFIG.TIMEZONE);
 
       bookablePromises.push(
         ...instructorChunks.map(
@@ -123,16 +126,16 @@ async function main() {
     progressBar.stop();
 
     // Filter valid results using the existing validation logic
-    const validResults = allBookableResults.filter((result) => {
-      const isWeekend = [0, 6].includes(result.startDateTime.getDay());
-      return isValidBlock(result.startDateTime, result.endDateTime, isWeekend);
-    });
+    const validResults = allBookableResults.filter((result) =>
+      isValidBlock(result.startDateTime, result.endDateTime, CONFIG),
+    );
 
     // Filter out time slots on days where you already have a reservation
     const availableWithoutConflicts = validResults.filter((result) => {
       return !hasReservationOnSameDay(
         result.startDateTime,
         existingReservations,
+        CONFIG.TIMEZONE,
       );
     });
 

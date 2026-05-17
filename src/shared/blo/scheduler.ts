@@ -12,17 +12,25 @@ import {
   ReservationBookingParams,
 } from "../dao/reservations.js";
 import { getPilotId } from "../dao/auth.js";
-import { format } from "date-fns";
+import {
+  DEFAULT_TIMEZONE,
+  formatFspLocalDateTime,
+  formatOperatorDisplayDate,
+  formatOperatorDisplayTime,
+  parseFspLocal,
+} from "../util/flightTime.js";
 
 export class SchedulerBLO {
+  private timeZone: string;
   private instructorsMap = new Map<string, string>();
   private aircraftMap = new Map<string, string>();
   private activityTypesMap = new Map<string, string>();
   private pilotId = "";
   private operatorId: number;
 
-  constructor(operatorId: number) {
+  constructor(operatorId: number, timeZone: string = DEFAULT_TIMEZONE) {
     this.operatorId = operatorId;
+    this.timeZone = timeZone;
   }
 
   /**
@@ -120,13 +128,13 @@ export class SchedulerBLO {
 
     for (const result of results) {
       for (const timeBlock of result.timeBlocks) {
-        const startDateTime = new Date(timeBlock.startAt);
-        const endDateTime = new Date(timeBlock.endAt);
+        const startDateTime = parseFspLocal(timeBlock.startAt, this.timeZone);
+        const endDateTime = parseFspLocal(timeBlock.endAt, this.timeZone);
 
         bookableResults.push({
-          date: startDateTime.toLocaleDateString(),
-          startTime: startDateTime.toLocaleTimeString(),
-          endTime: endDateTime.toLocaleTimeString(),
+          date: formatOperatorDisplayDate(startDateTime, this.timeZone),
+          startTime: formatOperatorDisplayTime(startDateTime, this.timeZone),
+          endTime: formatOperatorDisplayTime(endDateTime, this.timeZone),
           instructorId: result.flightInstructorId,
           aircraftId: result.aircraftId,
           instructor:
@@ -145,15 +153,6 @@ export class SchedulerBLO {
   }
 
   /**
-   * Format a Date object to local timezone ISO string (YYYY-MM-DDTHH:mm)
-   * @param date - The date to format
-   * @returns string - Formatted date string in local timezone
-   */
-  private formatLocalDateTime(date: Date): string {
-    return format(date, "yyyy-MM-dd'T'HH:mm");
-  }
-
-  /**
    * Book a reservation with validation
    * @param params - Reservation booking parameters
    * @returns Promise<ReservationResponse> - The reservation response
@@ -166,12 +165,12 @@ export class SchedulerBLO {
       // Construct the reservation request using CONFIG values and stored pilot ID
       const reservationRequest: UserReservationRequest = {
         aircraftId: params.aircraftId,
-        end: this.formatLocalDateTime(params.endTime),
+        end: formatFspLocalDateTime(params.endTime, this.timeZone),
         instructorId: params.instructorId,
         locationId: params.locationId,
         operatorId: this.operatorId,
         pilotId: this.pilotId,
-        start: this.formatLocalDateTime(params.startTime),
+        start: formatFspLocalDateTime(params.startTime, this.timeZone),
         reservationTypeId: params.reservationTypeId,
       };
 

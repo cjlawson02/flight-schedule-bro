@@ -6,7 +6,11 @@ import {
   type Env,
 } from "./types.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
-import { formatIsoDate, startOfUtcDay } from "../shared/util/utcDate.js";
+import {
+  DEFAULT_TIMEZONE,
+  formatOperatorIsoDate,
+  startOfOperatorDay,
+} from "../shared/util/flightTime.js";
 
 const SNAPSHOT_KEY = "availability_snapshot";
 
@@ -132,6 +136,7 @@ export async function getSlots(env: Env): Promise<BookableAvailability[]> {
 export function cleanPastSlotsFromSnapshot(
   snapshot: Snapshot | null,
   beforeDate: Date,
+  _timeZone: string = DEFAULT_TIMEZONE,
 ): Snapshot | null {
   if (!snapshot) {
     return null;
@@ -157,6 +162,7 @@ export function cleanPastSlotsFromSnapshot(
 export async function cleanPastSlots(
   env: Env,
   beforeDate: Date,
+  timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   const snapshot = await getSnapshot(env);
 
@@ -164,7 +170,11 @@ export async function cleanPastSlots(
     return;
   }
 
-  const cleanedSnapshot = cleanPastSlotsFromSnapshot(snapshot, beforeDate);
+  const cleanedSnapshot = cleanPastSlotsFromSnapshot(
+    snapshot,
+    beforeDate,
+    timeZone,
+  );
 
   if (cleanedSnapshot) {
     // Update snapshot with cleaned slots
@@ -186,9 +196,13 @@ export async function initializeSnapshot(
   env: Env,
   slots: BookableAvailability[],
   daysAhead: number,
+  timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   const now = new Date();
-  const todayISO = formatIsoDate(startOfUtcDay(now));
+  const todayISO = formatOperatorIsoDate(
+    startOfOperatorDay(now, timeZone),
+    timeZone,
+  );
 
   const metadata: Metadata = {
     lastSearchDate: todayISO,
