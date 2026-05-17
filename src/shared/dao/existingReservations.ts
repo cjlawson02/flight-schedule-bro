@@ -25,7 +25,7 @@ export type ExistingReservation = z.infer<typeof ExistingReservationSchema>;
  */
 export async function getExistingReservations(
   operatorId: number,
-  timeZoneBias: number = -420
+  timeZoneBias = -420,
 ): Promise<ExistingReservation[]> {
   const response = await safeFetch(
     `https://api-external.flightschedulepro.com/api/V2/Reservation?dateTypeFilter=1&operatorId=${operatorId}&pageIndex=0&pageSize=100&timeZoneBias=${timeZoneBias}`,
@@ -33,7 +33,7 @@ export async function getExistingReservations(
     null,
     ExistingReservationsResponseSchema,
     // Cache for 5 minutes (reservations don't change that often during a session)
-    5 * 60 * 1000
+    5 * 60 * 1000,
   );
 
   return response.results;
@@ -48,7 +48,7 @@ export async function getExistingReservations(
  */
 export function hasReservationOnSameDay(
   slotStart: Date,
-  existingReservations: ExistingReservation[]
+  existingReservations: ExistingReservation[],
 ): boolean {
   const slotYear = slotStart.getFullYear();
   const slotMonth = slotStart.getMonth();

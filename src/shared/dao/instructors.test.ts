@@ -27,7 +27,7 @@ describe("getInstructors", () => {
       "GET",
       null,
       expect.any(Object), // Schema
-      3 * 24 * 60 * 60 * 1000 // 3 days TTL
+      3 * 24 * 60 * 60 * 1000, // 3 days TTL
     );
   });
 
@@ -36,7 +36,7 @@ describe("getInstructors", () => {
 
     await getInstructors(54321);
 
-    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0] as string;
+    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
     expect(url).toContain("api-external.flightschedulepro.com/api/instructors");
     expect(url).toContain("operatorId=54321");
   });

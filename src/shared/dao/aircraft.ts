@@ -20,6 +20,6 @@ export async function getAircraft(operatorId: number) {
     null,
     AircraftResponseSchema,
     // 3 days
-    3 * 24 * 60 * 60 * 1000
+    3 * 24 * 60 * 60 * 1000,
   );
 }

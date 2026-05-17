@@ -51,7 +51,9 @@ describe("createReservation", () => {
     await createReservation(reservationData);
 
     // Verify that cache invalidation was called with the correct pattern
-    expect(invalidateCache).toHaveBeenCalledWith("api/V2/Reservation?dateTypeFilter=1");
+    expect(invalidateCache).toHaveBeenCalledWith(
+      "api/V2/Reservation?dateTypeFilter=1",
+    );
   });
 
   it("should not invalidate cache if reservation creation fails", async () => {
@@ -74,7 +76,9 @@ describe("createReservation", () => {
       reservationTypeId: "00000000-0000-0000-0000-000000000000",
     };
 
-    await expect(createReservation(reservationData)).rejects.toThrow("Reservation creation failed");
+    await expect(createReservation(reservationData)).rejects.toThrow(
+      "Reservation creation failed",
+    );
 
     // Verify that cache invalidation was not called
     expect(invalidateCache).not.toHaveBeenCalled();

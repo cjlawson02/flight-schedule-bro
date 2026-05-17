@@ -5,6 +5,7 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
 ## Features
 
 ### CLI (Interactive Booking)
+
 - 🔍 **Smart Availability Search** - Searches multiple days ahead for available time slots
 - 🎯 **Preference-Based Filtering** - Configurable time preferences (weekdays, weekends, min/max hours)
 - ✈️ **Aircraft Selection** - Filter by specific aircraft models (e.g., 172S, 172N)
@@ -15,6 +16,7 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
 - ✨ **Modern CLI** - Clean, intuitive interface with multi-select, auto-completion, and cancellation support
 
 ### Cloudflare Worker (Automated Monitoring)
+
 - 🔔 **Real-Time Notifications** - Get Discord alerts when new slots become available
 - ⏱️ **Automatic Monitoring** - Runs every 30 minutes via cron schedule
 - 🎯 **Smart Diffing** - Only notifies about genuinely new slots (not future date additions)
@@ -23,6 +25,7 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
 - 💰 **Cost Effective** - Well within free tier limits
 
 > **Two Ways to Use Flight Schedule Bro:**
+>
 > 1. **CLI** - Interactive booking tool for your local machine
 > 2. **Worker** - Automated monitoring with Discord notifications (setup instructions below)
 
@@ -36,12 +39,14 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
 ## Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repository-url>
    cd flight-schedule-bro
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
@@ -49,11 +54,13 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
 3. **Set up environment variables:**
 
    Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
 
    Edit `.env` with your credentials and preferences:
+
    ```env
    # Flight Schedule Pro Credentials (REQUIRED)
    FSP_EMAIL=your-email@example.com
@@ -128,11 +135,11 @@ Logged in!
 
 | Variable           | Required | Default | Description                             |
 | ------------------ | -------- | ------- | --------------------------------------- |
-| `FSP_EMAIL`        | ✅ Yes    | -       | Your Flight Schedule Pro email          |
-| `FSP_PASSWORD`     | ✅ Yes    | -       | Your Flight Schedule Pro password       |
-| `DAYS_AHEAD`       | ✅ Yes    | -       | Days ahead to search (e.g., 60)         |
-| `ACTIVITY_TYPE`    | ✅ Yes    | -       | Activity type ID or name (e.g., "dual") |
-| `AIRCRAFT_REGEX`   | ✅ Yes    | -       | Regex pattern for aircraft callsigns    |
+| `FSP_EMAIL`        | ✅ Yes   | -       | Your Flight Schedule Pro email          |
+| `FSP_PASSWORD`     | ✅ Yes   | -       | Your Flight Schedule Pro password       |
+| `DAYS_AHEAD`       | ✅ Yes   | -       | Days ahead to search (e.g., 60)         |
+| `ACTIVITY_TYPE`    | ✅ Yes   | -       | Activity type ID or name (e.g., "dual") |
+| `AIRCRAFT_REGEX`   | ✅ Yes   | -       | Regex pattern for aircraft callsigns    |
 | `WEEKDAY_MIN_HOUR` | No       | 15      | Earliest booking hour on weekdays (24h) |
 | `MAX_HOUR`         | No       | 19      | Latest booking hour on weekdays (24h)   |
 | `WEEKEND_MIN_HOUR` | No       | 8       | Earliest booking hour on weekends (24h) |
@@ -218,23 +225,27 @@ npm run exec
 ## How It Works
 
 ### 1. Authentication
+
 - Logs in to Flight Schedule Pro using provided credentials
 - Retrieves session tokens and operator details
 - Caches authentication for the session
 
 ### 2. Availability Search
+
 - Fetches aircraft, instructors, and reservation types
 - Searches availability for each day in the configured range
 - Uses chunked requests (3 instructors at a time) to avoid rate limits
 - Caches results for 30 minutes to reduce API load
 
 ### 3. Smart Filtering
+
 - **Time-based filtering**: Only shows slots within your preferred hours
 - **Duration filtering**: Only shows slots matching your min/max duration
 - **Conflict prevention**: Filters out any days where you already have a reservation
 - **Weekday/Weekend logic**: Applies different rules for weekdays vs weekends
 
 ### 4. Booking Process
+
 - Interactive multi-select for time slots
 - Aircraft selection if multiple options available
 - Instructor selection if multiple options available
@@ -242,6 +253,7 @@ npm run exec
 - Automatic calendar integration after successful booking
 
 ### 5. Calendar Integration
+
 - Fetches iCal data from Flight Schedule Pro
 - Creates temporary .ics file
 - Opens macOS Calendar with the event
@@ -252,6 +264,7 @@ npm run exec
 ### Authentication Issues
 
 **Problem:** "Failed to authenticate"
+
 - Verify `FSP_EMAIL` and `FSP_PASSWORD` are correct in `.env`
 - Check if your account has access to the operator
 - Ensure your password doesn't contain special characters that need escaping
@@ -259,6 +272,7 @@ npm run exec
 ### No Availability Found
 
 **Problem:** "No availability found for the specified criteria"
+
 - Try increasing `DAYS_AHEAD` to search further in the future
 - Adjust `WEEKDAY_MIN_HOUR`/`MAX_HOUR` for more flexible timing
 - Check if `AIRCRAFT_REGEX` matches available aircraft
@@ -267,6 +281,7 @@ npm run exec
 ### API Rate Limiting
 
 **Problem:** Too many requests or slow performance
+
 - The app automatically chunks requests (3 instructors at a time)
 - Results are cached for 30 minutes
 - If issues persist, reduce `DAYS_AHEAD` to search fewer days
@@ -274,6 +289,7 @@ npm run exec
 ### Calendar Integration Not Working
 
 **Problem:** Calendar event not appearing
+
 - Ensure you're running on macOS
 - Check that Calendar app is installed
 - Verify network access for iCal fetching
@@ -282,6 +298,7 @@ npm run exec
 ## Security
 
 ⚠️ **Important Security Notes:**
+
 - Never commit your `.env` file to version control
 - The `.env` file contains sensitive credentials
 - Keep your `FSP_PASSWORD` secure and rotate it regularly
@@ -290,6 +307,7 @@ npm run exec
 ## Testing
 
 Run tests with:
+
 ```bash
 npm test
 ```
@@ -397,6 +415,7 @@ The cron schedule in `wrangler.toml` runs every 30 minutes. Each run compares th
 ## Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new functionality
@@ -406,6 +425,7 @@ Contributions are welcome! Please:
 ## Support
 
 For issues or questions:
+
 - Check the Troubleshooting section above
 - Review existing issues on GitHub
 - Create a new issue with detailed information

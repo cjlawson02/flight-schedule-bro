@@ -15,20 +15,20 @@ const envSchema = z.object({
   MAX_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 });
 
-export type ConfigType = {
+export interface ConfigType {
   WEEKDAY_MIN_HOUR: number;
   MAX_HOUR: number;
   EMAIL: string;
   PASSWORD: string;
   AIRCRAFT_REGEX: RegExp;
   DAYS_AHEAD: number;
-};
+}
 
 /**
  * Create configuration from environment object
  * Works in both Node.js (process.env) and Cloudflare Workers (env object)
  */
-export function createConfig(envObj: Record<string, any>): ConfigType {
+export function createConfig(envObj: Record<string, unknown>): ConfigType {
   let env: z.infer<typeof envSchema>;
   try {
     env = envSchema.parse(envObj);
@@ -40,8 +40,9 @@ export function createConfig(envObj: Record<string, any>): ConfigType {
       });
       throw new Error(
         `Environment variable validation failed:\n${missingOrInvalid.join(
-          "\n"
-        )}\n\n` + `Please ensure all required environment variables are set.`
+          "\n",
+        )}\n\n` + `Please ensure all required environment variables are set.`,
+        { cause: error },
       );
     }
     throw error;
@@ -69,13 +70,13 @@ export function createConfig(envObj: Record<string, any>): ConfigType {
 export let CONFIG: ConfigType;
 
 // Check if we're in a Node.js environment (not Workers)
-if (typeof process !== "undefined" && process.env) {
+if (typeof process !== "undefined") {
   // Dynamically import dotenv only in Node.js environment
   try {
     const dotenv = await import("dotenv");
     dotenv.config();
     CONFIG = createConfig(process.env);
-  } catch (error) {
+  } catch {
     // If we're here, we might be in a bundled Worker context
     // The CONFIG will be created via createConfig in the Worker
     console.warn("Failed to load dotenv, assuming Worker environment");

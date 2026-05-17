@@ -1,6 +1,6 @@
 import { getInstructors } from "../dao/instructors.js";
 import { getReservationTypes } from "../dao/reservationTypes.js";
-import { getAircraft, Aircraft } from "../dao/aircraft.js";
+import { getAircraft } from "../dao/aircraft.js";
 import {
   fetchAvailability,
   BookableAvailability,
@@ -18,7 +18,7 @@ export class SchedulerBLO {
   private instructorsMap = new Map<string, string>();
   private aircraftMap = new Map<string, string>();
   private activityTypesMap = new Map<string, string>();
-  private pilotId: string = "";
+  private pilotId = "";
   private operatorId: number;
 
   constructor(operatorId: number) {
@@ -129,8 +129,12 @@ export class SchedulerBLO {
           endTime: endDateTime.toLocaleTimeString(),
           instructorId: result.flightInstructorId,
           aircraftId: result.aircraftId,
-          instructor: this.instructorsMap.get(result.flightInstructorId) || `Instructor ${result.flightInstructorId}`,
-          aircraft: this.aircraftMap.get(result.aircraftId) || `Aircraft ${result.aircraftId}`,
+          instructor:
+            this.instructorsMap.get(result.flightInstructorId) ??
+            `Instructor ${result.flightInstructorId}`,
+          aircraft:
+            this.aircraftMap.get(result.aircraftId) ??
+            `Aircraft ${result.aircraftId}`,
           startDateTime,
           endDateTime,
         });
@@ -156,7 +160,7 @@ export class SchedulerBLO {
    * @throws {Error} - When booking fails
    */
   async bookReservation(
-    params: ReservationBookingParams
+    params: ReservationBookingParams,
   ): Promise<ReservationResponse> {
     try {
       // Construct the reservation request using CONFIG values and stored pilot ID
@@ -182,9 +186,9 @@ export class SchedulerBLO {
       const err = new Error(
         `Failed to book reservation: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
-      (err as any).code = "BOOKING_FAILED";
+      (err as Error & { code: string }).code = "BOOKING_FAILED";
       throw err;
     }
   }

@@ -9,7 +9,7 @@ import { getSessionCookies } from "./auth.js";
  */
 export async function fetchICalContent(
   operatorId: number,
-  reservationId: string
+  reservationId: string,
 ): Promise<string> {
   const iCalUrl = `https://app.flightschedulepro.com/AddToCalendar/iCal/${reservationId}?operatorId=${operatorId}`;
 

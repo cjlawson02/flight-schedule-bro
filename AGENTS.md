@@ -5,12 +5,14 @@ This file provides guidance to agents when working with code in this repository.
 ## Project Overview
 
 Flight Schedule Bro is an automated flight training scheduler for Flight Schedule Pro that runs in two modes:
+
 1. **CLI** - Interactive booking tool for local development
 2. **Worker** - Cloudflare Worker that monitors availability and sends Discord notifications every 30 minutes
 
 ## Common Commands
 
 ### CLI Development
+
 ```bash
 # Run the CLI interactively
 npm start
@@ -25,6 +27,7 @@ npm run test:coverage    # Generate coverage report
 ```
 
 ### Cloudflare Worker
+
 ```bash
 # Local development
 npm run worker:dev
@@ -37,6 +40,7 @@ npm run worker:tail
 ```
 
 ### Testing
+
 - Test files are named `*.test.ts` and located alongside source files
 - Integration tests: `*.integration.test.ts`
 - Uses Vitest framework with globals enabled
@@ -95,6 +99,7 @@ src/
 ### Key Design Patterns
 
 **SchedulerBLO** (`src/shared/blo/scheduler.ts`)
+
 - Central orchestrator for availability searches and bookings
 - Maintains maps of instructors, aircraft, and activity types
 - Call `initialize()` before use to populate metadata
@@ -102,6 +107,7 @@ src/
 - `bookReservation()` handles reservation creation
 
 **API Wrapper with Rate Limiting** (`src/shared/dao/api_wrapper.ts`)
+
 - All FSP API calls go through `safeFetch()`
 - Multi-layered rate limit handling:
   - Request queue: Max 50 concurrent requests
@@ -112,17 +118,20 @@ src/
 - Uses Zod for runtime type validation
 
 **Chunking Strategy** (`src/shared/util/array.ts`)
+
 - FSP API limits to 3 instructors per availability request
 - `chunk()` helper splits instructor arrays into groups of 3
 - Used in both CLI and Worker to avoid API errors
 
 **Worker Rolling Window Algorithm** (`src/worker/index.ts`)
+
 - `findNewSlots()` prevents false notifications when date range advances
 - Compares current snapshot to previous snapshot
 - Only notifies about slots within the previously tracked window
 - Cleans up past slots automatically before each run
 
 **Environment Validation** (`src/shared/util/config.ts`)
+
 - Uses Zod schemas for runtime validation
 - CLI loads from `.env` via dotenv
 - Worker receives from Cloudflare environment
@@ -147,6 +156,7 @@ src/
 ## Worker-Specific Concepts
 
 **KV Snapshot Structure**:
+
 ```typescript
 {
   metadata: {
@@ -162,11 +172,13 @@ src/
 ```
 
 **Metadata Caching**:
+
 - FSP metadata (instructors, aircraft, types) cached in KV as `fsp-metadata`
 - Refreshed via `/refresh-metadata` endpoint
 - Saves 3 API calls per scheduled run
 
 **Setup Flow**:
+
 1. Call `/setup` to initialize snapshot
 2. Call `/refresh-metadata` to cache FSP metadata
 3. Cron runs every 30 minutes automatically

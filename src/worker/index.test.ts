@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { Env } from "./types.js";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -324,10 +324,10 @@ describe("Worker Index - Helper Functions", () => {
       );
 
       const usesUtcHelperImport =
-        /from "\.\.\/shared\/util\/utcDate\.js"/.test(indexCode) &&
-        /from "\.\.\/shared\/util\/utcDate\.js"/.test(setupCode);
-      const indexUsesStartOfUtcDay = /startOfUtcDay\(/.test(indexCode);
-      const setupUsesStartOfUtcDay = /startOfUtcDay\(/.test(setupCode);
+        indexCode.includes('from "../shared/util/utcDate.js"') &&
+        setupCode.includes('from "../shared/util/utcDate.js"');
+      const indexUsesStartOfUtcDay = indexCode.includes("startOfUtcDay(");
+      const setupUsesStartOfUtcDay = setupCode.includes("startOfUtcDay(");
       const indexUsesSetHours =
         /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(indexCode);
       const setupUsesSetHours =
@@ -592,11 +592,11 @@ describe("Worker Index - Helper Functions", () => {
 
 describe("Worker HTTP Endpoints", () => {
   // Mock the worker module
-  let worker: any;
-  let mockEnv: Env;
+  let _worker: unknown;
+  let _mockEnv: Env;
 
   beforeEach(async () => {
-    mockEnv = {
+    _mockEnv = {
       FSP_AVAILABILITY_KV: {
         get: vi.fn().mockResolvedValue(null),
         put: vi.fn().mockResolvedValue(undefined),

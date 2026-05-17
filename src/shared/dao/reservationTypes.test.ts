@@ -26,7 +26,7 @@ describe("getReservationTypes", () => {
       "GET",
       null,
       expect.any(Object), // Schema
-      10 * 24 * 60 * 60 * 1000 // 10 days TTL
+      10 * 24 * 60 * 60 * 1000, // 10 days TTL
     );
   });
 
@@ -35,9 +35,9 @@ describe("getReservationTypes", () => {
 
     await getReservationTypes(99999);
 
-    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0] as string;
+    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
     expect(url).toContain(
-      "api-external.flightschedulepro.com/api/ReservationTypes"
+      "api-external.flightschedulepro.com/api/ReservationTypes",
     );
     expect(url).toContain("operatorId=99999");
   });

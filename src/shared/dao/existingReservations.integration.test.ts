@@ -180,7 +180,7 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
     };
 
     expect(() =>
-      ExistingReservationsResponseSchema.parse(invalidResponse)
+      ExistingReservationsResponseSchema.parse(invalidResponse),
     ).toThrow();
   });
 
@@ -198,7 +198,7 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
     };
 
     const parsed = ExistingReservationsResponseSchema.parse(
-      responseWithoutOptionals
+      responseWithoutOptionals,
     );
 
     expect(parsed.results[0]).toEqual({

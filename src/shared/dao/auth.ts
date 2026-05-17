@@ -32,7 +32,7 @@ const MyOperatorsListSchema = z.object({
   companies: z.array(
     z.object({
       id: z.number(),
-    })
+    }),
   ),
 });
 
@@ -45,6 +45,12 @@ const MyOperatorsDetailSchema = z.object({
   operatorId: z.number(),
   defaultLocationId: z.number(),
 });
+
+function getSetCookieHeaders(headers: Headers): string[] {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie;
+  return getSetCookie?.call(headers) ?? [];
+}
 
 export function getSessionCookies(): string | null {
   return sessionCookies;
@@ -94,7 +100,7 @@ export function getDefaultLocationId(): number {
 
 export async function fetchAuth(
   email: string,
-  password: string
+  password: string,
 ): Promise<void> {
   // Login without operator ID
   const login = await fetch("https://app.flightschedulepro.com/Account/Login", {
@@ -108,8 +114,7 @@ export async function fetchAuth(
 
   // Extract and store session cookies from Set-Cookie header
   // Node.js fetch may return multiple Set-Cookie headers
-  const headers = login.headers as any;
-  const setCookieHeaders: string[] = headers.getSetCookie?.() || [];
+  const setCookieHeaders = getSetCookieHeaders(login.headers);
 
   if (setCookieHeaders.length > 0) {
     // Join all cookies with semicolon
@@ -144,7 +149,7 @@ function extractTokenFromCookie(): string | null {
   }
 
   // Find the FspApp cookie
-  const fspAppMatch = sessionCookies.match(/FspApp=([^;]+)/);
+  const fspAppMatch = /FspApp=([^;]+)/.exec(sessionCookies);
   if (!fspAppMatch) {
     return null;
   }
@@ -154,7 +159,7 @@ function extractTokenFromCookie(): string | null {
     const decodedValue = decodeURIComponent(fspAppMatch[1]);
 
     // Parse the JSON
-    const data = JSON.parse(decodedValue);
+    const data: unknown = JSON.parse(decodedValue);
 
     // Validate with Zod
     const result = FspAppCookieSchema.safeParse(data);
@@ -191,7 +196,7 @@ async function fetchSubscriptionKey(): Promise<void> {
       {
         headers,
         method: "GET",
-      }
+      },
     );
 
     if (!response.ok) {
@@ -240,7 +245,7 @@ async function fetchOperatorId(userToken: string): Promise<void> {
       {
         headers,
         method: "GET",
-      }
+      },
     );
 
     if (!listResponse.ok) {
@@ -254,11 +259,10 @@ async function fetchOperatorId(userToken: string): Promise<void> {
       throw new Error("Failed to parse MyOperators list response");
     }
 
-    const company = listResult.data.companies[0];
-
-    if (!company) {
+    if (listResult.data.companies.length === 0) {
       throw new Error("No company found");
     }
+    const company = listResult.data.companies[0];
 
     // Step 2: Get detailed operator info using the operator ID
     const detailResponse = await fetch(
@@ -266,7 +270,7 @@ async function fetchOperatorId(userToken: string): Promise<void> {
       {
         headers,
         method: "GET",
-      }
+      },
     );
 
     if (!detailResponse.ok) {

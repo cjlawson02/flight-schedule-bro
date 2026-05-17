@@ -17,6 +17,6 @@ export async function getInstructors(operatorId: number) {
     null,
     InstructorsResponseSchema,
     // 3 days
-    3 * 24 * 60 * 60 * 1000
+    3 * 24 * 60 * 60 * 1000,
   );
 }

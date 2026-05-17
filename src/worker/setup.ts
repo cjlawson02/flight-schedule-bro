@@ -39,8 +39,8 @@ export async function runSetup(env: Env): Promise<Response> {
       FSP_PASSWORD: env.FSP_PASSWORD,
       DAYS_AHEAD: env.DAYS_AHEAD,
       AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
-      WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR || "15",
-      MAX_HOUR: env.MAX_HOUR || "19",
+      WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
+      MAX_HOUR: env.MAX_HOUR ?? "19",
     });
 
     // Authenticate
@@ -53,11 +53,11 @@ export async function runSetup(env: Env): Promise<Response> {
     console.log("Loading metadata from KV...");
     const metadata = await getOrFetchMetadata(
       operatorId,
-      env.FSP_AVAILABILITY_KV
+      env.FSP_AVAILABILITY_KV,
     );
 
     console.log(
-      `Loaded ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`
+      `Loaded ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`,
     );
 
     const today = startOfUtcDay(new Date());
@@ -66,7 +66,7 @@ export async function runSetup(env: Env): Promise<Response> {
 
     if (allInstructorIds.length === 0) {
       throw new Error(
-        "No instructors found in metadata. Cannot fetch availability."
+        "No instructors found in metadata. Cannot fetch availability.",
       );
     }
 
@@ -83,7 +83,7 @@ export async function runSetup(env: Env): Promise<Response> {
         : metadata.aircraft.map((a) => a.aircraftId);
 
     console.log(
-      `Using ${aircraftIds.length} aircraft (${preferredAircraftIds.length} preferred)`
+      `Using ${aircraftIds.length} aircraft (${preferredAircraftIds.length} preferred)`,
     );
 
     // Get activity type - use first one (typically "dual")
@@ -94,7 +94,7 @@ export async function runSetup(env: Env): Promise<Response> {
     }
 
     console.log(
-      `Using activity type: ${metadata.reservationTypes[0].reservationTypeName} (${activityTypeId})`
+      `Using activity type: ${metadata.reservationTypes[0].reservationTypeName} (${activityTypeId})`,
     );
     console.log(`Fetching availability for ${config.DAYS_AHEAD} days ahead...`);
 
@@ -118,8 +118,8 @@ export async function runSetup(env: Env): Promise<Response> {
             aircraftIds,
             startDate: dayISO,
             endDate: dayISO,
-          })
-        )
+          }),
+        ),
       );
     }
 
@@ -136,7 +136,7 @@ export async function runSetup(env: Env): Promise<Response> {
         result.startDateTime,
         result.endDateTime,
         isWeekend,
-        config
+        config,
       );
     });
 
@@ -166,7 +166,7 @@ export async function runSetup(env: Env): Promise<Response> {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     const errorMessage = `❌ Setup failed: ${
@@ -182,7 +182,7 @@ export async function runSetup(env: Env): Promise<Response> {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

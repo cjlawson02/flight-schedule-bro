@@ -29,7 +29,7 @@ const createMockKV = () => {
 
 const createMockEnv = (kvMock: any): Env => {
   return {
-    FSP_AVAILABILITY_KV: kvMock as any,
+    FSP_AVAILABILITY_KV: kvMock,
     FSP_EMAIL: "test@example.com",
     FSP_PASSWORD: "password",
     DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
@@ -72,11 +72,11 @@ describe("Worker KV Operations", () => {
     it("throws error for invalid snapshot data", async () => {
       mockKV._store.set(
         "availability_snapshot",
-        JSON.stringify({ invalid: "data" })
+        JSON.stringify({ invalid: "data" }),
       );
 
       await expect(getSnapshot(env)).rejects.toThrow(
-        "Invalid snapshot data in KV"
+        "Invalid snapshot data in KV",
       );
     });
 
@@ -135,7 +135,7 @@ describe("Worker KV Operations", () => {
       };
 
       await expect(setSnapshot(env, invalidSlots, metadata)).rejects.toThrow(
-        "Invalid snapshot data"
+        "Invalid snapshot data",
       );
     });
   });
@@ -175,7 +175,7 @@ describe("Worker KV Operations", () => {
       expect(result[0].startDateTime).toBeInstanceOf(Date);
       expect(result[0].endDateTime).toBeInstanceOf(Date);
       expect(result[0].startDateTime.toISOString()).toBe(
-        "2024-01-15T17:00:00.000Z"
+        "2024-01-15T17:00:00.000Z",
       );
     });
   });
@@ -289,7 +289,7 @@ describe("Worker KV Operations", () => {
       expect(result[0].startDateTime).toBeInstanceOf(Date);
       expect(result[0].endDateTime).toBeInstanceOf(Date);
       expect(result[0].startDateTime.toISOString()).toBe(
-        "2024-01-15T17:00:00.000Z"
+        "2024-01-15T17:00:00.000Z",
       );
     });
   });
@@ -339,7 +339,7 @@ describe("Worker KV Operations", () => {
       expect(result).not.toBeNull();
       expect(result!.slots).toHaveLength(1);
       expect(result!.slots[0].aircraftId).toBe(
-        "323e4567-e89b-12d3-a456-426614174000"
+        "323e4567-e89b-12d3-a456-426614174000",
       );
       expect(result!.metadata).toEqual(snapshot.metadata);
     });

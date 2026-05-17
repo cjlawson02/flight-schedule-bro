@@ -239,6 +239,7 @@ export async function sendAvailabilityNotification(
       `Invalid Discord payload: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
+      { cause: error },
     );
   }
 
@@ -265,6 +266,7 @@ export async function sendAvailabilityNotification(
       `Failed to send Discord notification: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
+      { cause: error },
     );
   }
 }

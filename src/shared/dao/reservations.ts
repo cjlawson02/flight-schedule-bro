@@ -48,14 +48,14 @@ export const FullReservationRequestSchema = UserReservationRequestSchema.extend(
     sendEmailNotification: z.boolean(),
     trainingSessions: z.array(z.unknown()),
     validateOnly: z.boolean(),
-  }
+  },
 );
 
 /**
  * Zod schema for validating reservation API response
  */
 export const ReservationResponseSchema = z.object({
-  errors: z.array(z.record(z.string(), z.any())),
+  errors: z.array(z.object({ message: z.string().optional() })),
   id: z.uuid().nullish(),
 });
 /**
@@ -77,7 +77,7 @@ export type ReservationResponse = z.infer<typeof ReservationResponseSchema>;
  * @throws {Error} - When reservation creation fails
  */
 export async function createReservation(
-  reservationData: UserReservationRequest
+  reservationData: UserReservationRequest,
 ): Promise<ReservationResponse> {
   try {
     const requestData: FullReservationRequest = {
@@ -109,16 +109,16 @@ export async function createReservation(
       requestData,
       ReservationResponseSchema,
       // No caching for mutations (TTL = 0)
-      0
+      0,
     );
 
     // Check if there are errors in the response
-    if (response.errors && response.errors.length > 0) {
+    if (response.errors.length > 0) {
       const errorMessages = response.errors
-        .map((error) => error.message || "Unknown error")
+        .map((error) => error.message ?? "Unknown error")
         .join(", ");
       const err = new Error(`Reservation creation failed: ${errorMessages}`);
-      (err as any).code = "CREATION_FAILED";
+      (err as Error & { code: string }).code = "CREATION_FAILED";
       throw err;
     }
 
@@ -138,9 +138,9 @@ export async function createReservation(
     const err = new Error(
       `Failed to create reservation: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
-    (err as any).code = "API_ERROR";
+    (err as Error & { code: string }).code = "API_ERROR";
     throw err;
   }
 }

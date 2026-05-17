@@ -15,6 +15,6 @@ export async function getReservationTypes(operatorId: number) {
     null,
     ReservationTypeListSchema,
     // 10 days
-    10 * 24 * 60 * 60 * 1000
+    10 * 24 * 60 * 60 * 1000,
   );
 }

@@ -1,6 +1,5 @@
 import {
   SnapshotSchema,
-  MetadataSchema,
   type Snapshot,
   type Metadata,
   type BookableAvailabilityKV,
@@ -15,7 +14,7 @@ const SNAPSHOT_KEY = "availability_snapshot";
  * Convert BookableAvailability to KV-storable format (with Date objects as ISO strings)
  */
 function serializeAvailability(
-  availability: BookableAvailability
+  availability: BookableAvailability,
 ): BookableAvailabilityKV {
   return {
     ...availability,
@@ -28,7 +27,7 @@ function serializeAvailability(
  * Convert KV-stored format back to BookableAvailability (with ISO strings as Date objects)
  */
 function deserializeAvailability(
-  availabilityKV: BookableAvailabilityKV
+  availabilityKV: BookableAvailabilityKV,
 ): BookableAvailability {
   return {
     ...availabilityKV,
@@ -50,7 +49,7 @@ export async function getSnapshot(env: Env): Promise<Snapshot | null> {
   }
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     const validated = SnapshotSchema.parse(parsed);
     return validated;
   } catch (error) {
@@ -58,7 +57,8 @@ export async function getSnapshot(env: Env): Promise<Snapshot | null> {
     throw new Error(
       `Invalid snapshot data in KV: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
+      { cause: error },
     );
   }
 }
@@ -72,7 +72,7 @@ export async function getSnapshot(env: Env): Promise<Snapshot | null> {
 export async function setSnapshot(
   env: Env,
   slots: BookableAvailability[],
-  metadata: Metadata
+  metadata: Metadata,
 ): Promise<void> {
   // Serialize slots to KV-storable format
   const serializedSlots = slots.map(serializeAvailability);
@@ -90,7 +90,8 @@ export async function setSnapshot(
     throw new Error(
       `Invalid snapshot data: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
+      { cause: error },
     );
   }
 
@@ -103,7 +104,7 @@ export async function setSnapshot(
  * @returns Array of BookableAvailability or empty array if snapshot is null
  */
 export function getSlotsFromSnapshot(
-  snapshot: Snapshot | null
+  snapshot: Snapshot | null,
 ): BookableAvailability[] {
   if (!snapshot) {
     return [];
@@ -130,7 +131,7 @@ export async function getSlots(env: Env): Promise<BookableAvailability[]> {
  */
 export function cleanPastSlotsFromSnapshot(
   snapshot: Snapshot | null,
-  beforeDate: Date
+  beforeDate: Date,
 ): Snapshot | null {
   if (!snapshot) {
     return null;
@@ -155,7 +156,7 @@ export function cleanPastSlotsFromSnapshot(
  */
 export async function cleanPastSlots(
   env: Env,
-  beforeDate: Date
+  beforeDate: Date,
 ): Promise<void> {
   const snapshot = await getSnapshot(env);
 
@@ -170,7 +171,7 @@ export async function cleanPastSlots(
     await setSnapshot(
       env,
       cleanedSnapshot.slots.map(deserializeAvailability),
-      cleanedSnapshot.metadata
+      cleanedSnapshot.metadata,
     );
   }
 }
@@ -184,7 +185,7 @@ export async function cleanPastSlots(
 export async function initializeSnapshot(
   env: Env,
   slots: BookableAvailability[],
-  daysAhead: number
+  daysAhead: number,
 ): Promise<void> {
   const now = new Date();
   const todayISO = formatIsoDate(startOfUtcDay(now));

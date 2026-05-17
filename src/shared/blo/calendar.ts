@@ -18,7 +18,7 @@ const execAsync = promisify(exec);
  */
 export async function addReservationToCalendar(
   operatorId: number,
-  reservationId: string
+  reservationId: string,
 ): Promise<void> {
   let tempFilePath: string | null = null;
 
@@ -57,9 +57,9 @@ export async function addReservationToCalendar(
     const err = new Error(
       `Failed to add reservation to calendar: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
-    (err as any).code = "CALENDAR_ADD_FAILED";
+    (err as Error & { code: string }).code = "CALENDAR_ADD_FAILED";
     throw err;
   }
 }

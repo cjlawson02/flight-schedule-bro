@@ -11,8 +11,8 @@ export interface BookableAvailability {
   endTime: string;
   instructorId: string;
   aircraftId: string;
-  instructor?: string;  // Human-readable instructor name
-  aircraft?: string;    // Human-readable aircraft name
+  instructor?: string; // Human-readable instructor name
+  aircraft?: string; // Human-readable aircraft name
   startDateTime: Date;
   endDateTime: Date;
 }
@@ -83,6 +83,6 @@ export async function fetchAvailability({
     },
     ResponseSchema,
     // 30 min
-    30 * 60 * 1000
+    30 * 60 * 1000,
   );
 }

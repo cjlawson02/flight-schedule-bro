@@ -25,7 +25,7 @@ describe("Cache expiry and hit logic", () => {
     // Clean the test cache directory before each test
     try {
       await fs.promises.rm(TEST_CACHE_DIR, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore if directory doesn't exist
     }
   });
@@ -34,7 +34,7 @@ describe("Cache expiry and hit logic", () => {
     // Clean up the test cache directory after each test
     try {
       await fs.promises.rm(TEST_CACHE_DIR, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -88,7 +88,7 @@ describe("invalidateCache", () => {
     // Clean the test cache directory before each test
     try {
       await fs.promises.rm(TEST_CACHE_DIR, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore if directory doesn't exist
     }
   });
@@ -97,7 +97,7 @@ describe("invalidateCache", () => {
     // Clean up the test cache directory after each test
     try {
       await fs.promises.rm(TEST_CACHE_DIR, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -123,7 +123,7 @@ describe("invalidateCache", () => {
     // Set up cached data with different patterns
     await setCachedResult(
       { url: "api/V2/Reservation?dateTypeFilter=1" },
-      { data: "reservations" }
+      { data: "reservations" },
     );
     await setCachedResult({ url: "api/V2/Aircraft" }, { data: "aircraft" });
 
@@ -141,7 +141,7 @@ describe("invalidateCache", () => {
     // Verify the remaining cache still works
     const aircraftResult = await getCachedResult(
       { url: "api/V2/Aircraft" },
-      60000
+      60000,
     );
     expect(aircraftResult).toEqual({ data: "aircraft" });
   });
@@ -161,14 +161,17 @@ describe("cliCacheAdapter", () => {
     const testData = { test: "data" };
     await cliCacheAdapter.setCachedResult({ url: "test" }, testData);
 
-    const result = await cliCacheAdapter.getCachedResult({ url: "test" }, 60000);
+    const result = await cliCacheAdapter.getCachedResult(
+      { url: "test" },
+      60000,
+    );
     expect(result).toEqual(testData);
 
     await cliCacheAdapter.invalidateCache();
 
     const resultAfterClear = await cliCacheAdapter.getCachedResult(
       { url: "test" },
-      60000
+      60000,
     );
     expect(resultAfterClear).toBeNull();
   });

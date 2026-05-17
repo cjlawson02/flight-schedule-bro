@@ -299,7 +299,7 @@ describe("InteractiveCLI", () => {
       expect(select).toHaveBeenCalledWith(
         expect.objectContaining({
           default: "Dual Instruction",
-        })
+        }),
       );
     });
 

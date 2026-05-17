@@ -72,7 +72,7 @@ export default {
   async scheduled(
     event: ScheduledEvent,
     env: Env,
-    ctx: ExecutionContext,
+    _ctx: ExecutionContext,
   ): Promise<void> {
     console.log("Scheduled task started at", new Date().toISOString());
 
@@ -111,8 +111,8 @@ export default {
         FSP_PASSWORD: env.FSP_PASSWORD,
         DAYS_AHEAD: env.DAYS_AHEAD,
         AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
-        WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR || "15",
-        MAX_HOUR: env.MAX_HOUR || "19",
+        WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
+        MAX_HOUR: env.MAX_HOUR ?? "19",
       });
 
       console.log("Authenticating...");
@@ -172,7 +172,7 @@ export default {
       const scheduler = new SchedulerBLO(operatorId);
 
       // Step 5: Fetch current availability for the SAME date range as original search
-      const totalDays = Number(config.DAYS_AHEAD) + 1;
+      const totalDays = config.DAYS_AHEAD + 1;
       const totalRequests = totalDays * instructorChunks.length;
       console.log(
         `Fetching availability for ${config.DAYS_AHEAD} days ahead (${totalDays} days × ${instructorChunks.length} chunks = ${totalRequests} requests)...`,
@@ -314,7 +314,7 @@ export default {
   async fetch(
     request: Request,
     env: Env,
-    ctx: ExecutionContext,
+    _ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url);
 
@@ -385,7 +385,7 @@ export default {
         JSON.stringify({
           status: "ok",
           snapshotExists: !!snapshot,
-          metadata: snapshot?.metadata || null,
+          metadata: snapshot?.metadata ?? null,
         }),
         {
           status: 200,

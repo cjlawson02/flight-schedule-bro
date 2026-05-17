@@ -59,10 +59,10 @@ describe("SchedulerBLO", () => {
 
       // Verify all DAOs were called with correct parameters
       expect(instructorsDAO.getInstructors).toHaveBeenCalledWith(
-        mockOperatorId
+        mockOperatorId,
       );
       expect(reservationTypesDAO.getReservationTypes).toHaveBeenCalledWith(
-        mockOperatorId
+        mockOperatorId,
       );
       expect(aircraftDAO.getAircraft).toHaveBeenCalledWith(mockOperatorId);
 
@@ -204,7 +204,7 @@ describe("SchedulerBLO", () => {
       ];
 
       vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability
+        mockAvailability,
       );
 
       const params = {
@@ -259,7 +259,7 @@ describe("SchedulerBLO", () => {
       ];
 
       vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability
+        mockAvailability,
       );
 
       const result = await scheduler.getBookableAvailability({
@@ -290,7 +290,7 @@ describe("SchedulerBLO", () => {
       ];
 
       vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability
+        mockAvailability,
       );
 
       const result = await scheduler.getBookableAvailability({
@@ -321,7 +321,7 @@ describe("SchedulerBLO", () => {
       ];
 
       vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability
+        mockAvailability,
       );
 
       const result = await scheduler.getBookableAvailability({
@@ -358,7 +358,7 @@ describe("SchedulerBLO", () => {
       };
 
       vi.mocked(reservationsDAO.createReservation).mockResolvedValue(
-        mockResponse
+        mockResponse,
       );
 
       const params = {
@@ -410,7 +410,7 @@ describe("SchedulerBLO", () => {
 
     it("wraps errors with BOOKING_FAILED code", async () => {
       vi.mocked(reservationsDAO.createReservation).mockRejectedValue(
-        new Error("Network error")
+        new Error("Network error"),
       );
 
       const params = {
@@ -423,7 +423,7 @@ describe("SchedulerBLO", () => {
       };
 
       await expect(scheduler.bookReservation(params)).rejects.toThrow(
-        "Failed to book reservation: Network error"
+        "Failed to book reservation: Network error",
       );
 
       try {
@@ -438,7 +438,7 @@ describe("SchedulerBLO", () => {
       customError.code = "VALIDATION_ERROR";
 
       vi.mocked(reservationsDAO.createReservation).mockRejectedValue(
-        customError
+        customError,
       );
 
       const params = {

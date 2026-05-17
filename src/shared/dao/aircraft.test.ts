@@ -27,7 +27,7 @@ describe("getAircraft", () => {
       "GET",
       null,
       expect.any(Object), // Schema
-      3 * 24 * 60 * 60 * 1000 // 3 days TTL
+      3 * 24 * 60 * 60 * 1000, // 3 days TTL
     );
   });
 
@@ -36,7 +36,7 @@ describe("getAircraft", () => {
 
     await getAircraft(99999);
 
-    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0] as string;
+    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
     expect(url).toContain("includeSimulators=false");
     expect(url).toContain("includeAircraftTypes=true");
     expect(url).toContain("onlyReservable=true");
@@ -58,7 +58,7 @@ describe("getAircraft", () => {
       "GET",
       null,
       expect.any(Object), // Schema validator
-      expect.any(Number)
+      expect.any(Number),
     );
   });
 });

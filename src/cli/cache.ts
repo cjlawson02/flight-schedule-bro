@@ -5,22 +5,23 @@ import * as path from "path";
 import { createHash } from "crypto";
 import { CacheAdapter } from "../shared/dao/api_wrapper.js";
 
-const CACHE_DIR = process.env.NODE_ENV === 'test'
-  ? path.resolve(process.cwd(), "test-cache")
-  : path.resolve(process.cwd(), "cache");
+const CACHE_DIR =
+  process.env.NODE_ENV === "test"
+    ? path.resolve(process.cwd(), "test-cache")
+    : path.resolve(process.cwd(), "cache");
 
 function serializeQueryParams(params: object): string {
   // Stable serialization: sort keys recursively
-  function sortObject(obj: any): any {
+  function sortObject(obj: unknown): unknown {
     if (Array.isArray(obj)) {
       return obj.map(sortObject);
     } else if (obj && typeof obj === "object") {
       return Object.keys(obj)
         .sort()
-        .reduce((acc, key) => {
-          acc[key] = sortObject(obj[key]);
+        .reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = sortObject((obj as Record<string, unknown>)[key]);
           return acc;
-        }, {} as any);
+        }, {});
     }
     return obj;
   }
@@ -35,19 +36,24 @@ export function hashQueryParams(params: object): string {
 async function ensureCacheDir(): Promise<void> {
   try {
     await fs.mkdir(CACHE_DIR, { recursive: true });
-  } catch {}
+  } catch {
+    // Cache directory already exists
+  }
 }
 
 export async function getCachedResult(
   queryParams: object,
-  ttl: number
-): Promise<any | null> {
+  ttl: number,
+): Promise<unknown> {
   await ensureCacheDir();
   const hash = hashQueryParams(queryParams);
   const filePath = path.join(CACHE_DIR, `${hash}.json`);
   try {
     const data = await fs.readFile(filePath, "utf8");
-    const { timestamp, result } = JSON.parse(data);
+    const { timestamp, result } = JSON.parse(data) as {
+      timestamp: unknown;
+      result: unknown;
+    };
     const now = Date.now();
     if (typeof timestamp === "string") {
       const ts = Date.parse(timestamp);
@@ -63,7 +69,7 @@ export async function getCachedResult(
 
 export async function setCachedResult(
   queryParams: object,
-  result: any
+  result: unknown,
 ): Promise<void> {
   await ensureCacheDir();
   const hash = hashQueryParams(queryParams);
@@ -88,9 +94,9 @@ export async function invalidateCache(pattern?: string): Promise<void> {
     if (!pattern) {
       // Clear all cache files
       await Promise.all(
-        files.map(file =>
-          fs.unlink(path.join(CACHE_DIR, file)).catch(() => {})
-        )
+        files.map((file) =>
+          fs.unlink(path.join(CACHE_DIR, file)).catch(() => undefined),
+        ),
       );
       return;
     }
@@ -100,11 +106,14 @@ export async function invalidateCache(pattern?: string): Promise<void> {
       try {
         const filePath = path.join(CACHE_DIR, file);
         const data = await fs.readFile(filePath, "utf8");
-        const { queryParams } = JSON.parse(data);
+        const { queryParams } = JSON.parse(data) as { queryParams: unknown };
 
         // Check if this cache entry matches the pattern
-        if (typeof queryParams === 'object' && JSON.stringify(queryParams).includes(pattern)) {
-          await fs.unlink(filePath).catch(() => {});
+        if (
+          typeof queryParams === "object" &&
+          JSON.stringify(queryParams).includes(pattern)
+        ) {
+          await fs.unlink(filePath).catch(() => undefined);
         }
       } catch {
         // Ignore errors reading individual cache files

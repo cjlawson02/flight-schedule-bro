@@ -117,7 +117,7 @@ describe("Worker Setup", () => {
     });
 
     it("handles missing activity types", async () => {
-      const emptyActivityTypes: Array<[string, string]> = [];
+      const emptyActivityTypes: [string, string][] = [];
       // Should throw error when no activity types found
       if (emptyActivityTypes.length === 0) {
         const error = new Error("No activity types found");
@@ -233,7 +233,7 @@ describe("Worker Setup", () => {
       // Setup should still succeed if notification fails
 
       const discordError = new Error("Discord webhook failed");
-      let setupSucceeded = true;
+      const setupSucceeded = true;
 
       try {
         // Discord notification fails

@@ -20,9 +20,9 @@ export function isValidBlock(
   start: Date,
   end: Date,
   isWeekend: boolean,
-  config?: ConfigType
+  config?: ConfigType,
 ): boolean {
-  const cfg = config || CONFIG;
+  const cfg = config ?? CONFIG;
   const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
   if (durationMinutes !== 120) return false;
 

@@ -3,8 +3,8 @@ import { getSubscriptionKey, getAuthToken } from "./auth.js";
 
 // Cache interface for dependency injection
 export interface CacheAdapter {
-  getCachedResult<T>(key: any, ttlMs: number): Promise<T | null>;
-  setCachedResult<T>(key: any, data: T): Promise<void>;
+  getCachedResult(key: object, ttlMs: number): Promise<unknown>;
+  setCachedResult(key: object, data: unknown): Promise<void>;
   invalidateCache(pattern?: string): Promise<void>;
 }
 
@@ -79,7 +79,7 @@ function sleep(ms: number): Promise<void> {
 let activeRequests = 0;
 const MAX_CONCURRENT_REQUESTS = 50; // Limit concurrent requests
 const STAGGER_DELAY_MS = 50; // Delay between initial requests
-const requestQueue: Array<() => void> = [];
+const requestQueue: (() => void)[] = [];
 let totalRequestsStarted = 0;
 
 /**
@@ -127,13 +127,13 @@ const RateLimitErrorSchema = z.object({
   message: z.string(),
 });
 
-export async function safeFetch<T extends z.ZodTypeAny>(
+export async function safeFetch<T extends z.ZodType>(
   url: string,
   method: "GET" | "POST",
   params: Record<string, unknown> | null,
   parser: T,
   cacheTtlMs: number,
-): Promise<z.output<T>> {
+): Promise<z.infer<T>> {
   // Use consistent cache key (params object is sorted during serialization)
   const cacheKey = { url, method, params };
   let data = cacheAdapter
@@ -170,7 +170,7 @@ export async function safeFetch<T extends z.ZodTypeAny>(
           const rateLimitCheck = RateLimitErrorSchema.safeParse(data);
           if (rateLimitCheck.success) {
             // Extract wait time from message (e.g., "Try again in 34 seconds")
-            const match = rateLimitCheck.data.message.match(/(\d+)\s+seconds/);
+            const match = /(\d+)\s+seconds/.exec(rateLimitCheck.data.message);
             const waitSeconds = match ? parseInt(match[1], 10) : 5;
 
             // Use the API's suggested wait time
@@ -211,7 +211,7 @@ export async function safeFetch<T extends z.ZodTypeAny>(
       }
 
       if (!data) {
-        throw lastError || new Error("Failed to fetch data after retries");
+        throw lastError ?? new Error("Failed to fetch data after retries");
       }
     } finally {
       // Always release the request slot

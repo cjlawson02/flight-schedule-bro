@@ -46,7 +46,7 @@ async function main() {
   }
 
   const activityTypeId = activityTypes.find(
-    ([, name]) => name === selectedName
+    ([, name]) => name === selectedName,
   )?.[0];
 
   if (!activityTypeId) {
@@ -88,8 +88,8 @@ async function main() {
               aircraftIds,
               startDate: dayISO,
               endDate: dayISO,
-            })
-        )
+            }),
+        ),
       );
     }
 
@@ -108,11 +108,11 @@ async function main() {
           progressBar.update(completedCount);
           return result;
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           completedCount++;
           progressBar.update(completedCount);
           throw error;
-        })
+        }),
     );
 
     const allBookableResults: BookableAvailability[] = (
@@ -132,7 +132,7 @@ async function main() {
     const availableWithoutConflicts = validResults.filter((result) => {
       return !hasReservationOnSameDay(
         result.startDateTime,
-        existingReservations
+        existingReservations,
       );
     });
 
@@ -140,7 +140,7 @@ async function main() {
       validResults.length - availableWithoutConflicts.length;
     if (conflictsFiltered > 0) {
       console.log(
-        `\n⏭️  Filtered out ${conflictsFiltered} time slots on days where you already have reservations`
+        `\n⏭️  Filtered out ${conflictsFiltered} time slots on days where you already have reservations`,
       );
     }
 
@@ -152,27 +152,27 @@ async function main() {
         scheduler,
         availableWithoutConflicts,
         activityTypeId,
-        operatorId
+        operatorId,
       );
     } else {
       console.log("❌ No availability found for the specified criteria.");
       console.log(
-        "💡 Try adjusting your time preferences in the configuration."
+        "💡 Try adjusting your time preferences in the configuration.",
       );
     }
   } catch (error) {
     console.error(
       "❌ An error occurred:",
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
 
 // Execute main function
-main().catch((error) => {
+main().catch((error: unknown) => {
   console.error(
     "❌ Fatal error:",
-    error instanceof Error ? error.message : "Unknown error"
+    error instanceof Error ? error.message : "Unknown error",
   );
   process.exit(1);
 });
@@ -185,13 +185,12 @@ async function handleBookingFlow(
   scheduler: SchedulerBLO,
   availabilities: BookableAvailability[],
   activityTypeId: string,
-  operatorId: number
+  operatorId: number,
 ): Promise<void> {
   try {
     // Let user select multiple time slots using advanced interface
-    const selectedAvailabilities = await cli.selectMultipleTimeSlots(
-      availabilities
-    );
+    const selectedAvailabilities =
+      await cli.selectMultipleTimeSlots(availabilities);
 
     if (selectedAvailabilities.length === 0) {
       return; // User cancelled selection or selected nothing
@@ -201,29 +200,30 @@ async function handleBookingFlow(
     const timeSlotMap = new Map<string, BookableAvailability[]>();
     for (const avail of selectedAvailabilities) {
       const key = `${avail.date}|${avail.startTime}|${avail.endTime}`;
-      if (!timeSlotMap.has(key)) {
-        timeSlotMap.set(key, []);
+      const slot = timeSlotMap.get(key) ?? [];
+      if (slot.length === 0) {
+        timeSlotMap.set(key, slot);
       }
-      timeSlotMap.get(key)!.push(avail);
+      slot.push(avail);
     }
 
     // Collect final selections with instructor choices
     const finalSelections: BookableAvailability[] = [];
 
     for (const [timeSlotKey, availabilitiesForSlot] of timeSlotMap) {
-      const [date, startTime, endTime] = timeSlotKey.split("|");
+      const [_date, _startTime, _endTime] = timeSlotKey.split("|");
 
       // If only one option, auto-select it
       if (availabilitiesForSlot.length === 1) {
         finalSelections.push(availabilitiesForSlot[0]);
         console.log(
-          `✅ Auto-selected: ${availabilitiesForSlot[0].instructor} with ${availabilitiesForSlot[0].aircraft}`
+          `✅ Auto-selected: ${availabilitiesForSlot[0].instructor} with ${availabilitiesForSlot[0].aircraft}`,
         );
       } else {
         // Step 1: Select aircraft (if multiple available)
         const selectedAircraft = await cli.selectAircraft(
           availabilitiesForSlot[0], // Use first as template for time slot info
-          availabilitiesForSlot
+          availabilitiesForSlot,
         );
 
         if (!selectedAircraft) {
@@ -232,19 +232,19 @@ async function handleBookingFlow(
 
         // Filter availabilities by selected aircraft
         const availabilitiesForAircraft = availabilitiesForSlot.filter(
-          (avail) => avail.aircraft === selectedAircraft
+          (avail) => avail.aircraft === selectedAircraft,
         );
 
         // Step 2: Select instructor (if multiple available for this aircraft)
         const selectedInstructor = await cli.selectInstructor(
           availabilitiesForSlot[0], // Use first as template for time slot info
-          availabilitiesForAircraft
+          availabilitiesForAircraft,
         );
 
         if (selectedInstructor) {
           finalSelections.push(selectedInstructor);
           console.log(
-            `✅ Selected: ${selectedInstructor.instructor} with ${selectedInstructor.aircraft}`
+            `✅ Selected: ${selectedInstructor.instructor} with ${selectedInstructor.aircraft}`,
           );
         }
       }
@@ -259,18 +259,18 @@ async function handleBookingFlow(
     console.log(
       `\n📋 Ready to book ${finalSelections.length} time slot${
         finalSelections.length > 1 ? "s" : ""
-      }:`
+      }:`,
     );
     finalSelections.forEach((selection, index) => {
       console.log(
         `${index + 1}. ${selection.date} ${selection.startTime} - ${
           selection.endTime
-        } | ${selection.instructor} | ${selection.aircraft}`
+        } | ${selection.instructor} | ${selection.aircraft}`,
       );
     });
 
     const confirmed = await cli.confirmAction(
-      "\n✅ Confirm and proceed with booking? (y/n): "
+      "\n✅ Confirm and proceed with booking? (y/n): ",
     );
     if (!confirmed) {
       return;
@@ -289,7 +289,7 @@ async function handleBookingFlow(
     for (const selection of finalSelections) {
       try {
         console.log(
-          `📤 Booking request: Aircraft ID=${selection.aircraftId}, Instructor ID=${selection.instructorId}`
+          `📤 Booking request: Aircraft ID=${selection.aircraftId}, Instructor ID=${selection.instructorId}`,
         );
         const response = await scheduler.bookReservation({
           aircraftId: selection.aircraftId,
@@ -300,12 +300,15 @@ async function handleBookingFlow(
           locationId: getDefaultLocationId(),
         });
 
+        if (!response.id) {
+          throw new Error("Reservation created without an id");
+        }
         results.success.push({
           availability: selection,
-          reservationId: response.id!,
+          reservationId: response.id,
         });
         console.log(
-          `✅ Booked: ${selection.date} ${selection.startTime} with ${selection.instructor}`
+          `✅ Booked: ${selection.date} ${selection.startTime} with ${selection.instructor}`,
         );
       } catch (error) {
         results.failed.push({
@@ -315,7 +318,7 @@ async function handleBookingFlow(
         console.log(
           `❌ Failed: ${selection.date} ${selection.startTime} - ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
       }
     }
@@ -329,12 +332,12 @@ async function handleBookingFlow(
       console.log(
         `\n🎉 Successfully booked ${results.success.length} time slot${
           results.success.length > 1 ? "s" : ""
-        }:`
+        }:`,
       );
       results.success.forEach((booking) => {
         const { availability } = booking;
         console.log(
-          `✅ ${availability.date} ${availability.startTime} - ${availability.endTime} | ${availability.instructor} | ${availability.aircraft}`
+          `✅ ${availability.date} ${availability.startTime} - ${availability.endTime} | ${availability.instructor} | ${availability.aircraft}`,
         );
       });
     }
@@ -343,11 +346,11 @@ async function handleBookingFlow(
       console.log(
         `\n❌ Failed to book ${results.failed.length} time slot${
           results.failed.length > 1 ? "s" : ""
-        }:`
+        }:`,
       );
       results.failed.forEach(({ availability, error }) => {
         console.log(
-          `❌ ${availability.date} ${availability.startTime} - ${availability.endTime} | ${availability.instructor} | Error: ${error}`
+          `❌ ${availability.date} ${availability.startTime} - ${availability.endTime} | ${availability.instructor} | Error: ${error}`,
         );
       });
     }
@@ -357,12 +360,12 @@ async function handleBookingFlow(
     // Add successful bookings to calendar
     if (results.success.length > 0) {
       const bookingsWithIds = results.success.filter(
-        (booking) => booking.reservationId
+        (booking) => booking.reservationId,
       );
 
       if (bookingsWithIds.length > 0) {
         const addToCalendarChoice = await cli.confirmAction(
-          "\n📅 Would you like to add these bookings to your calendar? (y/n): "
+          "\n📅 Would you like to add these bookings to your calendar? (y/n): ",
         );
 
         if (addToCalendarChoice) {
@@ -371,19 +374,19 @@ async function handleBookingFlow(
           for (const booking of bookingsWithIds) {
             if (booking.reservationId) {
               console.log(
-                `  📆 Adding ${booking.availability.date} ${booking.availability.startTime} to calendar...`
+                `  📆 Adding ${booking.availability.date} ${booking.availability.startTime} to calendar...`,
               );
               try {
                 await addReservationToCalendar(
                   operatorId,
-                  booking.reservationId
+                  booking.reservationId,
                 );
                 console.log(`     ✅ Added to calendar successfully`);
               } catch (error) {
                 console.error(
                   `     ⚠️  Failed to add to calendar: ${
                     error instanceof Error ? error.message : "Unknown error"
-                  }`
+                  }`,
                 );
               }
             }
@@ -394,7 +397,7 @@ async function handleBookingFlow(
   } catch (error) {
     console.error(
       "\n❌ An error occurred during the booking process:",
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }

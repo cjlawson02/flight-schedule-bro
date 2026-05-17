@@ -1,4 +1,4 @@
-import { FspMetadataSchema, type FspMetadata, type Env } from "./types.js";
+import { FspMetadataSchema, type FspMetadata } from "./types.js";
 import { getInstructors } from "../shared/dao/instructors.js";
 import { getReservationTypes } from "../shared/dao/reservationTypes.js";
 import { getAircraft } from "../shared/dao/aircraft.js";
@@ -9,7 +9,7 @@ const METADATA_KEY = "fsp-metadata";
  * Fetch metadata from KV store
  */
 export async function getMetadataFromKV(
-  kv: KVNamespace
+  kv: KVNamespace,
 ): Promise<FspMetadata | null> {
   try {
     const data = await kv.get(METADATA_KEY, "json");
@@ -35,7 +35,7 @@ export async function getMetadataFromKV(
  */
 export async function setMetadataInKV(
   kv: KVNamespace,
-  metadata: FspMetadata
+  metadata: FspMetadata,
 ): Promise<void> {
   try {
     // Validate before storing
@@ -53,7 +53,7 @@ export async function setMetadataInKV(
  */
 export async function refreshMetadata(
   operatorId: number,
-  kv: KVNamespace
+  kv: KVNamespace,
 ): Promise<FspMetadata> {
   console.log("Fetching fresh metadata from FSP API...");
 
@@ -73,7 +73,11 @@ export async function refreshMetadata(
       reservationTypeName: r.reservationTypeName,
     })),
     aircraft: aircraft.results
-      .filter((a) => a.aircraftId !== "00000000-0000-0000-0000-000000000000" && a.tailNumber.trim() !== "")
+      .filter(
+        (a) =>
+          a.aircraftId !== "00000000-0000-0000-0000-000000000000" &&
+          a.tailNumber.trim() !== "",
+      )
       .map((a) => ({
         aircraftId: a.aircraftId,
         tailNumber: a.tailNumber.trim(),
@@ -85,7 +89,7 @@ export async function refreshMetadata(
   await setMetadataInKV(kv, metadata);
 
   console.log(
-    `Metadata refreshed: ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`
+    `Metadata refreshed: ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`,
   );
 
   return metadata;
@@ -96,14 +100,14 @@ export async function refreshMetadata(
  */
 export async function getOrFetchMetadata(
   operatorId: number,
-  kv: KVNamespace
+  kv: KVNamespace,
 ): Promise<FspMetadata> {
   // Try to get from KV first
-  let metadata = await getMetadataFromKV(kv);
+  const metadata = await getMetadataFromKV(kv);
 
   if (metadata) {
     console.log(
-      `Using cached metadata from KV (last updated: ${metadata.lastUpdated})`
+      `Using cached metadata from KV (last updated: ${metadata.lastUpdated})`,
     );
     return metadata;
   }

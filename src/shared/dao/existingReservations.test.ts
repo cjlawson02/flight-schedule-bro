@@ -43,7 +43,7 @@ describe("getExistingReservations", () => {
       "GET",
       null,
       expect.any(Object),
-      5 * 60 * 1000
+      5 * 60 * 1000,
     );
     expect(result).toEqual(mockResponse.results);
   });
@@ -56,7 +56,7 @@ describe("getExistingReservations", () => {
 
     await getExistingReservations(12345, -480);
 
-    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0] as string;
+    const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
     expect(url).toContain("operatorId=12345");
     expect(url).toContain("timeZoneBias=-480");
     expect(url).toContain("dateTypeFilter=1");
@@ -100,21 +100,21 @@ describe("hasReservationOnSameDay", () => {
   it("returns false when slot is on different day with no reservations", () => {
     const slotStart = new Date("2025-11-05T17:00:00"); // Day with no reservations
     expect(hasReservationOnSameDay(slotStart, existingReservations)).toBe(
-      false
+      false,
     );
   });
 
   it("returns false when slot is day before existing reservation", () => {
     const slotStart = new Date("2025-11-03T17:00:00"); // Day before
     expect(hasReservationOnSameDay(slotStart, existingReservations)).toBe(
-      false
+      false,
     );
   });
 
   it("returns false when slot is day after existing reservation", () => {
     const slotStart = new Date("2025-11-07T17:00:00"); // Day after
     expect(hasReservationOnSameDay(slotStart, existingReservations)).toBe(
-      false
+      false,
     );
   });
 

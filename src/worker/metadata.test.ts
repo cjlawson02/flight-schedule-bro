@@ -87,7 +87,7 @@ describe("Worker Metadata", () => {
 
       expect(mockKV.put).toHaveBeenCalledWith(
         "fsp-metadata",
-        JSON.stringify(metadata)
+        JSON.stringify(metadata),
       );
     });
 
@@ -123,10 +123,10 @@ describe("Worker Metadata", () => {
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
-        mockInstructors as any
+        mockInstructors,
       );
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        mockReservationTypes as any
+        mockReservationTypes,
       );
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
 
@@ -154,10 +154,8 @@ describe("Worker Metadata", () => {
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
-      } as any);
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        [] as any
-      );
+      });
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
 
       const result = await refreshMetadata(123, mockKV);
@@ -176,10 +174,8 @@ describe("Worker Metadata", () => {
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
-      } as any);
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        [] as any
-      );
+      });
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
 
       const result = await refreshMetadata(123, mockKV);
@@ -222,10 +218,10 @@ describe("Worker Metadata", () => {
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
-        mockInstructors as any
+        mockInstructors,
       );
       vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        mockReservationTypes as any
+        mockReservationTypes,
       );
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft as any);
 

@@ -17,7 +17,7 @@ export class InteractiveCLI {
    * Group availabilities by time slot for better selection experience
    */
   private groupAvailabilities(
-    availabilities: BookableAvailability[]
+    availabilities: BookableAvailability[],
   ): TimeSlotGroup[] {
     const grouped = new Map<string, TimeSlotGroup>();
 
@@ -33,13 +33,16 @@ export class InteractiveCLI {
         });
       }
 
-      grouped.get(key)!.availabilities.push(avail);
+      const group = grouped.get(key);
+      if (group) {
+        group.availabilities.push(avail);
+      }
     }
 
     return Array.from(grouped.values()).sort(
       (a, b) =>
         new Date(`${a.date} ${a.startTime}`).getTime() -
-        new Date(`${b.date} ${b.startTime}`).getTime()
+        new Date(`${b.date} ${b.startTime}`).getTime(),
     );
   }
 
@@ -95,7 +98,7 @@ export class InteractiveCLI {
    * Uses space bar to toggle selections, enter to confirm
    */
   async selectMultipleTimeSlots(
-    availabilities: BookableAvailability[]
+    availabilities: BookableAvailability[],
   ): Promise<BookableAvailability[]> {
     if (availabilities.length === 0) {
       console.log("\nNo availability found to book.");
@@ -125,7 +128,7 @@ export class InteractiveCLI {
       }
 
       return selectedAvailabilities;
-    } catch (error) {
+    } catch {
       // User cancelled (Ctrl+C)
       return [];
     }
@@ -137,7 +140,7 @@ export class InteractiveCLI {
    */
   async selectAircraft(
     timeSlot: BookableAvailability,
-    availableOptions: BookableAvailability[]
+    availableOptions: BookableAvailability[],
   ): Promise<string | null> {
     if (availableOptions.length === 0) {
       return null;
@@ -148,7 +151,7 @@ export class InteractiveCLI {
       ...new Set(
         availableOptions
           .map((a) => a.aircraft)
-          .filter((aircraft): aircraft is string => aircraft !== undefined)
+          .filter((aircraft): aircraft is string => aircraft !== undefined),
       ),
     ];
 
@@ -180,7 +183,7 @@ export class InteractiveCLI {
       });
 
       return selectedAircraft;
-    } catch (error) {
+    } catch {
       // User cancelled (Ctrl+C)
       return null;
     }
@@ -192,7 +195,7 @@ export class InteractiveCLI {
    */
   async selectInstructor(
     timeSlot: BookableAvailability,
-    availableInstructors: BookableAvailability[]
+    availableInstructors: BookableAvailability[],
   ): Promise<BookableAvailability | null> {
     if (availableInstructors.length === 0) {
       return null;
@@ -201,7 +204,7 @@ export class InteractiveCLI {
     // Get unique instructors (dedupe by instructor name)
     const uniqueInstructors = availableInstructors.filter(
       (avail, index, self) =>
-        index === self.findIndex((a) => a.instructor === avail.instructor)
+        index === self.findIndex((a) => a.instructor === avail.instructor),
     );
 
     // If only one option, return it directly (no need to prompt)
@@ -228,7 +231,7 @@ export class InteractiveCLI {
       });
 
       return uniqueInstructors[selectedIndex];
-    } catch (error) {
+    } catch {
       // User cancelled (Ctrl+C)
       return null;
     }
@@ -241,11 +244,11 @@ export class InteractiveCLI {
    * @returns Selected activity type name or null if cancelled
    */
   async selectActivityType(
-    activityTypes: [string, string][]
+    activityTypes: [string, string][],
   ): Promise<string | null> {
     // Check if there's a "dual" option (case-insensitive)
     const dualOption = activityTypes.find(([, name]) =>
-      name.toLowerCase().includes("dual")
+      name.toLowerCase().includes("dual"),
     );
 
     // Build choices
@@ -261,7 +264,7 @@ export class InteractiveCLI {
         loop: false,
         default: dualOption?.[1], // Default to dual if available
       });
-    } catch (error) {
+    } catch {
       // User cancelled (Ctrl+C)
       return null;
     }
@@ -274,7 +277,7 @@ export class InteractiveCLI {
   async confirmAction(message: string): Promise<boolean> {
     try {
       return await confirm({ message });
-    } catch (error) {
+    } catch {
       // User cancelled (Ctrl+C)
       return false;
     }
