@@ -31,7 +31,7 @@ DAYS_AHEAD = "14"  # Reduced to stay under subrequest limit (8 days * instructor
 AIRCRAFT_REGEX = "172S|172N"
 WEEKDAY_MIN_HOUR = "15"
 MAX_HOUR = "19"
-NOTIFICATION_AIRCRAFT = "N65411,N734UZ"  # Comma-separated aircraft tail numbers for Discord notifications
+NOTIFICATION_AIRCRAFT = "N65411,N734UZ,N713RE"  # Comma-separated aircraft tail numbers for Discord notifications
 
 # Secrets (set these via wrangler CLI):
 # wrangler secret put FSP_EMAIL
