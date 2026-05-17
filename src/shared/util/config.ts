@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { DEFAULT_TIMEZONE } from "./flightTime.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("config");
 
 function isValidIanaTimeZone(value: string): boolean {
   try {
@@ -98,6 +101,6 @@ if (typeof process !== "undefined") {
   } catch {
     // If we're here, we might be in a bundled Worker context
     // The CONFIG will be created via createConfig in the Worker
-    console.warn("Failed to load dotenv, assuming Worker environment");
+    log.warn("Failed to load dotenv, assuming Worker environment");
   }
 }

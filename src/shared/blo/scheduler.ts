@@ -19,6 +19,9 @@ import {
   formatOperatorDisplayTime,
   parseFspLocal,
 } from "../util/flightTime.js";
+import { createLogger } from "../util/logger.js";
+
+const log = createLogger("scheduler");
 
 export class SchedulerBLO {
   private timeZone: string;
@@ -96,7 +99,7 @@ export class SchedulerBLO {
     for (const a of aircraft.results) {
       this.aircraftMap.set(a.aircraftId, a.tailNumber.trim()); // Show only callsign
     }
-    console.log("Logged in!");
+    log.info("Scheduler initialized");
   }
 
   /**

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { createLogger } from "../util/logger.js";
+
+const log = createLogger("auth");
 
 // Store session cookies, operator ID, subscription key, auth token, user ID, pilot ID, and location ID for authenticated requests
 let sessionCookies: string | null = null;
@@ -165,13 +168,13 @@ function extractTokenFromCookie(): string | null {
     const result = FspAppCookieSchema.safeParse(data);
 
     if (!result.success) {
-      console.error("Failed to validate FspApp cookie:", result.error);
+      log.error("Failed to validate FspApp cookie", { zodError: result.error });
       return null;
     }
 
     return result.data.token;
   } catch (error) {
-    console.error("Failed to parse FspApp cookie:", error);
+    log.error("Failed to parse FspApp cookie", { error });
     return null;
   }
 }
@@ -207,13 +210,15 @@ async function fetchSubscriptionKey(): Promise<void> {
     const result = AccountAppContextSchema.safeParse(data);
 
     if (!result.success) {
-      console.error("Failed to validate AccountAppContext:", result.error);
+      log.error("Failed to validate AccountAppContext", {
+        zodError: result.error,
+      });
       throw new Error("Failed to parse AccountAppContext response");
     }
 
     subscriptionKey = result.data.subscriptionKey;
   } catch (error) {
-    console.error("Failed to fetch subscription key:", error);
+    log.error("Failed to fetch subscription key", { error });
     throw error;
   }
 }
@@ -290,7 +295,7 @@ async function fetchOperatorId(userToken: string): Promise<void> {
     pilotId = detailResult.data.pilotId;
     defaultLocationId = detailResult.data.defaultLocationId;
   } catch (error) {
-    console.error("Failed to fetch operator ID:", error);
+    log.error("Failed to fetch operator ID", { error });
     throw error;
   }
 }

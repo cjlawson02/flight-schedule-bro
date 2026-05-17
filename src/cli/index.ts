@@ -23,9 +23,12 @@ import {
 import { setCacheAdapter } from "../shared/dao/api_wrapper.js";
 import { chunk } from "../shared/util/array.js";
 import { cliCacheAdapter } from "./cache.js";
+import { configureLogger, createLogger } from "../shared/util/logger.js";
+
+configureLogger({ runtime: "cli" });
+const log = createLogger("cli");
 
 async function main() {
-  // Inject file-based cache for CLI
   setCacheAdapter(cliCacheAdapter);
   await fetchAuth(CONFIG.EMAIL, CONFIG.PASSWORD);
 
@@ -68,9 +71,11 @@ async function main() {
   const instructorChunks = chunk(allInstructorIds, 3); // API limit: max 3 instructors
 
   // Fetch existing reservations to filter out conflicts
-  console.log("\n🔍 Checking your existing reservations...");
+  log.info("Checking existing reservations");
   const existingReservations = await getExistingReservations(operatorId);
-  console.log(`Found ${existingReservations.length} existing reservations`);
+  log.info("Existing reservations loaded", {
+    count: existingReservations.length,
+  });
 
   try {
     // Collect all bookable availability
@@ -164,19 +169,18 @@ async function main() {
       );
     }
   } catch (error) {
-    console.error(
-      "❌ An error occurred:",
-      error instanceof Error ? error.message : "Unknown error",
-    );
+    log.error("An error occurred during availability search", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      error,
+    });
   }
 }
 
-// Execute main function
 main().catch((error: unknown) => {
-  console.error(
-    "❌ Fatal error:",
-    error instanceof Error ? error.message : "Unknown error",
-  );
+  log.error("Fatal error", {
+    message: error instanceof Error ? error.message : "Unknown error",
+    error,
+  });
   process.exit(1);
 });
 
@@ -386,11 +390,12 @@ async function handleBookingFlow(
                 );
                 console.log(`     ✅ Added to calendar successfully`);
               } catch (error) {
-                console.error(
-                  `     ⚠️  Failed to add to calendar: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                  }`,
-                );
+                log.error("Failed to add reservation to calendar", {
+                  reservationId: booking.reservationId,
+                  message:
+                    error instanceof Error ? error.message : "Unknown error",
+                  error,
+                });
               }
             }
           }
@@ -398,9 +403,9 @@ async function handleBookingFlow(
       }
     }
   } catch (error) {
-    console.error(
-      "\n❌ An error occurred during the booking process:",
-      error instanceof Error ? error.message : "Unknown error",
-    );
+    log.error("An error occurred during the booking process", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      error,
+    });
   }
 }

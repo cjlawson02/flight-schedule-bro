@@ -1,5 +1,8 @@
 import z from "zod";
 import { getSubscriptionKey, getAuthToken } from "./auth.js";
+import { createLogger } from "../util/logger.js";
+
+const log = createLogger("api-wrapper");
 
 // Cache interface for dependency injection
 export interface CacheAdapter {
@@ -183,9 +186,12 @@ export async function safeFetch<T extends z.ZodType>(
 
           // Check for other HTTP errors
           if (!res.ok) {
-            console.error(`HTTP ${res.status} error for ${url}`);
-            console.error("Request params:", JSON.stringify(params, null, 2));
-            console.error("Response data:", JSON.stringify(data, null, 2));
+            log.error("HTTP error from FSP API", {
+              status: res.status,
+              url,
+              params,
+              response: data,
+            });
             throw new Error(
               `HTTP error! status: ${res.status}, response: ${JSON.stringify(
                 data,
@@ -222,8 +228,10 @@ export async function safeFetch<T extends z.ZodType>(
   const result = parser.safeParse(data);
 
   if (!result.success) {
-    console.error("Response data:", data);
-    console.error("Failed to parse:", result.error);
+    log.error("Failed to parse FSP API response", {
+      response: data,
+      zodError: result.error,
+    });
     throw new Error("Failed to parse");
   }
 

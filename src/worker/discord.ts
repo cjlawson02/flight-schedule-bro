@@ -17,6 +17,9 @@ import {
   isOperatorWeekend,
 } from "../shared/util/flightTime.js";
 import { formatInTimeZone } from "date-fns-tz";
+import { createLogger } from "../shared/util/logger.js";
+
+const log = createLogger("discord");
 
 /**
  * Color codes for Discord embeds (based on day of week)
@@ -216,7 +219,7 @@ export async function sendAvailabilityNotification(
   timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   if (slots.length === 0) {
-    console.log("No new slots to notify about");
+    log.debug("No new slots to notify about");
     return;
   }
 
@@ -236,7 +239,7 @@ export async function sendAvailabilityNotification(
   try {
     DiscordPayloadSchema.parse(payload);
   } catch (error) {
-    console.error("Failed to validate Discord payload:", error);
+    log.error("Failed to validate Discord payload", { error });
     throw new Error(
       `Invalid Discord payload: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -259,11 +262,9 @@ export async function sendAvailabilityNotification(
       throw new Error(`Discord API error (${response.status}): ${errorText}`);
     }
 
-    console.log(
-      `Successfully sent Discord notification for ${slots.length} new slots`,
-    );
+    log.info("Discord notification sent", { slotCount: slots.length });
   } catch (error) {
-    console.error("Failed to send Discord notification:", error);
+    log.error("Failed to send Discord notification", { error });
     throw new Error(
       `Failed to send Discord notification: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -303,9 +304,8 @@ export async function sendSimpleNotification(
       throw new Error(`Discord API error (${response.status}): ${errorText}`);
     }
 
-    console.log("Successfully sent simple Discord notification");
+    log.info("Simple Discord notification sent");
   } catch (error) {
-    console.error("Failed to send simple Discord notification:", error);
-    // Don't throw - simple notifications are not critical
+    log.error("Failed to send simple Discord notification", { error });
   }
 }

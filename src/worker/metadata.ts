@@ -2,6 +2,9 @@ import { FspMetadataSchema, type FspMetadata } from "./types.js";
 import { getInstructors } from "../shared/dao/instructors.js";
 import { getReservationTypes } from "../shared/dao/reservationTypes.js";
 import { getAircraft } from "../shared/dao/aircraft.js";
+import { createLogger } from "../shared/util/logger.js";
+
+const log = createLogger("metadata");
 
 const METADATA_KEY = "fsp-metadata";
 
@@ -19,13 +22,13 @@ export async function getMetadataFromKV(
 
     const parsed = FspMetadataSchema.safeParse(data);
     if (!parsed.success) {
-      console.error("Invalid metadata in KV:", parsed.error);
+      log.error("Invalid metadata in KV", { zodError: parsed.error });
       return null;
     }
 
     return parsed.data;
   } catch (error) {
-    console.error("Failed to fetch metadata from KV:", error);
+    log.error("Failed to fetch metadata from KV", { error });
     return null;
   }
 }
@@ -41,9 +44,9 @@ export async function setMetadataInKV(
     // Validate before storing
     const validated = FspMetadataSchema.parse(metadata);
     await kv.put(METADATA_KEY, JSON.stringify(validated));
-    console.log("Metadata stored in KV successfully");
+    log.info("Metadata stored in KV");
   } catch (error) {
-    console.error("Failed to store metadata in KV:", error);
+    log.error("Failed to store metadata in KV", { error });
     throw error;
   }
 }
@@ -55,7 +58,7 @@ export async function refreshMetadata(
   operatorId: number,
   kv: KVNamespace,
 ): Promise<FspMetadata> {
-  console.log("Fetching fresh metadata from FSP API...");
+  log.info("Fetching fresh metadata from FSP API");
 
   const [instructors, reservationTypes, aircraft] = await Promise.all([
     getInstructors(operatorId),
@@ -88,9 +91,11 @@ export async function refreshMetadata(
   // Store in KV
   await setMetadataInKV(kv, metadata);
 
-  console.log(
-    `Metadata refreshed: ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`,
-  );
+  log.info("Metadata refreshed", {
+    instructors: metadata.instructors.length,
+    reservationTypes: metadata.reservationTypes.length,
+    aircraft: metadata.aircraft.length,
+  });
 
   return metadata;
 }
@@ -106,13 +111,12 @@ export async function getOrFetchMetadata(
   const metadata = await getMetadataFromKV(kv);
 
   if (metadata) {
-    console.log(
-      `Using cached metadata from KV (last updated: ${metadata.lastUpdated})`,
-    );
+    log.info("Using cached metadata from KV", {
+      lastUpdated: metadata.lastUpdated,
+    });
     return metadata;
   }
 
-  // Fall back to fetching from API
-  console.log("No metadata in KV, fetching from API...");
+  log.info("No metadata in KV, fetching from API");
   return await refreshMetadata(operatorId, kv);
 }

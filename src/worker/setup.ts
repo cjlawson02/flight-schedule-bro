@@ -18,7 +18,10 @@ import { initializeSnapshot } from "./kv.js";
 import { sendSimpleNotification } from "./discord.js";
 import { getOrFetchMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
+import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
+
+const log = createLogger("setup");
 
 /**
  * Initialize the availability snapshot in KV
@@ -29,7 +32,7 @@ import type { Env } from "./types.js";
  */
 export async function runSetup(env: Env): Promise<Response> {
   try {
-    console.log("Starting setup...");
+    log.info("Starting setup");
 
     initializeWorker();
 
@@ -45,21 +48,23 @@ export async function runSetup(env: Env): Promise<Response> {
     });
 
     // Authenticate
-    console.log("Authenticating...");
+    log.info("Authenticating");
     await fetchAuth(config.EMAIL, config.PASSWORD);
 
     const operatorId = getOperatorId();
 
     // Get or fetch metadata from KV (saves 3 API calls!)
-    console.log("Loading metadata from KV...");
+    log.info("Loading metadata from KV");
     const metadata = await getOrFetchMetadata(
       operatorId,
       env.FSP_AVAILABILITY_KV,
     );
 
-    console.log(
-      `Loaded ${metadata.instructors.length} instructors, ${metadata.reservationTypes.length} types, ${metadata.aircraft.length} aircraft`,
-    );
+    log.info("Metadata loaded", {
+      instructors: metadata.instructors.length,
+      reservationTypes: metadata.reservationTypes.length,
+      aircraft: metadata.aircraft.length,
+    });
 
     const today = startOfOperatorDay(new Date(), config.TIMEZONE);
 
@@ -83,9 +88,10 @@ export async function runSetup(env: Env): Promise<Response> {
         ? preferredAircraftIds
         : metadata.aircraft.map((a) => a.aircraftId);
 
-    console.log(
-      `Using ${aircraftIds.length} aircraft (${preferredAircraftIds.length} preferred)`,
-    );
+    log.info("Aircraft selected", {
+      total: aircraftIds.length,
+      preferred: preferredAircraftIds.length,
+    });
 
     // Get activity type - use first one (typically "dual")
     const activityTypeId = metadata.reservationTypes[0]?.reservationTypeId;
@@ -94,10 +100,11 @@ export async function runSetup(env: Env): Promise<Response> {
       throw new Error("No activity types found");
     }
 
-    console.log(
-      `Using activity type: ${metadata.reservationTypes[0].reservationTypeName} (${activityTypeId})`,
-    );
-    console.log(`Fetching availability for ${config.DAYS_AHEAD} days ahead...`);
+    log.info("Activity type selected", {
+      name: metadata.reservationTypes[0].reservationTypeName,
+      activityTypeId,
+    });
+    log.info("Fetching availability", { daysAhead: config.DAYS_AHEAD });
 
     // Create scheduler for availability fetching
     const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
@@ -128,14 +135,16 @@ export async function runSetup(env: Env): Promise<Response> {
       await Promise.all(bookablePromises)
     ).flat();
 
-    console.log(`Found ${allBookableResults.length} total bookable results`);
+    log.info("Availability search complete", {
+      totalResults: allBookableResults.length,
+    });
 
     // Filter valid results using the existing validation logic
     const validResults = allBookableResults.filter((result) =>
       isValidBlock(result.startDateTime, result.endDateTime, config),
     );
 
-    console.log(`Filtered to ${validResults.length} valid time slots`);
+    log.info("Filtered valid time slots", { count: validResults.length });
 
     // Initialize snapshot in KV
     await initializeSnapshot(
@@ -146,14 +155,16 @@ export async function runSetup(env: Env): Promise<Response> {
     );
 
     const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots for the next ${config.DAYS_AHEAD} days.`;
-    console.log(successMessage);
+    log.info("Setup complete", {
+      slotsCount: validResults.length,
+      daysAhead: config.DAYS_AHEAD,
+    });
 
     // Send notification to Discord
     try {
       await sendSimpleNotification(env, successMessage);
     } catch (error) {
-      console.error("Failed to send Discord notification:", error);
-      // Don't fail the setup if Discord notification fails
+      log.error("Failed to send Discord notification", { error });
     }
 
     return new Response(
@@ -172,7 +183,7 @@ export async function runSetup(env: Env): Promise<Response> {
     const errorMessage = `❌ Setup failed: ${
       error instanceof Error ? error.message : "Unknown error"
     }`;
-    console.error(errorMessage, error);
+    log.error(errorMessage, { error });
 
     return new Response(
       JSON.stringify({

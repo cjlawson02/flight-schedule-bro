@@ -11,6 +11,9 @@ import {
   formatOperatorIsoDate,
   startOfOperatorDay,
 } from "../shared/util/flightTime.js";
+import { createLogger } from "../shared/util/logger.js";
+
+const log = createLogger("kv");
 
 const SNAPSHOT_KEY = "availability_snapshot";
 
@@ -57,7 +60,7 @@ export async function getSnapshot(env: Env): Promise<Snapshot | null> {
     const validated = SnapshotSchema.parse(parsed);
     return validated;
   } catch (error) {
-    console.error("Failed to parse snapshot from KV:", error);
+    log.error("Failed to parse snapshot from KV", { error });
     throw new Error(
       `Invalid snapshot data in KV: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -90,7 +93,7 @@ export async function setSnapshot(
   try {
     SnapshotSchema.parse(snapshot);
   } catch (error) {
-    console.error("Failed to validate snapshot before storing:", error);
+    log.error("Failed to validate snapshot before storing", { error });
     throw new Error(
       `Invalid snapshot data: ${
         error instanceof Error ? error.message : "Unknown error"

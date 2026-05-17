@@ -26,7 +26,10 @@ import { sendAvailabilityNotification } from "./discord.js";
 import { runSetup } from "./setup.js";
 import { refreshMetadata, getMetadataFromKV } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
+import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
+
+const log = createLogger("worker");
 
 /**
  * Main scheduled handler - runs every 30 minutes
@@ -37,16 +40,16 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    console.log("Scheduled task started at", new Date().toISOString());
-
     initializeWorker();
+
+    log.info("Scheduled task started", { timestamp: new Date().toISOString() });
 
     try {
       // Get existing snapshot and metadata
       const snapshot = await getSnapshot(env);
 
       if (!snapshot) {
-        console.error(
+        log.error(
           "No snapshot found in KV. Please run setup first by visiting /setup",
         );
         return;
@@ -67,12 +70,12 @@ export default {
 
       const today = startOfOperatorDay(new Date(), config.TIMEZONE);
 
-      console.log(
-        `Last search date: ${metadata.lastSearchDate}, Today: ${formatOperatorIsoDate(today, config.TIMEZONE)}`,
-      );
+      log.info("Rolling window state", {
+        lastSearchDate: metadata.lastSearchDate,
+        today: formatOperatorIsoDate(today, config.TIMEZONE),
+      });
 
-      // Step 2: Clean up past slots
-      console.log("Cleaning past slots...");
+      log.info("Cleaning past slots");
       const cleanedSnapshot = cleanPastSlotsFromSnapshot(
         snapshot,
         today,
@@ -81,32 +84,35 @@ export default {
 
       // Step 3: Get previous slots from cleaned snapshot for comparison
       const previousSlots = getSlotsFromSnapshot(cleanedSnapshot);
-      console.log(`Previous snapshot has ${previousSlots.length} slots`);
+      log.info("Previous snapshot loaded", { slotCount: previousSlots.length });
 
-      console.log("Authenticating...");
+      log.info("Authenticating");
       await fetchAuth(config.EMAIL, config.PASSWORD);
 
       const operatorId = getOperatorId();
 
       // Fetch existing reservations to provide context
-      console.log("Fetching existing reservations...");
+      log.info("Fetching existing reservations");
       const existingReservations = await getExistingReservations(
         operatorId,
         config.TIMEZONE,
       );
-      console.log(`Found ${existingReservations.length} existing reservations`);
+      log.info("Existing reservations loaded", {
+        count: existingReservations.length,
+      });
 
-      // Load FSP metadata from KV (saves 3 API calls!)
-      console.log("Loading FSP metadata from KV...");
+      log.info("Loading FSP metadata from KV");
       const fspMetadata = await getMetadataFromKV(env.FSP_AVAILABILITY_KV);
 
       if (!fspMetadata) {
         throw new Error("No FSP metadata in KV. Run /refresh-metadata first.");
       }
 
-      console.log(
-        `Loaded ${fspMetadata.instructors.length} instructors, ${fspMetadata.reservationTypes.length} types, ${fspMetadata.aircraft.length} aircraft from KV`,
-      );
+      log.info("FSP metadata loaded from KV", {
+        instructors: fspMetadata.instructors.length,
+        reservationTypes: fspMetadata.reservationTypes.length,
+        aircraft: fspMetadata.aircraft.length,
+      });
 
       const allInstructorIds = fspMetadata.instructors.map(
         (i) => i.instructorId,
@@ -119,9 +125,10 @@ export default {
       }
 
       const instructorChunks = chunk(allInstructorIds, 3); // API limit: max 3 instructors
-      console.log(
-        `Found ${allInstructorIds.length} instructors in ${instructorChunks.length} chunks`,
-      );
+      log.info("Instructor chunks prepared", {
+        instructors: allInstructorIds.length,
+        chunks: instructorChunks.length,
+      });
 
       const preferredAircraftIds = fspMetadata.aircraft
         .filter((a) => config.AIRCRAFT_REGEX.test(a.tailNumber))
@@ -145,9 +152,12 @@ export default {
       // Step 5: Fetch current availability for the SAME date range as original search
       const totalDays = config.DAYS_AHEAD + 1;
       const totalRequests = totalDays * instructorChunks.length;
-      console.log(
-        `Fetching availability for ${config.DAYS_AHEAD} days ahead (${totalDays} days × ${instructorChunks.length} chunks = ${totalRequests} requests)...`,
-      );
+      log.info("Fetching availability", {
+        daysAhead: config.DAYS_AHEAD,
+        totalDays,
+        chunks: instructorChunks.length,
+        totalRequests,
+      });
 
       const bookablePromises: Promise<BookableAvailability[]>[] = [];
 
@@ -170,22 +180,24 @@ export default {
         );
       }
 
-      console.log(
-        `Executing ${bookablePromises.length} availability requests...`,
-      );
+      log.info("Executing availability requests", {
+        requestCount: bookablePromises.length,
+      });
 
       const allBookableResults: BookableAvailability[] = (
         await Promise.all(bookablePromises)
       ).flat();
 
-      console.log(`Found ${allBookableResults.length} total bookable results`);
+      log.info("Availability search complete", {
+        totalResults: allBookableResults.length,
+      });
 
       // Step 6: Filter valid results
       const validResults = allBookableResults.filter((result) =>
         isValidBlock(result.startDateTime, result.endDateTime, config),
       );
 
-      console.log(`Filtered to ${validResults.length} valid time slots`);
+      log.info("Filtered valid time slots", { count: validResults.length });
 
       // Step 7: Find new slots using rolling window algorithm
       const newSlots = findNewSlots(
@@ -196,7 +208,7 @@ export default {
         config.TIMEZONE,
       );
 
-      console.log(`Found ${newSlots.length} new slots within tracked window`);
+      log.info("New slots within tracked window", { count: newSlots.length });
 
       // Step 8: Filter slots for notification (configurable aircraft list)
       const notificationAircraftTailNumbers = env.NOTIFICATION_AIRCRAFT
@@ -222,13 +234,13 @@ export default {
           )
         : newSlots; // If no filter configured, notify for all aircraft
 
-      console.log(
-        `Filtered to ${slotsToNotify.length} slots for notification${
+      log.info("Slots selected for notification", {
+        count: slotsToNotify.length,
+        filter:
           notificationAircraftTailNumbers.length > 0
-            ? ` (${notificationAircraftTailNumbers.join(", ")})`
-            : " (all aircraft)"
-        }`,
-      );
+            ? notificationAircraftTailNumbers
+            : "all aircraft",
+      });
 
       // Step 9: Update snapshot with latest data BEFORE sending notification
       // This prevents duplicate notifications if setSnapshot fails
@@ -244,7 +256,7 @@ export default {
       // Step 10: Send Discord notification if filtered slots found
       // Now that snapshot is updated, we can safely send notifications
       if (slotsToNotify.length > 0) {
-        console.log("Sending Discord notification...");
+        log.info("Sending Discord notification");
         try {
           await sendAvailabilityNotification(
             env,
@@ -254,23 +266,22 @@ export default {
             config.TIMEZONE,
           );
         } catch (error) {
-          console.error("Failed to send Discord notification:", error);
+          log.error("Failed to send Discord notification", { error });
           // Don't fail the entire job if notification fails
           // Snapshot is already updated, so we won't get duplicates
         }
       } else if (newSlots.length > 0) {
-        console.log(
-          `Skipping notification: ${newSlots.length} new slots found but none match notification filter`,
-        );
+        log.info("Skipping notification: no slots match filter", {
+          newSlotCount: newSlots.length,
+        });
       }
 
-      console.log("Scheduled task completed successfully");
+      log.info("Scheduled task completed successfully");
     } catch (error) {
-      console.error(
-        "Error in scheduled task:",
-        error instanceof Error ? error.message : "Unknown error",
-      );
-      console.error(error);
+      log.error("Error in scheduled task", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        error,
+      });
       // Don't throw - let the worker continue running
     }
   },
@@ -295,7 +306,7 @@ export default {
       try {
         initializeWorker();
 
-        console.log("Refreshing metadata...");
+        log.info("Refreshing metadata");
         const config = createConfig({
           FSP_EMAIL: env.FSP_EMAIL,
           FSP_PASSWORD: env.FSP_PASSWORD,
