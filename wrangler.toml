@@ -23,7 +23,8 @@ crons = ["*/30 * * * *"]
 [[kv_namespaces]]
 binding = "FSP_AVAILABILITY_KV"
 id = "bbfa3eaaa6c24c26bbbd55836a87d2c9"
-preview_id = "c248023ca5fe4c6cab64d89c25972ada"
+preview_id = "bbfa3eaaa6c24c26bbbd55836a87d2c9"
+remote = true
 
 # Environment variables (non-sensitive)
 [vars]
