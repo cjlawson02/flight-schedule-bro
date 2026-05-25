@@ -8,6 +8,7 @@ import {
 import type { FspMetadata } from "./types.js";
 import * as instructorsDao from "../shared/dao/instructors.js";
 import * as reservationTypesDao from "../shared/dao/reservationTypes.js";
+import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import * as aircraftDao from "../shared/dao/aircraft.js";
 
 // Mock the DAO modules
@@ -110,7 +111,7 @@ describe("Worker Metadata", () => {
       const mockReservationTypes = [
         { reservationTypeId: "rt1", reservationTypeName: "Dual" },
         { reservationTypeId: "rt2", reservationTypeName: "Solo" },
-      ];
+      ] as ReservationType[];
       const mockAircraft = {
         results: [
           { aircraftId: "ac1", tailNumber: "N12345", model: "172S" },
@@ -157,7 +158,7 @@ describe("Worker Metadata", () => {
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
       });
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([] as ReservationType[]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
@@ -179,7 +180,7 @@ describe("Worker Metadata", () => {
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
       });
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([] as ReservationType[]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
@@ -216,7 +217,7 @@ describe("Worker Metadata", () => {
       };
       const mockReservationTypes = [
         { reservationTypeId: "rt1", reservationTypeName: "Dual" },
-      ];
+      ] as ReservationType[];
       const mockAircraft = {
         results: [{ aircraftId: "ac1", tailNumber: "N12345", model: "172S" }],
       };

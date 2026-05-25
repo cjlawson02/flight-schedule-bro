@@ -34,6 +34,12 @@ const envSchema = z.object({
   // Weekday hours (with defaults)
   WEEKDAY_MIN_HOUR: z.coerce.number().int().min(0).max(23).default(15),
   MAX_HOUR: z.coerce.number().int().min(0).max(23).default(19),
+
+  // Optional reservation type override for automated monitoring
+  RESERVATION_TYPE_ID: z
+    .string()
+    .uuid("RESERVATION_TYPE_ID must be a valid UUID")
+    .optional(),
 });
 
 export interface ConfigType {
@@ -44,6 +50,7 @@ export interface ConfigType {
   AIRCRAFT_REGEX: RegExp;
   DAYS_AHEAD: number;
   TIMEZONE: string;
+  RESERVATION_TYPE_ID?: string;
 }
 
 /**
@@ -83,6 +90,7 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
     AIRCRAFT_REGEX: new RegExp(env.AIRCRAFT_REGEX, "i"),
     DAYS_AHEAD: env.DAYS_AHEAD,
     TIMEZONE: env.TIMEZONE,
+    RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
   };
 }
 

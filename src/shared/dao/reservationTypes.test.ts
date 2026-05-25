@@ -1,8 +1,45 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { getReservationTypes } from "./reservationTypes.js";
+import {
+  getReservationTypes,
+  ReservationTypeSchema,
+} from "./reservationTypes.js";
+import { createReservationTypeFixture } from "./reservationTypes.fixtures.js";
 import * as apiWrapper from "./api_wrapper.js";
 
 vi.mock("./api_wrapper.js");
+
+describe("ReservationTypeSchema", () => {
+  it("parses FSP responses that only include requirement levels", () => {
+    const parsed = ReservationTypeSchema.parse({
+      reservationTypeId: "22222222-2222-4222-8222-222222222222",
+      reservationTypeName: "Rental",
+      aircraftRequirement: 2,
+      instructorRequirement: 0,
+    });
+
+    expect(parsed.aircraftEnabled).toBe(false);
+    expect(parsed.aircraftRequirement).toBe(2);
+  });
+
+  it("applies defaults when FSP omits boolean and requirement fields", () => {
+    const parsed = ReservationTypeSchema.parse({
+      reservationTypeId: "11111111-1111-4111-8111-111111111111",
+      reservationTypeName: "Legacy Type",
+    });
+
+    expect(parsed).toMatchObject({
+      aircraftEnabled: false,
+      instructorEnabled: false,
+      flightTypeEnabled: false,
+      flightRulesEnabled: false,
+      flightHoursEnabled: false,
+      flightRouteEnabled: false,
+      aircraftRequirement: 0,
+      instructorRequirement: 0,
+      defaultLength: 120,
+    });
+  });
+});
 
 describe("getReservationTypes", () => {
   beforeEach(() => {
@@ -11,9 +48,14 @@ describe("getReservationTypes", () => {
 
   it("fetches reservation types successfully", async () => {
     const mockResponse = [
-      { reservationTypeId: "type-1", reservationTypeName: "Dual Instruction" },
-      { reservationTypeId: "type-2", reservationTypeName: "Solo" },
-      { reservationTypeId: "type-3", reservationTypeName: "Checkout" },
+      createReservationTypeFixture({
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Dual Instruction",
+        aircraftEnabled: true,
+        instructorEnabled: true,
+        aircraftRequirement: 2,
+        instructorRequirement: 2,
+      }),
     ];
 
     vi.mocked(apiWrapper.safeFetch).mockResolvedValue(mockResponse);
@@ -40,5 +82,33 @@ describe("getReservationTypes", () => {
       "api-external.flightschedulepro.com/api/ReservationTypes",
     );
     expect(url).toContain("operatorId=99999");
+  });
+
+  it("refetches when cached reservation types lack field metadata", async () => {
+    const legacy = [
+      {
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Rental",
+      },
+    ];
+    const fresh = [
+      createReservationTypeFixture({
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Rental",
+        aircraftEnabled: true,
+        aircraftRequirement: 2,
+      }),
+    ];
+
+    vi.mocked(apiWrapper.safeFetch)
+      .mockResolvedValueOnce(legacy)
+      .mockResolvedValueOnce(fresh);
+    vi.mocked(apiWrapper.invalidateCache).mockResolvedValue(undefined);
+
+    const result = await getReservationTypes(12345);
+
+    expect(result).toEqual(fresh);
+    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("ReservationTypes");
+    expect(apiWrapper.safeFetch).toHaveBeenCalledTimes(2);
   });
 });

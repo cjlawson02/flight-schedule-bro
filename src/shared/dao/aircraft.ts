@@ -1,13 +1,31 @@
 import { z } from "zod";
 import { safeFetch } from "./api_wrapper.js";
 
-const AircraftSchema = z.object({
+export const AircraftMetadataSchema = z.object({
   aircraftId: z.uuid(),
   tailNumber: z.string(),
+});
+
+export type AircraftMetadata = z.infer<typeof AircraftMetadataSchema>;
+
+const AircraftSchema = AircraftMetadataSchema.extend({
   model: z.string(),
 });
 
 export type Aircraft = z.infer<typeof AircraftSchema>;
+
+/** FSP nil UUID for optional instructor/aircraft on reservations. */
+export const FSP_NIL_RESOURCE_ID = "00000000-0000-0000-0000-000000000000";
+
+/** Skip aircraft-type placeholders returned when includeAircraftTypes=true. */
+export function isReservableAircraft(
+  aircraft: Pick<Aircraft, "aircraftId" | "tailNumber">,
+): boolean {
+  return (
+    aircraft.aircraftId !== FSP_NIL_RESOURCE_ID &&
+    aircraft.tailNumber.trim() !== ""
+  );
+}
 
 const AircraftResponseSchema = z.object({
   results: z.array(AircraftSchema),

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { getAircraft } from "./aircraft.js";
+import {
+  getAircraft,
+  isReservableAircraft,
+  FSP_NIL_RESOURCE_ID,
+} from "./aircraft.js";
 import * as apiWrapper from "./api_wrapper.js";
 
 vi.mock("./api_wrapper.js");
@@ -60,5 +64,28 @@ describe("getAircraft", () => {
       expect.any(Object), // Schema validator
       expect.any(Number),
     );
+  });
+});
+
+describe("isReservableAircraft", () => {
+  it("rejects nil aircraft ids and empty tail numbers", () => {
+    expect(
+      isReservableAircraft({
+        aircraftId: FSP_NIL_RESOURCE_ID,
+        tailNumber: "172N",
+      }),
+    ).toBe(false);
+    expect(
+      isReservableAircraft({
+        aircraftId: "cc20d524-b205-43df-9670-5db41a761f87",
+        tailNumber: "",
+      }),
+    ).toBe(false);
+    expect(
+      isReservableAircraft({
+        aircraftId: "cc20d524-b205-43df-9670-5db41a761f87",
+        tailNumber: "N713RE",
+      }),
+    ).toBe(true);
   });
 });

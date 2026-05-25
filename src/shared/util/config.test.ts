@@ -119,4 +119,16 @@ describe("config", () => {
     const config = createConfig(validEnv);
     expect(config.TIMEZONE).toBe("America/Chicago");
   });
+
+  it("accepts optional RESERVATION_TYPE_ID", () => {
+    const config = createConfig({
+      FSP_EMAIL: "test@example.com",
+      FSP_PASSWORD: "password123",
+      RESERVATION_TYPE_ID: "09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+    });
+
+    expect(config.RESERVATION_TYPE_ID).toBe(
+      "09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+    );
+  });
 });

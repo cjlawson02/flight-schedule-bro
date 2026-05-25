@@ -9,6 +9,7 @@ import * as aircraftDAO from "../dao/aircraft.js";
 import * as availabilityDAO from "../dao/availability.js";
 import * as reservationsDAO from "../dao/reservations.js";
 import * as authDAO from "../dao/auth.js";
+import { createReservationTypeFixture } from "../dao/reservationTypes.fixtures.js";
 
 // Mock all DAO modules
 vi.mock("../dao/instructors.js");
@@ -42,11 +43,8 @@ describe("SchedulerBLO", () => {
       });
 
       vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        {
-          reservationTypeId: "type-1",
-          reservationTypeName: "Dual Instruction",
-        },
-        { reservationTypeId: "type-2", reservationTypeName: "Solo" },
+        createReservationTypeFixture({ reservationTypeId: "type-1", reservationTypeName: "Dual Instruction" }),
+        createReservationTypeFixture({ reservationTypeId: "type-2", reservationTypeName: "Solo" }),
       ]);
 
       vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
@@ -102,10 +100,7 @@ describe("SchedulerBLO", () => {
       });
 
       vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        {
-          reservationTypeId: "type-1",
-          reservationTypeName: "Dual Instruction",
-        },
+        createReservationTypeFixture({ reservationTypeId: "type-1", reservationTypeName: "Dual Instruction" }),
       ]);
 
       vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
