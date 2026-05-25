@@ -1,51 +1,16 @@
 import { checkbox, select, confirm } from "@inquirer/prompts";
-import { BookableAvailability } from "../dao/availability.js";
-
-interface TimeSlotGroup {
-  date: string;
-  startTime: string;
-  endTime: string;
-  availabilities: BookableAvailability[];
-}
+import type { ReservationType } from "../dao/reservationTypes.js";
+import { pickReservationType } from "../dao/reservationTypes.js";
+import {
+  groupAvailabilitiesByTimeSlot,
+  type BookableAvailability,
+} from "../dao/availability.js";
 
 /**
  * Interactive CLI utility for user interaction during booking flow
  * Uses Inquirer.js for cross-platform terminal prompts
  */
 export class InteractiveCLI {
-  /**
-   * Group availabilities by time slot for better selection experience
-   */
-  private groupAvailabilities(
-    availabilities: BookableAvailability[],
-  ): TimeSlotGroup[] {
-    const grouped = new Map<string, TimeSlotGroup>();
-
-    for (const avail of availabilities) {
-      const key = `${avail.date}|${avail.startTime}|${avail.endTime}`;
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          date: avail.date,
-          startTime: avail.startTime,
-          endTime: avail.endTime,
-          availabilities: [],
-        });
-      }
-
-      const group = grouped.get(key);
-      if (group) {
-        group.availabilities.push(avail);
-      }
-    }
-
-    return Array.from(grouped.values()).sort(
-      (a, b) =>
-        new Date(`${a.date} ${a.startTime}`).getTime() -
-        new Date(`${b.date} ${b.startTime}`).getTime(),
-    );
-  }
-
   /**
    * Format a date string with day of week and no year (e.g., "Mon 11/4")
    */
@@ -73,7 +38,12 @@ export class InteractiveCLI {
   /**
    * Format a time slot group for display with columns and borders
    */
-  private formatTimeSlot(group: TimeSlotGroup): string {
+  private formatTimeSlot(group: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    availabilities: BookableAvailability[];
+  }): string {
     // Dedupe instructors for cleaner display
     const instructorList = [
       ...new Set(group.availabilities.map((a) => a.instructor)),
@@ -105,7 +75,7 @@ export class InteractiveCLI {
       return [];
     }
 
-    const timeSlotGroups = this.groupAvailabilities(availabilities);
+    const timeSlotGroups = groupAvailabilitiesByTimeSlot(availabilities);
 
     // Create choices with group index as value
     const choices = timeSlotGroups.map((group, index) => ({
@@ -238,34 +208,36 @@ export class InteractiveCLI {
   }
 
   /**
-   * Select activity type
-   * Prompts user to select from available activity types
-   * @param activityTypes - Array of [id, name] tuples
-   * @returns Selected activity type name or null if cancelled
+   * Select a reservation type for booking or search.
    */
-  async selectActivityType(
-    activityTypes: [string, string][],
-  ): Promise<string | null> {
-    // Check if there's a "dual" option (case-insensitive)
-    const dualOption = activityTypes.find(([, name]) =>
-      name.toLowerCase().includes("dual"),
+  async selectReservationType(
+    reservationTypes: ReservationType[],
+    options?: { preferredTypeId?: string },
+  ): Promise<ReservationType | null> {
+    const preferred = pickReservationType(
+      reservationTypes,
+      options?.preferredTypeId,
     );
 
-    // Build choices
-    const choices = activityTypes.map(([, name]) => ({
-      name,
-      value: name,
+    const choices = reservationTypes.map((type) => ({
+      name: type.reservationTypeName,
+      value: type.reservationTypeId,
     }));
 
     try {
-      return await select({
+      const selectedId = await select({
         message: "Select activity type:",
         choices,
         loop: false,
-        default: dualOption?.[1], // Default to dual if available
+        default: preferred?.reservationTypeId,
       });
+
+      return (
+        reservationTypes.find(
+          (type) => type.reservationTypeId === selectedId,
+        ) ?? null
+      );
     } catch {
-      // User cancelled (Ctrl+C)
       return null;
     }
   }

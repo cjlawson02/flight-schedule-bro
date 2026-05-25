@@ -1,13 +1,20 @@
 import { getInstructors } from "../dao/instructors.js";
-import { getReservationTypes } from "../dao/reservationTypes.js";
-import { getAircraft, FSP_NIL_RESOURCE_ID } from "../dao/aircraft.js";
+import {
+  getReservationTypes,
+  type ReservationType,
+} from "../dao/reservationTypes.js";
+import {
+  getAircraft,
+  isReservableAircraft,
+  FSP_NIL_RESOURCE_ID,
+} from "../dao/aircraft.js";
 import {
   fetchAvailability,
   BookableAvailability,
 } from "../dao/availability.js";
 import {
+  buildUserReservationRequest,
   createReservation,
-  UserReservationRequest,
   ReservationResponse,
   ReservationBookingParams,
 } from "../dao/reservations.js";
@@ -27,7 +34,7 @@ export class SchedulerBLO {
   private timeZone: string;
   private instructorsMap = new Map<string, string>();
   private aircraftMap = new Map<string, string>();
-  private activityTypesMap = new Map<string, string>();
+  private reservationTypesMap = new Map<string, ReservationType>();
   private pilotId = "";
   private operatorId: number;
 
@@ -52,30 +59,12 @@ export class SchedulerBLO {
     return Array.from(this.aircraftMap.keys());
   }
 
-  /**
-   * Get instructor name by ID
-   * @param id - Instructor ID
-   * @returns Instructor display name or undefined
-   */
-  getInstructorName(id: string): string | undefined {
-    return this.instructorsMap.get(id);
-  }
-
-  /**
-   * Get aircraft name by ID
-   * @param id - Aircraft ID
-   * @returns Aircraft display name or undefined
-   */
-  getAircraftName(id: string): string | undefined {
-    return this.aircraftMap.get(id);
-  }
-
   getAircraftMapEntries() {
     return this.aircraftMap.entries();
   }
 
-  getActivityTypesMapEntries() {
-    return this.activityTypesMap.entries();
+  getReservationTypes(): ReservationType[] {
+    return Array.from(this.reservationTypesMap.values());
   }
 
   async initialize() {
@@ -93,11 +82,11 @@ export class SchedulerBLO {
     }
 
     for (const act of activityTypes) {
-      this.activityTypesMap.set(act.reservationTypeId, act.reservationTypeName);
+      this.reservationTypesMap.set(act.reservationTypeId, act);
     }
 
-    for (const a of aircraft.results) {
-      this.aircraftMap.set(a.aircraftId, a.tailNumber.trim()); // Show only callsign
+    for (const a of aircraft.results.filter(isReservableAircraft)) {
+      this.aircraftMap.set(a.aircraftId, a.tailNumber.trim());
     }
     log.info("Scheduler initialized");
   }
@@ -117,6 +106,7 @@ export class SchedulerBLO {
     endDate: string;
     lengthOfReservationInMinutes?: number;
   }): Promise<BookableAvailability[]> {
+    const reservationType = this.reservationTypesMap.get(params.activityTypeId);
     const results = await fetchAvailability({
       customerUserGuid: params.customerUserGuid,
       locationId: params.locationId,
@@ -127,7 +117,8 @@ export class SchedulerBLO {
       endDate: params.endDate,
       operatorId: this.operatorId,
       timeZone: this.timeZone,
-      lengthOfReservationInMinutes: params.lengthOfReservationInMinutes ?? 120,
+      lengthOfReservationInMinutes:
+        params.lengthOfReservationInMinutes ?? reservationType?.defaultLength,
     });
 
     const bookableResults: BookableAvailability[] = [];
@@ -174,18 +165,21 @@ export class SchedulerBLO {
   ): Promise<ReservationResponse> {
     try {
       // Construct the reservation request using CONFIG values and stored pilot ID
-      const reservationRequest: UserReservationRequest = {
+      const reservationRequest = buildUserReservationRequest({
+        reservationType: params.reservationType,
         aircraftId: params.aircraftId,
-        end: formatFspLocalDateTime(params.endTime, this.timeZone),
         instructorId: params.instructorId,
+        end: formatFspLocalDateTime(params.endTime, this.timeZone),
+        start: formatFspLocalDateTime(params.startTime, this.timeZone),
         locationId: params.locationId,
         operatorId: this.operatorId,
         pilotId: this.pilotId,
-        start: formatFspLocalDateTime(params.startTime, this.timeZone),
-        reservationTypeId: params.reservationTypeId,
-      };
+      });
 
-      return await createReservation(reservationRequest);
+      return await createReservation(
+        params.reservationType,
+        reservationRequest,
+      );
     } catch (error) {
       // If error already has a code property, re-throw it
       if (error instanceof Error && "code" in error) {

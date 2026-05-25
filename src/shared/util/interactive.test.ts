@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { InteractiveCLI } from "./interactive.js";
 import { checkbox, select, confirm } from "@inquirer/prompts";
+import {
+  createReservationTypeFixture,
+  dualFlightTraining,
+  rental,
+} from "../dao/reservationTypes.fixtures.js";
 
 vi.mock("@inquirer/prompts", () => ({
   checkbox: vi.fn(),
@@ -260,58 +265,74 @@ describe("InteractiveCLI", () => {
     });
   });
 
-  describe("selectActivityType", () => {
-    it("prompts user to select activity type", async () => {
-      const activityTypes: [string, string][] = [
-        ["id-1", "Solo Flight"],
-        ["id-2", "Dual Flight Training"],
-        ["id-3", "Ground School"],
+  describe("selectReservationType", () => {
+    it("prompts user to select a reservation type", async () => {
+      const reservationTypes = [
+        createReservationTypeFixture({
+          reservationTypeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          reservationTypeName: "Solo Flight",
+        }),
+        dualFlightTraining,
+        createReservationTypeFixture({
+          reservationTypeId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          reservationTypeName: "Ground School",
+          instructorEnabled: true,
+          instructorRequirement: 2,
+        }),
       ];
 
-      vi.mocked(select).mockResolvedValue("Dual Flight Training");
+      vi.mocked(select).mockResolvedValue(dualFlightTraining.reservationTypeId);
 
-      const result = await cli.selectActivityType(activityTypes);
+      const result = await cli.selectReservationType(reservationTypes);
 
-      expect(result).toBe("Dual Flight Training");
+      expect(result).toEqual(dualFlightTraining);
       expect(select).toHaveBeenCalledWith({
         message: "Select activity type:",
         choices: [
-          { name: "Solo Flight", value: "Solo Flight" },
-          { name: "Dual Flight Training", value: "Dual Flight Training" },
-          { name: "Ground School", value: "Ground School" },
+          {
+            name: "Solo Flight",
+            value: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          },
+          {
+            name: "Dual Flight Training",
+            value: dualFlightTraining.reservationTypeId,
+          },
+          {
+            name: "Ground School",
+            value: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          },
         ],
         loop: false,
-        default: "Dual Flight Training", // Should default to dual option
+        default: dualFlightTraining.reservationTypeId,
       });
     });
 
-    it("defaults to 'dual' option when available", async () => {
-      const activityTypes: [string, string][] = [
-        ["id-1", "Solo Flight"],
-        ["id-2", "Dual Instruction"], // Has "dual" in name
-        ["id-3", "Ground School"],
+    it("defaults to preferred reservation type when configured", async () => {
+      const reservationTypes = [
+        createReservationTypeFixture({
+          reservationTypeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          reservationTypeName: "Solo Flight",
+        }),
+        rental,
       ];
 
-      vi.mocked(select).mockResolvedValue("Dual Instruction");
+      vi.mocked(select).mockResolvedValue(rental.reservationTypeId);
 
-      await cli.selectActivityType(activityTypes);
+      await cli.selectReservationType(reservationTypes, {
+        preferredTypeId: rental.reservationTypeId,
+      });
 
       expect(select).toHaveBeenCalledWith(
         expect.objectContaining({
-          default: "Dual Instruction",
+          default: rental.reservationTypeId,
         }),
       );
     });
 
     it("returns null when user cancels", async () => {
-      const activityTypes: [string, string][] = [
-        ["id-1", "Solo Flight"],
-        ["id-2", "Dual Flight Training"],
-      ];
-
       vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
 
-      const result = await cli.selectActivityType(activityTypes);
+      const result = await cli.selectReservationType([dualFlightTraining]);
 
       expect(result).toBeNull();
     });

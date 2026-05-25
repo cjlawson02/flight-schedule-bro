@@ -1,19 +1,21 @@
 import { z } from "zod";
+import { FSP_NIL_RESOURCE_ID } from "./aircraft.js";
+import { type ReservationType, getFieldState } from "./reservationTypes.js";
 import { safeFetch, invalidateCache } from "./api_wrapper.js";
 
 /**
  * Parameters for booking a reservation
  */
 export interface ReservationBookingParams {
-  aircraftId: string;
-  instructorId: string;
+  aircraftId?: string;
+  instructorId?: string;
   startTime: Date;
   endTime: Date;
-  reservationTypeId: string;
+  reservationType: ReservationType;
   locationId: number;
 }
 
-export const UserReservationRequestSchema = z.object({
+const UserReservationRequestSchema = z.object({
   aircraftId: z.uuid(),
   end: z.string(),
   instructorId: z.uuid(),
@@ -27,47 +29,113 @@ export const UserReservationRequestSchema = z.object({
 /**
  * Zod schema for validating reservation request payload
  */
-export const FullReservationRequestSchema = UserReservationRequestSchema.extend(
-  {
-    additionalEmailNotifications: z.array(z.string()),
-    additionalUserNotifications: z.array(z.string()),
-    application: z.number(),
-    client: z.string(),
-    comments: z.string(),
-    equipmentIds: z.array(z.string()),
-    estimatedFlightHours: z.string(),
-    internalComments: z.string(),
-    overrideExceptions: z.boolean(),
-    recurring: z.boolean(),
-    recurringForceReservations: z.null(),
-    recurringOverrideExceptions: z.null(),
-    recurringRepeatEveryMonthsDayOfMonth: z.null(),
-    recurringRepeatEveryMonthsDayOfWeek: z.null(),
-    schedulingGroupId: z.null(),
-    schedulingGroupSlotId: z.null(),
-    sendEmailNotification: z.boolean(),
-    trainingSessions: z.array(z.unknown()),
-    validateOnly: z.boolean(),
-  },
-);
+const FullReservationRequestSchema = UserReservationRequestSchema.extend({
+  additionalEmailNotifications: z.array(z.string()),
+  additionalUserNotifications: z.array(z.string()),
+  application: z.number(),
+  client: z.string(),
+  comments: z.string(),
+  equipmentIds: z.array(z.string()),
+  estimatedFlightHours: z.string().optional(),
+  flightRoute: z.string().optional(),
+  flightRules: z.number().nullish(),
+  flightType: z.number().nullish(),
+  internalComments: z.string(),
+  overrideExceptions: z.boolean(),
+  recurring: z.boolean(),
+  recurringForceReservations: z.null(),
+  recurringOverrideExceptions: z.null(),
+  recurringRepeatEveryMonthsDayOfMonth: z.null(),
+  recurringRepeatEveryMonthsDayOfWeek: z.null(),
+  schedulingGroupId: z.null(),
+  schedulingGroupSlotId: z.null(),
+  sendEmailNotification: z.boolean(),
+  trainingSessions: z.array(z.unknown()),
+  validateOnly: z.boolean(),
+});
 
 /**
  * Zod schema for validating reservation API response
  */
-export const ReservationResponseSchema = z.object({
+const ReservationResponseSchema = z.object({
   errors: z.array(z.object({ message: z.string().optional() })),
   id: z.uuid().nullish(),
 });
-/**
- * TypeScript types exported for use in other modules
- */
-export type UserReservationRequest = z.infer<
-  typeof UserReservationRequestSchema
->;
-export type FullReservationRequest = z.infer<
-  typeof FullReservationRequestSchema
->;
+
+type UserReservationRequest = z.infer<typeof UserReservationRequestSchema>;
+type FullReservationRequest = z.infer<typeof FullReservationRequestSchema>;
 export type ReservationResponse = z.infer<typeof ReservationResponseSchema>;
+
+function resolveResourceId(
+  enabled: boolean,
+  resourceId: string | undefined,
+): string {
+  if (!enabled) {
+    return FSP_NIL_RESOURCE_ID;
+  }
+  return resourceId ?? FSP_NIL_RESOURCE_ID;
+}
+
+export function buildUserReservationRequest(params: {
+  reservationType: ReservationType;
+  aircraftId?: string;
+  instructorId?: string;
+  end: string;
+  start: string;
+  locationId: number;
+  operatorId: number;
+  pilotId: string;
+}): UserReservationRequest {
+  const aircraft = getFieldState(params.reservationType, "aircraft");
+  const instructor = getFieldState(params.reservationType, "instructor");
+
+  return {
+    aircraftId: resolveResourceId(aircraft.enabled, params.aircraftId),
+    instructorId: resolveResourceId(instructor.enabled, params.instructorId),
+    end: params.end,
+    start: params.start,
+    locationId: params.locationId,
+    operatorId: params.operatorId,
+    pilotId: params.pilotId,
+    reservationTypeId: params.reservationType.reservationTypeId,
+  };
+}
+
+export function buildFullReservationRequest(
+  reservationType: ReservationType,
+  reservationData: UserReservationRequest,
+): FullReservationRequest {
+  const flightHours = getFieldState(reservationType, "flightHours");
+  const flightRoute = getFieldState(reservationType, "flightRoute");
+  const flightRules = getFieldState(reservationType, "flightRules");
+  const flightType = getFieldState(reservationType, "flightType");
+
+  return {
+    ...reservationData,
+    additionalEmailNotifications: [],
+    additionalUserNotifications: [],
+    application: 2,
+    client: "V4",
+    comments: "",
+    equipmentIds: [],
+    estimatedFlightHours: flightHours.enabled ? "" : undefined,
+    flightRoute: flightRoute.enabled ? "" : undefined,
+    flightRules: flightRules.enabled ? null : undefined,
+    flightType: flightType.enabled ? null : undefined,
+    internalComments: "",
+    overrideExceptions: false,
+    recurring: false,
+    recurringForceReservations: null,
+    recurringOverrideExceptions: null,
+    recurringRepeatEveryMonthsDayOfMonth: null,
+    recurringRepeatEveryMonthsDayOfWeek: null,
+    schedulingGroupId: null,
+    schedulingGroupSlotId: null,
+    sendEmailNotification: true,
+    trainingSessions: [],
+    validateOnly: false,
+  };
+}
 
 /**
  * Creates a new reservation
@@ -77,31 +145,13 @@ export type ReservationResponse = z.infer<typeof ReservationResponseSchema>;
  * @throws {Error} - When reservation creation fails
  */
 export async function createReservation(
+  reservationType: ReservationType,
   reservationData: UserReservationRequest,
 ): Promise<ReservationResponse> {
   try {
-    const requestData: FullReservationRequest = {
-      ...reservationData,
-      additionalEmailNotifications: [],
-      additionalUserNotifications: [],
-      application: 2,
-      client: "V4",
-      comments: "",
-      equipmentIds: [],
-      estimatedFlightHours: "",
-      internalComments: "",
-      overrideExceptions: false,
-      recurring: false,
-      recurringForceReservations: null,
-      recurringOverrideExceptions: null,
-      recurringRepeatEveryMonthsDayOfMonth: null,
-      recurringRepeatEveryMonthsDayOfWeek: null,
-      schedulingGroupId: null,
-      schedulingGroupSlotId: null,
-      sendEmailNotification: true,
-      trainingSessions: [],
-      validateOnly: false,
-    };
+    const requestData = FullReservationRequestSchema.parse(
+      buildFullReservationRequest(reservationType, reservationData),
+    );
 
     const response = await safeFetch(
       "https://api-external.flightschedulepro.com/api/V2/Reservation",

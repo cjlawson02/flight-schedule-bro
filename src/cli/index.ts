@@ -1,13 +1,22 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { CONFIG } from "../shared/util/config.js";
 import {
-  addOperatorDays,
-  formatOperatorIsoDate,
-  startOfOperatorDay,
-} from "../shared/util/flightTime.js";
-import { BookableAvailability } from "../shared/dao/availability.js";
+  buildAvailabilityFetchTasks,
+  fetchAllAvailability,
+  filterValidAvailabilityBlocks,
+  prepareAvailabilitySearch,
+} from "../shared/blo/availabilitySearch.js";
+import { CONFIG } from "../shared/util/config.js";
+import { startOfOperatorDay } from "../shared/util/flightTime.js";
+import {
+  clearInvalidInstructorIds,
+  getInvalidInstructorIds,
+} from "../shared/dao/availability.js";
+import {
+  supportsScheduleMatchSearch,
+  type ReservationType,
+} from "../shared/dao/reservationTypes.js";
+import { FSP_NIL_RESOURCE_ID } from "../shared/dao/aircraft.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
-import { isValidBlock } from "../shared/util/dates.js";
 import { createProgressBar } from "../shared/util/progressBar.js";
 import { addReservationToCalendar } from "../shared/blo/calendar.js";
 import {
@@ -21,7 +30,8 @@ import {
   hasReservationOnSameDay,
 } from "../shared/dao/existingReservations.js";
 import { setCacheAdapter } from "../shared/dao/api_wrapper.js";
-import { chunk } from "../shared/util/array.js";
+import type { BookableAvailability } from "../shared/dao/availability.js";
+import { groupAvailabilitiesByTimeSlot } from "../shared/dao/availability.js";
 import { cliCacheAdapter } from "./cache.js";
 import { configureLogger, createLogger } from "../shared/util/logger.js";
 
@@ -30,6 +40,7 @@ const log = createLogger("cli");
 
 async function main() {
   setCacheAdapter(cliCacheAdapter);
+  clearInvalidInstructorIds();
   await fetchAuth(CONFIG.EMAIL, CONFIG.PASSWORD);
 
   const operatorId = getOperatorId();
@@ -42,21 +53,25 @@ async function main() {
   const allInstructorIds: string[] = scheduler.getInstructorIds();
   const cli = new InteractiveCLI();
 
-  // Get all available activity types and prompt user to select
-  const activityTypes = Array.from(scheduler.getActivityTypesMapEntries());
-  const selectedName = await cli.selectActivityType(activityTypes);
+  // Prompt user to select a reservation type
+  const reservationType = await cli.selectReservationType(
+    scheduler.getReservationTypes(),
+    { preferredTypeId: CONFIG.RESERVATION_TYPE_ID },
+  );
 
-  if (!selectedName) {
+  if (!reservationType) {
     console.log("❌ No activity type selected. Exiting.");
     return;
   }
 
-  const activityTypeId = activityTypes.find(
-    ([, name]) => name === selectedName,
-  )?.[0];
+  const activityTypeId = reservationType.reservationTypeId;
+  const selectedName = reservationType.reservationTypeName;
 
-  if (!activityTypeId) {
-    throw new Error("Failed to determine activity type");
+  if (!supportsScheduleMatchSearch(reservationType)) {
+    console.log(
+      `❌ "${selectedName}" is not supported for automated availability search.`,
+    );
+    return;
   }
 
   const preferredAircraftIds = Array.from(scheduler.getAircraftMapEntries())
@@ -68,7 +83,35 @@ async function main() {
       ? preferredAircraftIds
       : scheduler.getAircraftIds();
 
-  const instructorChunks = chunk(allInstructorIds, 3); // API limit: max 3 instructors
+  const searchParams = {
+    customerUserGuid: getUserId(),
+    locationId: getDefaultLocationId(),
+    operatorId,
+    timeZone: CONFIG.TIMEZONE,
+    activityTypeId,
+    reservationType,
+    allInstructorIds,
+    aircraftIds,
+  };
+
+  const prepared = prepareAvailabilitySearch(searchParams);
+
+  if (!prepared) {
+    console.log(
+      `❌ "${selectedName}" has no instructors or aircraft to search with.`,
+    );
+    return;
+  }
+
+  const skippedInstructors = allInstructorIds.filter((id) =>
+    getInvalidInstructorIds().has(id),
+  );
+  if (skippedInstructors.length > 0) {
+    log.warn("Skipped instructors not valid for scheduleMatch", {
+      count: skippedInstructors.length,
+      instructorIds: skippedInstructors,
+    });
+  }
 
   // Fetch existing reservations to filter out conflicts
   log.info("Checking existing reservations");
@@ -79,27 +122,12 @@ async function main() {
 
   try {
     // Collect all bookable availability
-    const bookablePromises: Promise<BookableAvailability[]>[] = [];
-
-    for (let offset = 0; offset <= CONFIG.DAYS_AHEAD; offset++) {
-      const day = addOperatorDays(today, offset, CONFIG.TIMEZONE);
-      const dayISO = formatOperatorIsoDate(day, CONFIG.TIMEZONE);
-
-      bookablePromises.push(
-        ...instructorChunks.map(
-          async (instructors) =>
-            await scheduler.getBookableAvailability({
-              customerUserGuid: getUserId(),
-              locationId: getDefaultLocationId(),
-              activityTypeId,
-              instructors,
-              aircraftIds,
-              startDate: dayISO,
-              endDate: dayISO,
-            }),
-        ),
-      );
-    }
+    const bookablePromises = buildAvailabilityFetchTasks(scheduler, {
+      params: searchParams,
+      prepared,
+      today,
+      daysAhead: CONFIG.DAYS_AHEAD,
+    });
 
     // Create progress bar
     const progressBar = createProgressBar("🔄 Fetching schedules");
@@ -123,16 +151,16 @@ async function main() {
         }),
     );
 
-    const allBookableResults: BookableAvailability[] = (
-      await Promise.all(trackedPromises)
-    ).flat();
+    const allBookableResults = await fetchAllAvailability(trackedPromises);
 
     // Stop progress bar
     progressBar.stop();
 
-    // Filter valid results using the existing validation logic
-    const validResults = allBookableResults.filter((result) =>
-      isValidBlock(result.startDateTime, result.endDateTime, CONFIG, 120),
+    // Filter valid results using reservation type duration and hour rules
+    const validResults = filterValidAvailabilityBlocks(
+      allBookableResults,
+      CONFIG,
+      reservationType.defaultLength,
     );
 
     // Filter out time slots on days where you already have a reservation
@@ -159,7 +187,7 @@ async function main() {
         cli,
         scheduler,
         availableWithoutConflicts,
-        activityTypeId,
+        reservationType,
         operatorId,
       );
     } else {
@@ -191,7 +219,7 @@ async function handleBookingFlow(
   cli: InteractiveCLI,
   scheduler: SchedulerBLO,
   availabilities: BookableAvailability[],
-  activityTypeId: string,
+  reservationType: ReservationType,
   operatorId: number,
 ): Promise<void> {
   try {
@@ -204,22 +232,14 @@ async function handleBookingFlow(
     }
 
     // Group selected availabilities by time slot for instructor selection
-    const timeSlotMap = new Map<string, BookableAvailability[]>();
-    for (const avail of selectedAvailabilities) {
-      const key = `${avail.date}|${avail.startTime}|${avail.endTime}`;
-      const slot = timeSlotMap.get(key) ?? [];
-      if (slot.length === 0) {
-        timeSlotMap.set(key, slot);
-      }
-      slot.push(avail);
-    }
+    const timeSlotGroups = groupAvailabilitiesByTimeSlot(
+      selectedAvailabilities,
+    );
 
     // Collect final selections with instructor choices
     const finalSelections: BookableAvailability[] = [];
 
-    for (const [timeSlotKey, availabilitiesForSlot] of timeSlotMap) {
-      const [_date, _startTime, _endTime] = timeSlotKey.split("|");
-
+    for (const { availabilities: availabilitiesForSlot } of timeSlotGroups) {
       // If only one option, auto-select it
       if (availabilitiesForSlot.length === 1) {
         finalSelections.push(availabilitiesForSlot[0]);
@@ -299,11 +319,17 @@ async function handleBookingFlow(
           `📤 Booking request: Aircraft ID=${selection.aircraftId}, Instructor ID=${selection.instructorId}`,
         );
         const response = await scheduler.bookReservation({
-          aircraftId: selection.aircraftId,
-          instructorId: selection.instructorId,
+          aircraftId:
+            selection.aircraftId === FSP_NIL_RESOURCE_ID
+              ? undefined
+              : selection.aircraftId,
+          instructorId:
+            selection.instructorId === FSP_NIL_RESOURCE_ID
+              ? undefined
+              : selection.instructorId,
           startTime: selection.startDateTime,
           endTime: selection.endDateTime,
-          reservationTypeId: activityTypeId,
+          reservationType,
           locationId: getDefaultLocationId(),
         });
 

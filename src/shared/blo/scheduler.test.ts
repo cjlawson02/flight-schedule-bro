@@ -3,20 +3,41 @@ import { SchedulerBLO } from "./scheduler.js";
 import { parseFspLocal } from "../util/flightTime.js";
 
 const LA = "America/Los_Angeles";
+
+import { dualFlightTraining as mockDualReservationType } from "../dao/reservationTypes.fixtures.js";
 import * as instructorsDAO from "../dao/instructors.js";
 import * as reservationTypesDAO from "../dao/reservationTypes.js";
 import * as aircraftDAO from "../dao/aircraft.js";
 import * as availabilityDAO from "../dao/availability.js";
 import * as reservationsDAO from "../dao/reservations.js";
 import * as authDAO from "../dao/auth.js";
-import { createReservationTypeFixture } from "../dao/reservationTypes.fixtures.js";
 
 // Mock all DAO modules
 vi.mock("../dao/instructors.js");
-vi.mock("../dao/reservationTypes.js");
-vi.mock("../dao/aircraft.js");
+vi.mock("../dao/reservationTypes.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../dao/reservationTypes.js")>();
+  return {
+    ...actual,
+    getReservationTypes: vi.fn(),
+  };
+});
+vi.mock("../dao/aircraft.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../dao/aircraft.js")>();
+  return {
+    ...actual,
+    getAircraft: vi.fn(),
+  };
+});
 vi.mock("../dao/availability.js");
-vi.mock("../dao/reservations.js");
+vi.mock("../dao/reservations.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../dao/reservations.js")>();
+  return {
+    ...actual,
+    createReservation: vi.fn(),
+  };
+});
 vi.mock("../dao/auth.js");
 
 describe("SchedulerBLO", () => {
@@ -43,8 +64,12 @@ describe("SchedulerBLO", () => {
       });
 
       vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        createReservationTypeFixture({ reservationTypeId: "type-1", reservationTypeName: "Dual Instruction" }),
-        createReservationTypeFixture({ reservationTypeId: "type-2", reservationTypeName: "Solo" }),
+        mockDualReservationType,
+        {
+          ...mockDualReservationType,
+          reservationTypeId: "22222222-2222-4222-8222-222222222222",
+          reservationTypeName: "Solo",
+        },
       ]);
 
       vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
@@ -86,7 +111,8 @@ describe("SchedulerBLO", () => {
 
       await scheduler.initialize();
 
-      expect(scheduler.getAircraftName("ac-1")).toBe("N12345");
+      const entries = Array.from(scheduler.getAircraftMapEntries());
+      expect(entries.find(([id]) => id === "ac-1")?.[1]).toBe("N12345");
     });
   });
 
@@ -100,7 +126,7 @@ describe("SchedulerBLO", () => {
       });
 
       vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        createReservationTypeFixture({ reservationTypeId: "type-1", reservationTypeName: "Dual Instruction" }),
+        mockDualReservationType,
       ]);
 
       vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
@@ -131,28 +157,6 @@ describe("SchedulerBLO", () => {
       });
     });
 
-    describe("getInstructorName", () => {
-      it("returns instructor name when ID exists", () => {
-        expect(scheduler.getInstructorName("inst-1")).toBe("John Doe");
-        expect(scheduler.getInstructorName("inst-2")).toBe("Jane Smith");
-      });
-
-      it("returns undefined when ID does not exist", () => {
-        expect(scheduler.getInstructorName("non-existent")).toBeUndefined();
-      });
-    });
-
-    describe("getAircraftName", () => {
-      it("returns aircraft tail number when ID exists", () => {
-        expect(scheduler.getAircraftName("ac-1")).toBe("N12345");
-        expect(scheduler.getAircraftName("ac-2")).toBe("N67890");
-      });
-
-      it("returns undefined when ID does not exist", () => {
-        expect(scheduler.getAircraftName("non-existent")).toBeUndefined();
-      });
-    });
-
     describe("getAircraftMapEntries", () => {
       it("returns an iterator of aircraft ID to name mappings", () => {
         const entries = Array.from(scheduler.getAircraftMapEntries());
@@ -160,13 +164,6 @@ describe("SchedulerBLO", () => {
           ["ac-1", "N12345"],
           ["ac-2", "N67890"],
         ]);
-      });
-    });
-
-    describe("getActivityTypesMapEntries", () => {
-      it("returns an iterator of activity type ID to name mappings", () => {
-        const entries = Array.from(scheduler.getActivityTypesMapEntries());
-        expect(entries).toEqual([["type-1", "Dual Instruction"]]);
       });
     });
   });
@@ -208,7 +205,7 @@ describe("SchedulerBLO", () => {
       const params = {
         customerUserGuid: "user-123",
         locationId: 1,
-        activityTypeId: "type-1",
+        activityTypeId: mockDualReservationType.reservationTypeId,
         instructors: ["inst-1"],
         aircraftIds: ["ac-1"],
         startDate: "2024-07-15",
@@ -221,7 +218,6 @@ describe("SchedulerBLO", () => {
         ...params,
         operatorId: mockOperatorId,
         timeZone: LA,
-        lengthOfReservationInMinutes: 120,
       });
 
       expect(result).toHaveLength(1);
@@ -265,7 +261,7 @@ describe("SchedulerBLO", () => {
       const result = await scheduler.getBookableAvailability({
         customerUserGuid: "user-123",
         locationId: 1,
-        activityTypeId: "type-1",
+        activityTypeId: mockDualReservationType.reservationTypeId,
         instructors: ["inst-1"],
         aircraftIds: ["ac-1"],
         startDate: "2024-07-15",
@@ -296,7 +292,7 @@ describe("SchedulerBLO", () => {
       const result = await scheduler.getBookableAvailability({
         customerUserGuid: "user-123",
         locationId: 1,
-        activityTypeId: "type-1",
+        activityTypeId: mockDualReservationType.reservationTypeId,
         instructors: ["unknown-instructor"],
         aircraftIds: ["ac-1"],
         startDate: "2024-07-15",
@@ -327,14 +323,35 @@ describe("SchedulerBLO", () => {
       const result = await scheduler.getBookableAvailability({
         customerUserGuid: "user-123",
         locationId: 1,
-        activityTypeId: "type-1",
+        activityTypeId: mockDualReservationType.reservationTypeId,
         instructors: ["inst-1"],
         aircraftIds: ["unknown-aircraft"],
         startDate: "2024-07-15",
         endDate: "2024-07-16",
       });
 
-      expect(result[0].aircraftId).toBe("unknown-aircraft"); // Falls back to ID
+      expect(result[0].aircraftId).toBe("unknown-aircraft");
+    });
+
+    it("uses explicit lengthOfReservationInMinutes without initialize metadata", async () => {
+      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue([]);
+
+      const workerScheduler = new SchedulerBLO(mockOperatorId, LA);
+
+      await workerScheduler.getBookableAvailability({
+        customerUserGuid: "user-123",
+        locationId: 1,
+        activityTypeId: mockDualReservationType.reservationTypeId,
+        instructors: ["inst-1"],
+        aircraftIds: ["ac-1"],
+        startDate: "2024-07-15",
+        endDate: "2024-07-15",
+        lengthOfReservationInMinutes: 90,
+      });
+
+      expect(availabilityDAO.fetchAvailability).toHaveBeenCalledWith(
+        expect.objectContaining({ lengthOfReservationInMinutes: 90 }),
+      );
     });
   });
 
@@ -343,7 +360,9 @@ describe("SchedulerBLO", () => {
       vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
         results: [],
       });
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([]);
+      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
+        mockDualReservationType,
+      ]);
       vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({ results: [] });
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
 
@@ -352,8 +371,7 @@ describe("SchedulerBLO", () => {
 
     it("books a reservation successfully", async () => {
       const mockResponse = {
-        id: "reservation-123",
-        reservationTypeId: "type-1",
+        id: "66666666-6666-4666-8666-666666666666",
         errors: [],
       };
 
@@ -362,49 +380,52 @@ describe("SchedulerBLO", () => {
       );
 
       const params = {
-        aircraftId: "ac-1",
-        instructorId: "inst-1",
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
         startTime: parseFspLocal("2024-07-15T10:00:00", LA),
         endTime: parseFspLocal("2024-07-15T12:00:00", LA),
-        reservationTypeId: "type-1",
+        reservationType: mockDualReservationType,
         locationId: 1,
       };
 
       const result = await scheduler.bookReservation(params);
 
       expect(result).toEqual(mockResponse);
-      expect(reservationsDAO.createReservation).toHaveBeenCalledWith({
-        aircraftId: "ac-1",
-        instructorId: "inst-1",
-        start: "2024-07-15T10:00",
-        end: "2024-07-15T12:00",
-        reservationTypeId: "type-1",
-        locationId: 1,
-        operatorId: mockOperatorId,
-        pilotId: "pilot-123",
-      });
+      expect(reservationsDAO.createReservation).toHaveBeenCalledWith(
+        mockDualReservationType,
+        {
+          aircraftId: "33333333-3333-4333-8333-333333333333",
+          instructorId: "44444444-4444-4444-8444-444444444444",
+          start: "2024-07-15T10:00",
+          end: "2024-07-15T12:00",
+          reservationTypeId: mockDualReservationType.reservationTypeId,
+          locationId: 1,
+          operatorId: mockOperatorId,
+          pilotId: "pilot-123",
+        },
+      );
     });
 
     it("formats dates to local timezone ISO string without seconds", async () => {
       vi.mocked(reservationsDAO.createReservation).mockResolvedValue({
-        id: "res-1",
+        id: "66666666-6666-4666-8666-666666666666",
         errors: [],
       });
 
       const params = {
-        aircraftId: "ac-1",
-        instructorId: "inst-1",
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
         startTime: parseFspLocal("2024-07-15T14:30:45", LA),
         endTime: parseFspLocal("2024-07-15T16:30:45", LA),
-        reservationTypeId: "type-1",
+        reservationType: mockDualReservationType,
         locationId: 1,
       };
 
       await scheduler.bookReservation(params);
 
       const call = vi.mocked(reservationsDAO.createReservation).mock
-        .calls[0][0];
-      expect(call.start).toBe("2024-07-15T14:30"); // No seconds
+        .calls[0][1];
+      expect(call.start).toBe("2024-07-15T14:30");
       expect(call.end).toBe("2024-07-15T16:30");
     });
 
@@ -414,11 +435,11 @@ describe("SchedulerBLO", () => {
       );
 
       const params = {
-        aircraftId: "ac-1",
-        instructorId: "inst-1",
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
         startTime: parseFspLocal("2024-07-15T10:00:00", LA),
         endTime: parseFspLocal("2024-07-15T12:00:00", LA),
-        reservationTypeId: "type-1",
+        reservationType: mockDualReservationType,
         locationId: 1,
       };
 
@@ -442,18 +463,18 @@ describe("SchedulerBLO", () => {
       );
 
       const params = {
-        aircraftId: "ac-1",
-        instructorId: "inst-1",
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
         startTime: parseFspLocal("2024-07-15T10:00:00", LA),
         endTime: parseFspLocal("2024-07-15T12:00:00", LA),
-        reservationTypeId: "type-1",
+        reservationType: mockDualReservationType,
         locationId: 1,
       };
 
       try {
         await scheduler.bookReservation(params);
       } catch (error: any) {
-        expect(error.code).toBe("VALIDATION_ERROR"); // Original code preserved
+        expect(error.code).toBe("VALIDATION_ERROR");
         expect(error.message).toBe("Validation failed");
       }
     });
