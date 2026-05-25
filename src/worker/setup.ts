@@ -141,7 +141,7 @@ export async function runSetup(env: Env): Promise<Response> {
 
     // Filter valid results using the existing validation logic
     const validResults = allBookableResults.filter((result) =>
-      isValidBlock(result.startDateTime, result.endDateTime, config),
+      isValidBlock(result.startDateTime, result.endDateTime, config, 120),
     );
 
     log.info("Filtered valid time slots", { count: validResults.length });

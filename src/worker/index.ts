@@ -194,7 +194,7 @@ export default {
 
       // Step 6: Filter valid results
       const validResults = allBookableResults.filter((result) =>
-        isValidBlock(result.startDateTime, result.endDateTime, config),
+        isValidBlock(result.startDateTime, result.endDateTime, config, 120),
       );
 
       log.info("Filtered valid time slots", { count: validResults.length });

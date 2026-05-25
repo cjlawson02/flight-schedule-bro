@@ -220,6 +220,8 @@ describe("SchedulerBLO", () => {
       expect(availabilityDAO.fetchAvailability).toHaveBeenCalledWith({
         ...params,
         operatorId: mockOperatorId,
+        timeZone: LA,
+        lengthOfReservationInMinutes: 120,
       });
 
       expect(result).toHaveLength(1);

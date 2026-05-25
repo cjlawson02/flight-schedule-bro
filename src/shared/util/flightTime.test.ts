@@ -65,7 +65,7 @@ describe("isValidBlock with operator timezone", () => {
   it("accepts a 5-7 PM Pacific weekday block", () => {
     const start = parseFspLocal("2025-11-04T17:00:00", LA);
     const end = parseFspLocal("2025-11-04T19:00:00", LA);
-    expect(isValidBlock(start, end, testConfig)).toBe(true);
+    expect(isValidBlock(start, end, testConfig, 120)).toBe(true);
     expect(getOperatorHour(start, LA)).toBe(17);
     expect(isOperatorWeekend(start, LA)).toBe(false);
   });
@@ -73,6 +73,6 @@ describe("isValidBlock with operator timezone", () => {
   it("rejects a 9-11 AM Pacific weekday block", () => {
     const start = parseFspLocal("2025-11-04T09:00:00", LA);
     const end = parseFspLocal("2025-11-04T11:00:00", LA);
-    expect(isValidBlock(start, end, testConfig)).toBe(false);
+    expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
   });
 });

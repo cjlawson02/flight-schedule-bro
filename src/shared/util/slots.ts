@@ -5,7 +5,7 @@ import {
   parseOperatorDateString,
 } from "./flightTime.js";
 
-export function createSlotKey(slot: BookableAvailability): string {
+function createSlotKey(slot: BookableAvailability): string {
   return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
 }
 

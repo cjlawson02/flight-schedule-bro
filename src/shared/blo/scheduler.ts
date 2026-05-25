@@ -1,6 +1,6 @@
 import { getInstructors } from "../dao/instructors.js";
 import { getReservationTypes } from "../dao/reservationTypes.js";
-import { getAircraft } from "../dao/aircraft.js";
+import { getAircraft, FSP_NIL_RESOURCE_ID } from "../dao/aircraft.js";
 import {
   fetchAvailability,
   BookableAvailability,
@@ -115,6 +115,7 @@ export class SchedulerBLO {
     aircraftIds: string[];
     startDate: string;
     endDate: string;
+    lengthOfReservationInMinutes?: number;
   }): Promise<BookableAvailability[]> {
     const results = await fetchAvailability({
       customerUserGuid: params.customerUserGuid,
@@ -125,6 +126,8 @@ export class SchedulerBLO {
       startDate: params.startDate,
       endDate: params.endDate,
       operatorId: this.operatorId,
+      timeZone: this.timeZone,
+      lengthOfReservationInMinutes: params.lengthOfReservationInMinutes ?? 120,
     });
 
     const bookableResults: BookableAvailability[] = [];
@@ -133,19 +136,24 @@ export class SchedulerBLO {
       for (const timeBlock of result.timeBlocks) {
         const startDateTime = parseFspLocal(timeBlock.startAt, this.timeZone);
         const endDateTime = parseFspLocal(timeBlock.endAt, this.timeZone);
+        const instructorId = result.flightInstructorId ?? FSP_NIL_RESOURCE_ID;
+        const aircraftId = result.aircraftId ?? FSP_NIL_RESOURCE_ID;
 
         bookableResults.push({
           date: formatOperatorDisplayDate(startDateTime, this.timeZone),
           startTime: formatOperatorDisplayTime(startDateTime, this.timeZone),
           endTime: formatOperatorDisplayTime(endDateTime, this.timeZone),
-          instructorId: result.flightInstructorId,
-          aircraftId: result.aircraftId,
+          instructorId,
+          aircraftId,
           instructor:
-            this.instructorsMap.get(result.flightInstructorId) ??
-            `Instructor ${result.flightInstructorId}`,
+            instructorId === FSP_NIL_RESOURCE_ID
+              ? undefined
+              : (this.instructorsMap.get(instructorId) ??
+                `Instructor ${instructorId}`),
           aircraft:
-            this.aircraftMap.get(result.aircraftId) ??
-            `Aircraft ${result.aircraftId}`,
+            aircraftId === FSP_NIL_RESOURCE_ID
+              ? undefined
+              : (this.aircraftMap.get(aircraftId) ?? `Aircraft ${aircraftId}`),
           startDateTime,
           endDateTime,
         });

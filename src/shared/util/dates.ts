@@ -1,4 +1,4 @@
-import { CONFIG, type ConfigType } from "./config.js";
+import { type ConfigType } from "./config.js";
 import {
   getOperatorHour,
   isOperatorWeekend,
@@ -9,19 +9,19 @@ import {
  * Validate if a time block meets scheduling criteria in the operator's timezone.
  *
  * Rules:
- * - Duration must be exactly 2 hours (120 minutes)
+ * - Duration must match expectedDurationMinutes (reservation type defaultLength)
  * - Weekdays: start >= WEEKDAY_MIN_HOUR, end <= MAX_HOUR
  * - Weekends: end <= MAX_HOUR
  */
 export function isValidBlock(
   start: Date,
   end: Date,
-  config?: ConfigType,
+  config: ConfigType,
+  expectedDurationMinutes: number,
 ): boolean {
-  const cfg = config ?? CONFIG;
-  const timeZone = cfg.TIMEZONE;
+  const timeZone = config.TIMEZONE;
   const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-  if (durationMinutes !== 120) return false;
+  if (durationMinutes !== expectedDurationMinutes) return false;
 
   const hour = getOperatorHour(start, timeZone);
   const endZoned = toOperatorZoned(end, timeZone);
@@ -29,6 +29,6 @@ export function isValidBlock(
   const isWeekend = isOperatorWeekend(start, timeZone);
 
   return isWeekend
-    ? endHour <= cfg.MAX_HOUR
-    : hour >= cfg.WEEKDAY_MIN_HOUR && endHour <= cfg.MAX_HOUR;
+    ? endHour <= config.MAX_HOUR
+    : hour >= config.WEEKDAY_MIN_HOUR && endHour <= config.MAX_HOUR;
 }

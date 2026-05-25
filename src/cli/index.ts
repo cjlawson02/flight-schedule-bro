@@ -132,7 +132,7 @@ async function main() {
 
     // Filter valid results using the existing validation logic
     const validResults = allBookableResults.filter((result) =>
-      isValidBlock(result.startDateTime, result.endDateTime, CONFIG),
+      isValidBlock(result.startDateTime, result.endDateTime, CONFIG, 120),
     );
 
     // Filter out time slots on days where you already have a reservation
