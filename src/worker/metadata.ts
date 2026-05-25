@@ -1,8 +1,9 @@
 import { reservationTypeMissingFieldMetadata } from "../shared/dao/reservationTypes.js";
-import { FspMetadataSchema, type FspMetadata } from "./types.js";
-import { getInstructors } from "../shared/dao/instructors.js";
-import { getReservationTypes } from "../shared/dao/reservationTypes.js";
-import { getAircraft, isReservableAircraft } from "../shared/dao/aircraft.js";
+import {
+  fetchFspMetadata,
+  FspMetadataSchema,
+  type FspMetadata,
+} from "../shared/blo/fspMetadata.js";
 import { createLogger } from "../shared/util/logger.js";
 
 const log = createLogger("metadata");
@@ -64,27 +65,7 @@ export async function refreshMetadata(
   kv: KVNamespace,
 ): Promise<FspMetadata> {
   log.info("Fetching fresh metadata from FSP API");
-
-  const [instructors, reservationTypes, aircraft] = await Promise.all([
-    getInstructors(operatorId),
-    getReservationTypes(operatorId),
-    getAircraft(operatorId),
-  ]);
-
-  const metadata: FspMetadata = {
-    instructors: instructors.results.map((i) => ({
-      instructorId: i.instructorId,
-      displayName: i.displayName,
-    })),
-    reservationTypes,
-    aircraft: aircraft.results.filter(isReservableAircraft).map((a) => ({
-      aircraftId: a.aircraftId,
-      tailNumber: a.tailNumber.trim(),
-    })),
-    lastUpdated: new Date().toISOString(),
-  };
-
-  // Store in KV
+  const metadata = await fetchFspMetadata(operatorId);
   await setMetadataInKV(kv, metadata);
 
   log.info("Metadata refreshed", {

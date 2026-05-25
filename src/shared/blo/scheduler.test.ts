@@ -5,30 +5,12 @@ import { parseFspLocal } from "../util/flightTime.js";
 const LA = "America/Los_Angeles";
 
 import { dualFlightTraining as mockDualReservationType } from "../dao/reservationTypes.fixtures.js";
-import * as instructorsDAO from "../dao/instructors.js";
-import * as reservationTypesDAO from "../dao/reservationTypes.js";
-import * as aircraftDAO from "../dao/aircraft.js";
+import * as fspMetadataModule from "./fspMetadata.js";
 import * as availabilityDAO from "../dao/availability.js";
 import * as reservationsDAO from "../dao/reservations.js";
 import * as authDAO from "../dao/auth.js";
 
-// Mock all DAO modules
-vi.mock("../dao/instructors.js");
-vi.mock("../dao/reservationTypes.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../dao/reservationTypes.js")>();
-  return {
-    ...actual,
-    getReservationTypes: vi.fn(),
-  };
-});
-vi.mock("../dao/aircraft.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../dao/aircraft.js")>();
-  return {
-    ...actual,
-    getAircraft: vi.fn(),
-  };
-});
+vi.mock("./fspMetadata.js");
 vi.mock("../dao/availability.js");
 vi.mock("../dao/reservations.js", async (importOriginal) => {
   const actual =
@@ -39,6 +21,31 @@ vi.mock("../dao/reservations.js", async (importOriginal) => {
   };
 });
 vi.mock("../dao/auth.js");
+
+function createMockMetadata(
+  overrides: Partial<fspMetadataModule.FspMetadata> = {},
+): fspMetadataModule.FspMetadata {
+  return {
+    instructors: [
+      { instructorId: "inst-1", displayName: "John Doe" },
+      { instructorId: "inst-2", displayName: "Jane Smith" },
+    ],
+    reservationTypes: [
+      mockDualReservationType,
+      {
+        ...mockDualReservationType,
+        reservationTypeId: "22222222-2222-4222-8222-222222222222",
+        reservationTypeName: "Solo",
+      },
+    ],
+    aircraft: [
+      { aircraftId: "ac-1", tailNumber: "N12345" },
+      { aircraftId: "ac-2", tailNumber: "N67890" },
+    ],
+    lastUpdated: "2024-01-15T12:00:00.000Z",
+    ...overrides,
+  };
+}
 
 describe("SchedulerBLO", () => {
   const mockOperatorId = 12345;
@@ -54,59 +61,74 @@ describe("SchedulerBLO", () => {
   });
 
   describe("initialize", () => {
-    it("loads instructors, aircraft, and activity types successfully", async () => {
-      // Mock DAO responses
-      vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
-        results: [
-          { instructorId: "inst-1", displayName: "John Doe" },
-          { instructorId: "inst-2", displayName: "Jane Smith" },
-        ],
+    it("hydrates maps from metadata without API calls", () => {
+      scheduler.hydrateFromMetadata(createMockMetadata());
+
+      expect(scheduler.getInstructorIds()).toEqual(["inst-1", "inst-2"]);
+      expect(scheduler.getAircraftIds()).toEqual(["ac-1", "ac-2"]);
+      expect(scheduler.getReservationTypes()).toHaveLength(2);
+    });
+
+    it("binds pilotId from auth session during hydrateFromMetadata", async () => {
+      vi.mocked(authDAO.getAuthSession).mockReturnValue({
+        sessionCookies: "session=abc",
+        operatorId: mockOperatorId,
+        subscriptionKey: "sub-key",
+        authToken: "token",
+        userId: "user-guid",
+        pilotId: "123e4567-e89b-12d3-a456-426614174000",
+        defaultLocationId: 456,
       });
 
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
+      scheduler.hydrateFromMetadata(
+        createMockMetadata({ reservationTypes: [mockDualReservationType] }),
+      );
+
+      vi.mocked(reservationsDAO.createReservation).mockResolvedValue({
+        id: "66666666-6666-4666-8666-666666666666",
+        errors: [],
+      });
+
+      await scheduler.bookReservation({
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
+        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
+        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
+        reservationType: mockDualReservationType,
+        locationId: 1,
+      });
+
+      expect(reservationsDAO.createReservation).toHaveBeenCalledWith(
         mockDualReservationType,
-        {
-          ...mockDualReservationType,
-          reservationTypeId: "22222222-2222-4222-8222-222222222222",
-          reservationTypeName: "Solo",
-        },
-      ]);
+        expect.objectContaining({
+          pilotId: "123e4567-e89b-12d3-a456-426614174000",
+        }),
+      );
+    });
 
-      vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
-        results: [
-          { aircraftId: "ac-1", tailNumber: "N12345", model: "172S" },
-          { aircraftId: "ac-2", tailNumber: "N67890", model: "172N" },
-        ],
-      });
-
+    it("loads instructors, aircraft, and activity types successfully", async () => {
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
+        createMockMetadata(),
+      );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
 
       await scheduler.initialize();
 
-      // Verify all DAOs were called with correct parameters
-      expect(instructorsDAO.getInstructors).toHaveBeenCalledWith(
+      expect(fspMetadataModule.fetchFspMetadata).toHaveBeenCalledWith(
         mockOperatorId,
       );
-      expect(reservationTypesDAO.getReservationTypes).toHaveBeenCalledWith(
-        mockOperatorId,
-      );
-      expect(aircraftDAO.getAircraft).toHaveBeenCalledWith(mockOperatorId);
-
-      // Verify data was loaded correctly
       expect(scheduler.getInstructorIds()).toEqual(["inst-1", "inst-2"]);
       expect(scheduler.getAircraftIds()).toEqual(["ac-1", "ac-2"]);
     });
 
     it("trims aircraft tail numbers when loading", async () => {
-      vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
-        results: [],
-      });
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([]);
-      vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
-        results: [
-          { aircraftId: "ac-1", tailNumber: "  N12345  ", model: "172S" },
-        ],
-      });
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
+        createMockMetadata({
+          instructors: [],
+          reservationTypes: [],
+          aircraft: [{ aircraftId: "ac-1", tailNumber: "N12345" }],
+        }),
+      );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
 
       await scheduler.initialize();
@@ -118,26 +140,12 @@ describe("SchedulerBLO", () => {
 
   describe("getter methods", () => {
     beforeEach(async () => {
-      vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
-        results: [
-          { instructorId: "inst-1", displayName: "John Doe" },
-          { instructorId: "inst-2", displayName: "Jane Smith" },
-        ],
-      });
-
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        mockDualReservationType,
-      ]);
-
-      vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
-        results: [
-          { aircraftId: "ac-1", tailNumber: "N12345", model: "172S" },
-          { aircraftId: "ac-2", tailNumber: "N67890", model: "172N" },
-        ],
-      });
-
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
+        createMockMetadata({
+          reservationTypes: [mockDualReservationType],
+        }),
+      );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
-
       await scheduler.initialize();
     });
 
@@ -170,17 +178,14 @@ describe("SchedulerBLO", () => {
 
   describe("getBookableAvailability", () => {
     beforeEach(async () => {
-      vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
-        results: [{ instructorId: "inst-1", displayName: "John Doe" }],
-      });
-
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([]);
-      vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({
-        results: [{ aircraftId: "ac-1", tailNumber: "N12345", model: "172S" }],
-      });
-
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
+        createMockMetadata({
+          instructors: [{ instructorId: "inst-1", displayName: "John Doe" }],
+          reservationTypes: [],
+          aircraft: [{ aircraftId: "ac-1", tailNumber: "N12345" }],
+        }),
+      );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
-
       await scheduler.initialize();
     });
 
@@ -357,13 +362,14 @@ describe("SchedulerBLO", () => {
 
   describe("bookReservation", () => {
     beforeEach(async () => {
-      vi.mocked(instructorsDAO.getInstructors).mockResolvedValue({
-        results: [],
-      });
-      vi.mocked(reservationTypesDAO.getReservationTypes).mockResolvedValue([
-        mockDualReservationType,
-      ]);
-      vi.mocked(aircraftDAO.getAircraft).mockResolvedValue({ results: [] });
+      vi.mocked(authDAO.getAuthSession).mockReturnValue(null);
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
+        createMockMetadata({
+          instructors: [],
+          reservationTypes: [mockDualReservationType],
+          aircraft: [],
+        }),
+      );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
 
       await scheduler.initialize();

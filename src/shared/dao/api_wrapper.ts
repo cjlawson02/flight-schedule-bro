@@ -248,9 +248,9 @@ export async function safeFetch<T extends z.ZodType>(
 
             log.error("HTTP error from FSP API", {
               status: res.status,
-              url,
-              params,
-              response: data,
+              url: url.split("?")[0],
+              response:
+                typeof data === "object" && data !== null ? "[redacted]" : data,
             });
             throw new FspHttpError(res.status, data);
           }

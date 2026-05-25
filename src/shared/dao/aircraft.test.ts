@@ -3,6 +3,8 @@ import {
   getAircraft,
   isReservableAircraft,
   FSP_NIL_RESOURCE_ID,
+  nilToOptionalResourceId,
+  selectPreferredAircraftIds,
 } from "./aircraft.js";
 import * as apiWrapper from "./api_wrapper.js";
 
@@ -87,5 +89,37 @@ describe("isReservableAircraft", () => {
         tailNumber: "N713RE",
       }),
     ).toBe(true);
+  });
+});
+
+describe("nilToOptionalResourceId", () => {
+  it("returns undefined for nil UUIDs", () => {
+    expect(nilToOptionalResourceId(FSP_NIL_RESOURCE_ID)).toBeUndefined();
+    expect(
+      nilToOptionalResourceId("cc20d524-b205-43df-9670-5db41a761f87"),
+    ).toBe("cc20d524-b205-43df-9670-5db41a761f87");
+  });
+});
+
+describe("selectPreferredAircraftIds", () => {
+  const aircraft = [
+    { aircraftId: "ac-1", tailNumber: "N172S" },
+    { aircraftId: "ac-2", tailNumber: "N172N" },
+    { aircraftId: "ac-3", tailNumber: "N152" },
+  ];
+
+  it("returns preferred aircraft when regex matches", () => {
+    expect(selectPreferredAircraftIds(aircraft, /172S|172N/i)).toEqual([
+      "ac-1",
+      "ac-2",
+    ]);
+  });
+
+  it("returns all aircraft when nothing matches", () => {
+    expect(selectPreferredAircraftIds(aircraft, /999/i)).toEqual([
+      "ac-1",
+      "ac-2",
+      "ac-3",
+    ]);
   });
 });

@@ -27,6 +27,21 @@ export function isReservableAircraft(
   );
 }
 
+export function nilToOptionalResourceId(id: string): string | undefined {
+  return id === FSP_NIL_RESOURCE_ID ? undefined : id;
+}
+
+export function selectPreferredAircraftIds(
+  aircraft: Pick<AircraftMetadata, "aircraftId" | "tailNumber">[],
+  regex: RegExp,
+): string[] {
+  const preferred = aircraft
+    .filter((a) => regex.test(a.tailNumber))
+    .map((a) => a.aircraftId);
+
+  return preferred.length > 0 ? preferred : aircraft.map((a) => a.aircraftId);
+}
+
 const AircraftResponseSchema = z.object({
   results: z.array(AircraftSchema),
 });

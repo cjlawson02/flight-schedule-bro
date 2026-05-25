@@ -1,11 +1,8 @@
 import { getSessionCookies } from "./auth.js";
 
 /**
- * Fetches iCal content from the API for a given reservation
- * This endpoint requires cookie-based authentication from the login session
- * @param reservationId - The UUID of the reservation
- * @returns Promise<string> - The iCal file content
- * @throws {Error} - When the fetch fails
+ * Fetches iCal content from the API for a given reservation.
+ * Requires cookie-based authentication from the login session.
  */
 export async function fetchICalContent(
   operatorId: number,

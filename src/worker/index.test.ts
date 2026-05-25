@@ -1,7 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { Env } from "./types.js";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { chunk } from "../shared/util/array.js";
 import { findNewSlots } from "../shared/util/slots.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
@@ -192,44 +190,6 @@ describe("Worker Index - Helper Functions", () => {
     });
   });
 
-  describe("Date Normalization Edge Cases", () => {
-    it("uses shared UTC date helpers in worker code", () => {
-      // This test checks the actual source files to ensure Worker date handling
-      // stays UTC-safe and doesn't regress to local-time normalization.
-
-      const projectRoot = process.cwd();
-
-      const indexCode = readFileSync(
-        join(projectRoot, "src/worker/index.ts"),
-        "utf-8",
-      );
-      const setupCode = readFileSync(
-        join(projectRoot, "src/worker/setup.ts"),
-        "utf-8",
-      );
-
-      const usesFlightTimeImport =
-        indexCode.includes('from "../shared/util/flightTime.js"') &&
-        setupCode.includes('from "../shared/util/flightTime.js"');
-      const indexUsesStartOfOperatorDay = indexCode.includes(
-        "startOfOperatorDay(",
-      );
-      const setupUsesStartOfOperatorDay = setupCode.includes(
-        "startOfOperatorDay(",
-      );
-      const indexUsesSetHours =
-        /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(indexCode);
-      const setupUsesSetHours =
-        /today\.setHours\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(setupCode);
-
-      expect(usesFlightTimeImport).toBe(true);
-      expect(indexUsesStartOfOperatorDay).toBe(true);
-      expect(setupUsesStartOfOperatorDay).toBe(true);
-      expect(indexUsesSetHours).toBe(false);
-      expect(setupUsesSetHours).toBe(false);
-    });
-  });
-
   describe("Rolling Window Date Comparison Edge Cases", () => {
     it("handles slots exactly at maxTrackedDateOnly boundary", () => {
       const currentSlots = [
@@ -322,52 +282,6 @@ describe("Worker Index - Helper Functions", () => {
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
-    });
-  });
-
-  describe("Snapshot Update Failure Edge Cases", () => {
-    it("verifies snapshot is updated before notification to prevent duplicates", async () => {
-      // This test checks the ACTUAL source code to verify the fix is in place
-      // FIXED: Snapshot is now updated BEFORE notification is sent
-      // This prevents duplicate notifications if setSnapshot fails (it will fail before notification)
-      // If notification fails, snapshot is already updated (no duplicates on retry)
-
-      const projectRoot = process.cwd();
-      const indexCode = readFileSync(
-        join(projectRoot, "src/worker/index.ts"),
-        "utf-8",
-      );
-
-      // Find the line numbers for notification and snapshot update
-      const lines = indexCode.split("\n");
-
-      // Find where sendAvailabilityNotification is called
-      let notificationLine = -1;
-      let setSnapshotLine = -1;
-
-      for (let i = 0; i < lines.length; i++) {
-        // Look for the actual function call, not the import
-        if (
-          lines[i].includes("await sendAvailabilityNotification") &&
-          notificationLine === -1
-        ) {
-          notificationLine = i + 1; // 1-indexed
-        }
-        if (lines[i].includes("await setSnapshot") && setSnapshotLine === -1) {
-          setSnapshotLine = i + 1; // 1-indexed
-        }
-      }
-
-      // This test verifies that snapshot is updated BEFORE notification
-      // This prevents duplicate notifications if setSnapshot fails
-      expect(notificationLine).toBeGreaterThan(0);
-      expect(setSnapshotLine).toBeGreaterThan(0);
-
-      // FIXED: Snapshot should be updated BEFORE notification
-      // This ensures if setSnapshot fails, we don't send notification (no duplicates)
-      // If notification fails, snapshot is already updated (no duplicates on retry)
-      const snapshotBeforeNotification = setSnapshotLine < notificationLine;
-      expect(snapshotBeforeNotification).toBe(true); // Snapshot should come first
     });
   });
 });

@@ -1,13 +1,6 @@
-import { getInstructors } from "../dao/instructors.js";
-import {
-  getReservationTypes,
-  type ReservationType,
-} from "../dao/reservationTypes.js";
-import {
-  getAircraft,
-  isReservableAircraft,
-  FSP_NIL_RESOURCE_ID,
-} from "../dao/aircraft.js";
+import { FSP_NIL_RESOURCE_ID } from "../dao/aircraft.js";
+import { type ReservationType } from "../dao/reservationTypes.js";
+import { fetchFspMetadata, type FspMetadata } from "./fspMetadata.js";
 import {
   fetchAvailability,
   BookableAvailability,
@@ -18,7 +11,7 @@ import {
   ReservationResponse,
   ReservationBookingParams,
 } from "../dao/reservations.js";
-import { getPilotId } from "../dao/auth.js";
+import { getPilotId, getAuthSession } from "../dao/auth.js";
 import {
   DEFAULT_TIMEZONE,
   formatFspLocalDateTime,
@@ -63,30 +56,45 @@ export class SchedulerBLO {
     return this.aircraftMap.entries();
   }
 
+  getOperatorId(): number {
+    return this.operatorId;
+  }
+
   getReservationTypes(): ReservationType[] {
     return Array.from(this.reservationTypesMap.values());
   }
 
+  hydrateFromMetadata(metadata: FspMetadata): void {
+    this.instructorsMap.clear();
+    this.aircraftMap.clear();
+    this.reservationTypesMap.clear();
+
+    for (const instructor of metadata.instructors) {
+      this.instructorsMap.set(instructor.instructorId, instructor.displayName);
+    }
+
+    for (const reservationType of metadata.reservationTypes) {
+      this.reservationTypesMap.set(
+        reservationType.reservationTypeId,
+        reservationType,
+      );
+    }
+
+    for (const aircraft of metadata.aircraft) {
+      this.aircraftMap.set(aircraft.aircraftId, aircraft.tailNumber);
+    }
+
+    const session = getAuthSession();
+    if (session) {
+      this.pilotId = session.pilotId;
+    }
+  }
+
   async initialize() {
-    const [instructors, activityTypes, aircraft] = await Promise.all([
-      getInstructors(this.operatorId),
-      getReservationTypes(this.operatorId),
-      getAircraft(this.operatorId),
-    ]);
-
-    // Store the correct pilot ID from auth
-    this.pilotId = getPilotId();
-
-    for (const i of instructors.results) {
-      this.instructorsMap.set(i.instructorId, i.displayName);
-    }
-
-    for (const act of activityTypes) {
-      this.reservationTypesMap.set(act.reservationTypeId, act);
-    }
-
-    for (const a of aircraft.results.filter(isReservableAircraft)) {
-      this.aircraftMap.set(a.aircraftId, a.tailNumber.trim());
+    const metadata = await fetchFspMetadata(this.operatorId);
+    this.hydrateFromMetadata(metadata);
+    if (!this.pilotId) {
+      this.pilotId = getPilotId();
     }
     log.info("Scheduler initialized");
   }

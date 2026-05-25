@@ -5,26 +5,22 @@ import type {
   APIEmbedFooter,
   RESTPostAPIWebhookWithTokenJSONBody,
 } from "discord-api-types/v10";
-import { ReservationTypeSchema } from "../shared/dao/reservationTypes.js";
 import { BookableAvailabilityKvSchema } from "../shared/dao/availability.js";
-import { InstructorMetadataSchema } from "../shared/dao/instructors.js";
-import { AircraftMetadataSchema } from "../shared/dao/aircraft.js";
+import {
+  FspMetadataSchema,
+  type FspMetadata,
+} from "../shared/blo/fspMetadata.js";
 
 /**
  * Metadata schema for tracking snapshot state
  */
 export const MetadataSchema = z.object({
-  lastSearchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-  lastUpdate: z.iso.datetime(), // ISO timestamp
+  lastSearchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  lastUpdate: z.iso.datetime(),
   daysAhead: z.number().int().positive(),
 });
 
-export const FspMetadataSchema = z.object({
-  instructors: z.array(InstructorMetadataSchema),
-  reservationTypes: z.array(ReservationTypeSchema),
-  aircraft: z.array(AircraftMetadataSchema),
-  lastUpdated: z.iso.datetime(),
-});
+export { FspMetadataSchema, type FspMetadata };
 
 /**
  * Complete snapshot schema for KV storage
@@ -118,6 +114,5 @@ export interface Env {
  */
 export type Metadata = z.infer<typeof MetadataSchema>;
 export type Snapshot = z.infer<typeof SnapshotSchema>;
-export type FspMetadata = z.infer<typeof FspMetadataSchema>;
 export type DiscordEmbed = z.infer<typeof DiscordEmbedSchema>;
 export type DiscordPayload = z.infer<typeof DiscordPayloadSchema>;

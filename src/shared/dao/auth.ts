@@ -3,14 +3,17 @@ import { createLogger } from "../util/logger.js";
 
 const log = createLogger("auth");
 
-// Store session cookies, operator ID, subscription key, auth token, user ID, pilot ID, and location ID for authenticated requests
-let sessionCookies: string | null = null;
-let operatorId: number | null = null;
-let subscriptionKey: string | null = null;
-let authToken: string | null = null;
-let userId: string | null = null;
-let pilotId: string | null = null;
-let defaultLocationId: number | null = null;
+export interface AuthSession {
+  sessionCookies: string;
+  operatorId: number;
+  subscriptionKey: string;
+  authToken: string;
+  userId: string;
+  pilotId: string;
+  defaultLocationId: number;
+}
+
+let currentSession: AuthSession | null = null;
 
 /**
  * Zod schema for AccountAppContext response
@@ -55,102 +58,108 @@ function getSetCookieHeaders(headers: Headers): string[] {
   return getSetCookie?.call(headers) ?? [];
 }
 
+function requireSession(): AuthSession {
+  if (!currentSession) {
+    throw new Error("Not authenticated. Please login first.");
+  }
+  return currentSession;
+}
+
+export function resetAuthForTests(): void {
+  currentSession = null;
+}
+
+export function getAuthSession(): AuthSession | null {
+  return currentSession;
+}
+
 export function getSessionCookies(): string | null {
-  return sessionCookies;
+  return currentSession?.sessionCookies ?? null;
 }
 
 export function getOperatorId(): number {
-  if (operatorId === null) {
-    throw new Error("Operator ID not set. Please login first.");
-  }
-  return operatorId;
+  return requireSession().operatorId;
 }
 
 export function getSubscriptionKey(): string {
-  if (subscriptionKey === null) {
-    throw new Error("Subscription key not set. Please login first.");
-  }
-  return subscriptionKey;
+  return requireSession().subscriptionKey;
 }
 
 export function getAuthToken(): string {
-  if (authToken === null) {
-    throw new Error("Auth token not set. Please login first.");
-  }
-  return authToken;
+  return requireSession().authToken;
 }
 
 export function getUserId(): string {
-  if (userId === null) {
-    throw new Error("User ID not set. Please login first.");
-  }
-  return userId;
+  return requireSession().userId;
 }
 
 export function getPilotId(): string {
-  if (pilotId === null) {
-    throw new Error("Pilot ID not set. Please login first.");
-  }
-  return pilotId;
+  return requireSession().pilotId;
 }
 
 export function getDefaultLocationId(): number {
-  if (defaultLocationId === null) {
-    throw new Error("Default location ID not set. Please login first.");
-  }
-  return defaultLocationId;
+  return requireSession().defaultLocationId;
 }
 
 export async function fetchAuth(
   email: string,
   password: string,
-): Promise<void> {
-  // Login without operator ID
+): Promise<AuthSession> {
   const login = await fetch("https://app.flightschedulepro.com/Account/Login", {
     headers: {
       "content-type": "application/x-www-form-urlencoded",
     },
     body: `username=${email}&password=${password}&checkEmail=false`,
     method: "POST",
-    redirect: "manual", // Don't follow redirects automatically
+    redirect: "manual",
   });
 
-  // Extract and store session cookies from Set-Cookie header
-  // Node.js fetch may return multiple Set-Cookie headers
   const setCookieHeaders = getSetCookieHeaders(login.headers);
+  let sessionCookies: string | null = null;
 
   if (setCookieHeaders.length > 0) {
-    // Join all cookies with semicolon
     sessionCookies = setCookieHeaders
-      .map((cookie: string) => cookie.split(";")[0]) // Get just the key=value part
+      .map((cookie: string) => cookie.split(";")[0])
       .join("; ");
   } else {
-    // Fallback: try to get single set-cookie header
     const singleCookie = login.headers.get("set-cookie");
     if (singleCookie) {
       sessionCookies = singleCookie.split(";")[0];
     }
   }
 
+  if (!sessionCookies) {
+    throw new Error("Failed to obtain session cookies from login response");
+  }
+
   // Extract and store the auth token from the FspApp cookie
-  authToken = extractTokenFromCookie();
+  const authToken = extractTokenFromCookie(sessionCookies);
   if (!authToken) {
     throw new Error("Failed to extract auth token from cookies");
   }
 
   // Fetch the subscription key and operator ID from APIs
-  await fetchSubscriptionKey();
-  await fetchOperatorId(authToken);
+  const subscriptionKey = await fetchSubscriptionKey(sessionCookies);
+  const operatorDetails = await fetchOperatorDetails(
+    authToken,
+    sessionCookies,
+    subscriptionKey,
+  );
+
+  currentSession = {
+    sessionCookies,
+    subscriptionKey,
+    authToken,
+    ...operatorDetails,
+  };
+
+  return currentSession;
 }
 
 /**
  * Extracts the auth token from the FspApp cookie
  */
-function extractTokenFromCookie(): string | null {
-  if (!sessionCookies) {
-    return null;
-  }
-
+function extractTokenFromCookie(sessionCookies: string): string | null {
   // Find the FspApp cookie
   const fspAppMatch = /FspApp=([^;]+)/.exec(sessionCookies);
   if (!fspAppMatch) {
@@ -180,24 +189,18 @@ function extractTokenFromCookie(): string | null {
 }
 
 /**
- * Fetches and stores the subscription key from AccountAppContext
+ * Fetches the subscription key from AccountAppContext
  */
-async function fetchSubscriptionKey(): Promise<void> {
+async function fetchSubscriptionKey(sessionCookies: string): Promise<string> {
   try {
-    const headers: Record<string, string> = {
-      accept: "*/*",
-      "cache-control": "no-cache, no-store, must-revalidate",
-    };
-
-    // Add cookies if available
-    if (sessionCookies) {
-      headers.cookie = sessionCookies;
-    }
-
     const response = await fetch(
       "https://app.flightschedulepro.com/AccountAppContext",
       {
-        headers,
+        headers: {
+          accept: "*/*",
+          "cache-control": "no-cache, no-store, must-revalidate",
+          cookie: sessionCookies,
+        },
         method: "GET",
       },
     );
@@ -216,7 +219,7 @@ async function fetchSubscriptionKey(): Promise<void> {
       throw new Error("Failed to parse AccountAppContext response");
     }
 
-    subscriptionKey = result.data.subscriptionKey;
+    return result.data.subscriptionKey;
   } catch (error) {
     log.error("Failed to fetch subscription key", { error });
     throw error;
@@ -224,25 +227,25 @@ async function fetchSubscriptionKey(): Promise<void> {
 }
 
 /**
- * Fetches and stores the operator ID from MyOperators API
+ * Fetches the operator ID from MyOperators API
  */
-async function fetchOperatorId(userToken: string): Promise<void> {
+async function fetchOperatorDetails(
+  userToken: string,
+  sessionCookies: string,
+  subscriptionKey: string,
+): Promise<{
+  operatorId: number;
+  userId: string;
+  pilotId: string;
+  defaultLocationId: number;
+}> {
   try {
-    // We need to wait a moment to ensure subscription key is available
-    if (!subscriptionKey) {
-      throw new Error("Subscription key not available");
-    }
-
     const headers: Record<string, string> = {
       accept: "application/json, text/plain, */*",
       authorization: `Bearer ${userToken}`,
       "x-subscription-key": subscriptionKey,
+      cookie: sessionCookies,
     };
-
-    // Add cookies if available
-    if (sessionCookies) {
-      headers.cookie = sessionCookies;
-    }
 
     // Step 1: Get list of companies to find active operator ID
     const listResponse = await fetch(
@@ -289,11 +292,12 @@ async function fetchOperatorId(userToken: string): Promise<void> {
       throw new Error("Failed to parse MyOperators detail response");
     }
 
-    // Store the operator ID, user ID, pilot ID, and default location ID
-    operatorId = detailResult.data.operatorId;
-    userId = detailResult.data.userId;
-    pilotId = detailResult.data.pilotId;
-    defaultLocationId = detailResult.data.defaultLocationId;
+    return {
+      operatorId: detailResult.data.operatorId,
+      userId: detailResult.data.userId,
+      pilotId: detailResult.data.pilotId,
+      defaultLocationId: detailResult.data.defaultLocationId,
+    };
   } catch (error) {
     log.error("Failed to fetch operator ID", { error });
     throw error;

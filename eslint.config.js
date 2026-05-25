@@ -30,12 +30,14 @@ export default defineConfig(
       },
     },
     rules: {
+      "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
           caughtErrorsIgnorePattern: "^_",
+          enableAutofixRemoval: { imports: true },
         },
       ],
       "@typescript-eslint/restrict-template-expressions": [

@@ -1,8 +1,5 @@
 import { z } from "zod";
 import { DEFAULT_TIMEZONE } from "./flightTime.js";
-import { createLogger } from "./logger.js";
-
-const log = createLogger("config");
 
 function isValidIanaTimeZone(value: string): boolean {
   try {
@@ -53,6 +50,18 @@ export interface ConfigType {
   RESERVATION_TYPE_ID?: string;
 }
 
+/** Worker env bindings used to build runtime config. */
+export type WorkerEnvInput = {
+  FSP_EMAIL: string;
+  FSP_PASSWORD: string;
+  DAYS_AHEAD: string;
+  AIRCRAFT_REGEX: string;
+  WEEKDAY_MIN_HOUR?: string;
+  MAX_HOUR?: string;
+  TIMEZONE?: string;
+  RESERVATION_TYPE_ID?: string;
+};
+
 /**
  * Create configuration from environment object
  * Works in both Node.js (process.env) and Cloudflare Workers (env object)
@@ -94,22 +103,27 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
   };
 }
 
-/**
- * CLI-specific config loader (uses dotenv)
- * Only import this in CLI code
- */
-export let CONFIG: ConfigType;
+export function createWorkerConfig(env: WorkerEnvInput): ConfigType {
+  return createConfig({
+    FSP_EMAIL: env.FSP_EMAIL,
+    FSP_PASSWORD: env.FSP_PASSWORD,
+    DAYS_AHEAD: env.DAYS_AHEAD,
+    AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
+    WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
+    MAX_HOUR: env.MAX_HOUR ?? "19",
+    TIMEZONE: env.TIMEZONE,
+    RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
+  });
+}
 
-// Check if we're in a Node.js environment (not Workers)
-if (typeof process !== "undefined") {
-  // Dynamically import dotenv only in Node.js environment
-  try {
-    const dotenv = await import("dotenv");
-    dotenv.config();
-    CONFIG = createConfig(process.env);
-  } catch {
-    // If we're here, we might be in a bundled Worker context
-    // The CONFIG will be created via createConfig in the Worker
-    log.warn("Failed to load dotenv, assuming Worker environment");
+/**
+ * CLI-specific config loader (uses dotenv).
+ * Call once from the CLI entry point.
+ */
+export function loadCliConfig(): ConfigType {
+  if (typeof process === "undefined") {
+    throw new Error("loadCliConfig() is only available in Node.js");
   }
+
+  return createConfig(process.env);
 }
