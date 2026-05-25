@@ -2,10 +2,12 @@ import {
   SnapshotSchema,
   type Snapshot,
   type Metadata,
-  type BookableAvailabilityKV,
   type Env,
 } from "./types.js";
-import { BookableAvailability } from "../shared/dao/availability.js";
+import {
+  BookableAvailability,
+  type BookableAvailabilityKV,
+} from "../shared/dao/availability.js";
 import {
   DEFAULT_TIMEZONE,
   formatOperatorIsoDate,
@@ -121,16 +123,6 @@ export function getSlotsFromSnapshot(
 }
 
 /**
- * Get all availability slots from the snapshot, converted to BookableAvailability objects
- * @param env - Worker environment with KV binding
- * @returns Array of BookableAvailability or empty array if not found
- */
-export async function getSlots(env: Env): Promise<BookableAvailability[]> {
-  const snapshot = await getSnapshot(env);
-  return getSlotsFromSnapshot(snapshot);
-}
-
-/**
  * Remove availability slots that are in the past from a snapshot (in-memory operation)
  * @param snapshot - Snapshot object to clean
  * @param beforeDate - Remove slots before this date (typically today)
@@ -155,38 +147,6 @@ export function cleanPastSlotsFromSnapshot(
     slots: filteredSlots,
     metadata: snapshot.metadata,
   };
-}
-
-/**
- * Remove availability slots that are in the past
- * @param env - Worker environment with KV binding
- * @param beforeDate - Remove slots before this date (typically today)
- */
-export async function cleanPastSlots(
-  env: Env,
-  beforeDate: Date,
-  timeZone: string = DEFAULT_TIMEZONE,
-): Promise<void> {
-  const snapshot = await getSnapshot(env);
-
-  if (!snapshot) {
-    return;
-  }
-
-  const cleanedSnapshot = cleanPastSlotsFromSnapshot(
-    snapshot,
-    beforeDate,
-    timeZone,
-  );
-
-  if (cleanedSnapshot) {
-    // Update snapshot with cleaned slots
-    await setSnapshot(
-      env,
-      cleanedSnapshot.slots.map(deserializeAvailability),
-      cleanedSnapshot.metadata,
-    );
-  }
 }
 
 /**

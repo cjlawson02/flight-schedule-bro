@@ -5,6 +5,7 @@ import {
 } from "./discord.js";
 import type { Env, FspMetadata } from "./types.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
+import { createReservationTypeFixture } from "../shared/dao/reservationTypes.fixtures.js";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -31,10 +32,10 @@ const createMockMetadata = (): FspMetadata => ({
     },
   ],
   reservationTypes: [
-    {
+    createReservationTypeFixture({
       reservationTypeId: "323e4567-e89b-12d3-a456-426614174000",
       reservationTypeName: "Dual",
-    },
+    }),
   ],
   aircraft: [
     {

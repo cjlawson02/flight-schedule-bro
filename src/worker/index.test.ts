@@ -2,21 +2,32 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { Env } from "./types.js";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { chunk } from "../shared/util/array.js";
+import { findNewSlots } from "../shared/util/slots.js";
+import type { BookableAvailability } from "../shared/dao/availability.js";
+
+const LA = "America/Los_Angeles";
+
+function makeSlot(
+  overrides: Partial<BookableAvailability> &
+    Pick<BookableAvailability, "startDateTime">,
+): BookableAvailability {
+  return {
+    date: "1/20/2024",
+    startTime: "5:00:00 PM",
+    endTime: "7:00:00 PM",
+    instructorId: "123e4567-e89b-12d3-a456-426614174000",
+    aircraftId: "223e4567-e89b-12d3-a456-426614174000",
+    endDateTime: new Date("2024-01-20T19:00:00.000Z"),
+    ...overrides,
+  };
+}
 
 // We'll test the helper functions and HTTP endpoints
 // The scheduled handler is harder to unit test due to dependencies
 
 describe("Worker Index - Helper Functions", () => {
   describe("chunk function", () => {
-    // Import the chunk function logic for testing
-    const chunk = <T>(arr: T[], size: number): T[][] => {
-      const chunks: T[][] = [];
-      for (let i = 0; i < arr.length; i += size) {
-        chunks.push(arr.slice(i, i + size));
-      }
-      return chunks;
-    };
-
     it("chunks array into specified size", () => {
       const arr = [1, 2, 3, 4, 5, 6, 7];
       const result = chunk(arr, 3);
@@ -36,131 +47,35 @@ describe("Worker Index - Helper Functions", () => {
     });
   });
 
-  describe("createSlotKey function", () => {
-    // Import the slot key logic for testing
-    const createSlotKey = (slot: any): string => {
-      return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
-    };
-
-    it("creates unique key from slot properties", () => {
-      const slot = {
-        date: "1/15/2024",
-        startTime: "5:00:00 PM",
-        endTime: "7:00:00 PM",
-        aircraftId: "aircraft-123",
-        instructorId: "instructor-456",
-      };
-
-      const key = createSlotKey(slot);
-      expect(key).toBe(
-        "1/15/2024|5:00:00 PM|7:00:00 PM|aircraft-123|instructor-456",
-      );
-    });
-
-    it("creates different keys for different slots", () => {
-      const slot1 = {
-        date: "1/15/2024",
-        startTime: "5:00:00 PM",
-        endTime: "7:00:00 PM",
-        aircraftId: "aircraft-123",
-        instructorId: "instructor-456",
-      };
-
-      const slot2 = {
-        date: "1/15/2024",
-        startTime: "5:00:00 PM",
-        endTime: "7:00:00 PM",
-        aircraftId: "aircraft-789", // Different aircraft
-        instructorId: "instructor-456",
-      };
-
-      expect(createSlotKey(slot1)).not.toBe(createSlotKey(slot2));
-    });
-
-    it("creates same key for identical slots", () => {
-      const slot1 = {
-        date: "1/15/2024",
-        startTime: "5:00:00 PM",
-        endTime: "7:00:00 PM",
-        aircraftId: "aircraft-123",
-        instructorId: "instructor-456",
-      };
-
-      const slot2 = { ...slot1 };
-
-      expect(createSlotKey(slot1)).toBe(createSlotKey(slot2));
-    });
-  });
-
   describe("findNewSlots function", () => {
-    // Import the rolling window logic for testing
-    const addDays = (date: Date, days: number): Date => {
-      const result = new Date(date);
-      result.setDate(result.getDate() + days);
-      return result;
-    };
-
-    const createSlotKey = (slot: any): string => {
-      return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
-    };
-
-    const findNewSlots = (
-      currentSlots: any[],
-      previousSlots: any[],
-      lastSearchDate: Date,
-      daysAhead: number,
-    ): any[] => {
-      const previousSlotKeys = new Set(previousSlots.map(createSlotKey));
-      const maxTrackedDate = addDays(lastSearchDate, daysAhead);
-
-      // Normalize to end of day in UTC for comparison (strip time component)
-      const maxTrackedDateOnly = new Date(maxTrackedDate);
-      maxTrackedDateOnly.setUTCHours(23, 59, 59, 999);
-
-      const newSlots = currentSlots.filter((slot) => {
-        const slotKey = createSlotKey(slot);
-        const isNew = !previousSlotKeys.has(slotKey);
-        // Compare dates by checking if slot is on or before the last tracked day
-        const isWithinTrackedWindow = slot.startDateTime <= maxTrackedDateOnly;
-
-        return isNew && isWithinTrackedWindow;
-      });
-
-      return newSlots;
-    };
-
     it("identifies new slots not in previous snapshot", () => {
-      const lastSearchDate = new Date("2024-01-15");
-      const daysAhead = 60;
-
       const previousSlots = [
-        {
-          date: "1/20/2024",
-          startTime: "5:00:00 PM",
-          endTime: "7:00:00 PM",
+        makeSlot({
+          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
-        },
+        }),
       ];
 
       const currentSlots = [
         ...previousSlots,
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "3:00:00 PM",
           endTime: "5:00:00 PM",
           aircraftId: "aircraft-789",
           instructorId: "instructor-101",
           startDateTime: new Date("2024-01-25T15:00:00.000Z"),
-        },
+          endDateTime: new Date("2024-01-25T17:00:00.000Z"),
+        }),
       ];
 
       const newSlots = findNewSlots(
         currentSlots,
         previousSlots,
-        lastSearchDate,
-        daysAhead,
+        "2024-01-15",
+        60,
+        LA,
       );
 
       expect(newSlots).toHaveLength(1);
@@ -168,92 +83,71 @@ describe("Worker Index - Helper Functions", () => {
     });
 
     it("excludes slots beyond tracked window", () => {
-      const lastSearchDate = new Date("2024-01-15");
-      const daysAhead = 10; // Only tracking up to Jan 25
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
-          date: "1/20/2024",
-          startTime: "5:00:00 PM",
-          endTime: "7:00:00 PM",
+        makeSlot({
+          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-20T17:00:00.000Z"), // Within window
-        },
-        {
-          date: "2/01/2024",
+        }),
+        makeSlot({
+          date: "2/1/2024",
           startTime: "3:00:00 PM",
           endTime: "5:00:00 PM",
           aircraftId: "aircraft-789",
           instructorId: "instructor-101",
-          startDateTime: new Date("2024-02-01T15:00:00.000Z"), // Beyond window
-        },
+          startDateTime: new Date("2024-02-01T15:00:00.000Z"),
+          endDateTime: new Date("2024-02-01T17:00:00.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].date).toBe("1/20/2024");
     });
 
     it("returns empty array when no new slots", () => {
-      const lastSearchDate = new Date("2024-01-15");
-      const daysAhead = 60;
-
       const slots = [
-        {
-          date: "1/20/2024",
-          startTime: "5:00:00 PM",
-          endTime: "7:00:00 PM",
+        makeSlot({
+          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
-        },
+        }),
       ];
 
-      const newSlots = findNewSlots(slots, slots, lastSearchDate, daysAhead);
+      const newSlots = findNewSlots(slots, slots, "2024-01-15", 60, LA);
 
       expect(newSlots).toHaveLength(0);
     });
 
     it("handles different slot times for same aircraft/instructor", () => {
-      const lastSearchDate = new Date("2024-01-15");
-      const daysAhead = 60;
-
       const previousSlots = [
-        {
-          date: "1/20/2024",
-          startTime: "5:00:00 PM",
-          endTime: "7:00:00 PM",
+        makeSlot({
+          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-20T17:00:00.000Z"),
-        },
+        }),
       ];
 
       const currentSlots = [
         ...previousSlots,
-        {
+        makeSlot({
           date: "1/20/2024",
-          startTime: "3:00:00 PM", // Different time
+          startTime: "3:00:00 PM",
           endTime: "5:00:00 PM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
           startDateTime: new Date("2024-01-20T15:00:00.000Z"),
-        },
+          endDateTime: new Date("2024-01-20T17:00:00.000Z"),
+        }),
       ];
 
       const newSlots = findNewSlots(
         currentSlots,
         previousSlots,
-        lastSearchDate,
-        daysAhead,
+        "2024-01-15",
+        60,
+        LA,
       );
 
       expect(newSlots).toHaveLength(1);
@@ -261,49 +155,40 @@ describe("Worker Index - Helper Functions", () => {
     });
 
     it("includes slots on the last tracked day regardless of time", () => {
-      const lastSearchDate = new Date("2024-01-15");
-      const daysAhead = 10; // Tracking up to Jan 25
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "8:00:00 AM",
           endTime: "10:00:00 AM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-25T08:00:00.000Z"), // Early morning on last day
-        },
-        {
+          startDateTime: new Date("2024-01-25T16:00:00.000Z"),
+          endDateTime: new Date("2024-01-25T18:00:00.000Z"),
+        }),
+        makeSlot({
           date: "1/25/2024",
           startTime: "11:00:00 PM",
           endTime: "11:59:00 PM",
           aircraftId: "aircraft-789",
           instructorId: "instructor-101",
-          startDateTime: new Date("2024-01-25T23:00:00.000Z"), // Late night on last day
-        },
-        {
+          startDateTime: new Date("2024-01-26T07:00:00.000Z"),
+          endDateTime: new Date("2024-01-26T07:59:00.000Z"),
+        }),
+        makeSlot({
           date: "1/26/2024",
           startTime: "9:00:00 AM",
           endTime: "11:00:00 AM",
           aircraftId: "aircraft-999",
           instructorId: "instructor-999",
-          startDateTime: new Date("2024-01-26T09:00:00.000Z"), // Day after (should be excluded)
-        },
+          startDateTime: new Date("2024-01-26T17:00:00.000Z"),
+          endDateTime: new Date("2024-01-26T19:00:00.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
-      // Should include both slots on Jan 25 but not Jan 26
       expect(newSlots).toHaveLength(2);
-      expect(newSlots[0].date).toBe("1/25/2024");
-      expect(newSlots[1].date).toBe("1/25/2024");
-      expect(newSlots.some((s) => s.date === "1/26/2024")).toBe(false);
+      expect(newSlots.every((slot) => slot.date === "1/25/2024")).toBe(true);
     });
   });
 
@@ -346,201 +231,94 @@ describe("Worker Index - Helper Functions", () => {
   });
 
   describe("Rolling Window Date Comparison Edge Cases", () => {
-    const addDays = (date: Date, days: number): Date => {
-      const result = new Date(date);
-      result.setDate(result.getDate() + days);
-      return result;
-    };
-
-    const createSlotKey = (slot: any): string => {
-      return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
-    };
-
-    const findNewSlots = (
-      currentSlots: any[],
-      previousSlots: any[],
-      lastSearchDate: Date,
-      daysAhead: number,
-    ): any[] => {
-      const previousSlotKeys = new Set(previousSlots.map(createSlotKey));
-      const maxTrackedDate = addDays(lastSearchDate, daysAhead);
-
-      // Normalize to end of day in UTC for comparison (strip time component)
-      const maxTrackedDateOnly = new Date(maxTrackedDate);
-      maxTrackedDateOnly.setUTCHours(23, 59, 59, 999);
-
-      const newSlots = currentSlots.filter((slot) => {
-        const slotKey = createSlotKey(slot);
-        const isNew = !previousSlotKeys.has(slotKey);
-        // Compare dates by checking if slot is on or before the last tracked day
-        const isWithinTrackedWindow = slot.startDateTime <= maxTrackedDateOnly;
-
-        return isNew && isWithinTrackedWindow;
-      });
-
-      return newSlots;
-    };
-
     it("handles slots exactly at maxTrackedDateOnly boundary", () => {
-      const lastSearchDate = new Date("2024-01-15T00:00:00.000Z");
-      const daysAhead = 10; // Max date is Jan 25, 23:59:59.999 UTC
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "11:59:59 PM",
           endTime: "11:59:59 PM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-25T23:59:59.999Z"), // Exactly at boundary
-        },
-        {
+          startDateTime: new Date("2024-01-26T07:59:59.999Z"),
+          endDateTime: new Date("2024-01-26T07:59:59.999Z"),
+        }),
+        makeSlot({
           date: "1/26/2024",
           startTime: "12:00:00 AM",
           endTime: "12:00:00 AM",
           aircraftId: "aircraft-789",
           instructorId: "instructor-101",
-          startDateTime: new Date("2024-01-26T00:00:00.000Z"), // Just after boundary
-        },
+          startDateTime: new Date("2024-01-26T08:00:00.000Z"),
+          endDateTime: new Date("2024-01-26T08:00:00.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
-      // Should include the slot at the boundary but not after
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
     });
 
     it("handles slots just before maxTrackedDateOnly boundary", () => {
-      const lastSearchDate = new Date("2024-01-15T00:00:00.000Z");
-      const daysAhead = 10;
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "11:59:58 PM",
           endTime: "11:59:58 PM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-25T23:59:58.000Z"), // Just before boundary
-        },
+          startDateTime: new Date("2024-01-26T07:59:58.000Z"),
+          endDateTime: new Date("2024-01-26T07:59:58.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
     });
 
     it("handles lastSearchDate parsed from ISO date string", () => {
-      // Simulate how lastSearchDate is created from metadata
-      const dateStr = "2024-01-15";
-      const lastSearchDate = new Date(dateStr); // This creates midnight UTC
-      const daysAhead = 10;
-
-      // Verify it's midnight UTC
-      expect(lastSearchDate.toISOString()).toBe("2024-01-15T00:00:00.000Z");
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "5:00:00 PM",
           endTime: "7:00:00 PM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-25T17:00:00.000Z"),
-        },
+          startDateTime: new Date("2024-01-26T01:00:00.000Z"),
+          endDateTime: new Date("2024-01-26T03:00:00.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
-
-      expect(newSlots).toHaveLength(1);
-    });
-
-    it("handles timezone edge case with UTC vs local time", () => {
-      // Test that UTC normalization works correctly
-      // Create a date that could be interpreted differently in different timezones
-      const lastSearchDate = new Date("2024-01-15"); // Midnight UTC
-      const daysAhead = 10;
-
-      // Create a slot that's at the end of the tracked day in UTC
-      const maxDate = new Date(lastSearchDate);
-      maxDate.setUTCDate(maxDate.getUTCDate() + daysAhead);
-      maxDate.setUTCHours(23, 59, 59, 999);
-
-      const previousSlots: any[] = [];
-      const currentSlots = [
-        {
-          date: "1/25/2024",
-          startTime: "11:59:59 PM",
-          endTime: "11:59:59 PM",
-          aircraftId: "aircraft-123",
-          instructorId: "instructor-456",
-          startDateTime: maxDate, // Exactly at max tracked date
-        },
-      ];
-
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
       expect(newSlots).toHaveLength(1);
     });
 
     it("excludes slots when lastSearchDate is today and slot is beyond window", () => {
-      // Simulate running the worker on the same day
-      const today = new Date("2024-01-15T12:00:00.000Z"); // Noon UTC
-      const lastSearchDate = new Date(today);
-      lastSearchDate.setUTCHours(0, 0, 0, 0); // Normalized to midnight
-      const daysAhead = 10;
-
-      const previousSlots: any[] = [];
       const currentSlots = [
-        {
+        makeSlot({
           date: "1/25/2024",
           startTime: "5:00:00 PM",
           endTime: "7:00:00 PM",
           aircraftId: "aircraft-123",
           instructorId: "instructor-456",
-          startDateTime: new Date("2024-01-25T17:00:00.000Z"), // Within window
-        },
-        {
+          startDateTime: new Date("2024-01-26T01:00:00.000Z"),
+          endDateTime: new Date("2024-01-26T03:00:00.000Z"),
+        }),
+        makeSlot({
           date: "1/26/2024",
           startTime: "5:00:00 PM",
           endTime: "7:00:00 PM",
           aircraftId: "aircraft-789",
           instructorId: "instructor-101",
-          startDateTime: new Date("2024-01-26T17:00:00.000Z"), // Beyond window
-        },
+          startDateTime: new Date("2024-01-27T01:00:00.000Z"),
+          endDateTime: new Date("2024-01-27T03:00:00.000Z"),
+        }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        lastSearchDate,
-        daysAhead,
-      );
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");

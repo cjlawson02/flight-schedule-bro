@@ -1,12 +1,17 @@
+import { reservationTypeMissingFieldMetadata } from "../shared/dao/reservationTypes.js";
 import { FspMetadataSchema, type FspMetadata } from "./types.js";
 import { getInstructors } from "../shared/dao/instructors.js";
 import { getReservationTypes } from "../shared/dao/reservationTypes.js";
-import { getAircraft } from "../shared/dao/aircraft.js";
+import { getAircraft, isReservableAircraft } from "../shared/dao/aircraft.js";
 import { createLogger } from "../shared/util/logger.js";
 
 const log = createLogger("metadata");
 
 const METADATA_KEY = "fsp-metadata";
+
+export function metadataNeedsRefresh(metadata: FspMetadata): boolean {
+  return metadata.reservationTypes.some(reservationTypeMissingFieldMetadata);
+}
 
 /**
  * Fetch metadata from KV store
@@ -71,20 +76,11 @@ export async function refreshMetadata(
       instructorId: i.instructorId,
       displayName: i.displayName,
     })),
-    reservationTypes: reservationTypes.map((r) => ({
-      reservationTypeId: r.reservationTypeId,
-      reservationTypeName: r.reservationTypeName,
+    reservationTypes,
+    aircraft: aircraft.results.filter(isReservableAircraft).map((a) => ({
+      aircraftId: a.aircraftId,
+      tailNumber: a.tailNumber.trim(),
     })),
-    aircraft: aircraft.results
-      .filter(
-        (a) =>
-          a.aircraftId !== "00000000-0000-0000-0000-000000000000" &&
-          a.tailNumber.trim() !== "",
-      )
-      .map((a) => ({
-        aircraftId: a.aircraftId,
-        tailNumber: a.tailNumber.trim(),
-      })),
     lastUpdated: new Date().toISOString(),
   };
 
@@ -111,6 +107,13 @@ export async function getOrFetchMetadata(
   const metadata = await getMetadataFromKV(kv);
 
   if (metadata) {
+    if (metadataNeedsRefresh(metadata)) {
+      log.info(
+        "Cached metadata is missing reservation type fields, refreshing",
+      );
+      return await refreshMetadata(operatorId, kv);
+    }
+
     log.info("Using cached metadata from KV", {
       lastUpdated: metadata.lastUpdated,
     });

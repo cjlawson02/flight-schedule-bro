@@ -1,19 +1,25 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { createConfig } from "../shared/util/config.js";
-import { BookableAvailability } from "../shared/dao/availability.js";
-import { isValidBlock } from "../shared/util/dates.js";
 import {
-  addOperatorDays,
-  formatOperatorIsoDate,
-  startOfOperatorDay,
-} from "../shared/util/flightTime.js";
+  buildAvailabilityFetchTasks,
+  fetchAllAvailability,
+  filterValidAvailabilityBlocks,
+  logAvailabilitySearchBudget,
+  prepareAvailabilitySearch,
+  resolveAvailabilityDaysAhead,
+} from "../shared/blo/availabilitySearch.js";
+import { createConfig } from "../shared/util/config.js";
+import {
+  reservationTypeUsesInstructor,
+  selectMonitoringReservationType,
+} from "../shared/dao/reservationTypes.js";
+import { clearInvalidInstructorIds } from "../shared/dao/availability.js";
+import { startOfOperatorDay } from "../shared/util/flightTime.js";
 import {
   fetchAuth,
   getOperatorId,
   getUserId,
   getDefaultLocationId,
 } from "../shared/dao/auth.js";
-import { chunk } from "../shared/util/array.js";
 import { initializeSnapshot } from "./kv.js";
 import { sendSimpleNotification } from "./discord.js";
 import { getOrFetchMetadata } from "./metadata.js";
@@ -35,6 +41,7 @@ export async function runSetup(env: Env): Promise<Response> {
     log.info("Starting setup");
 
     initializeWorker();
+    clearInvalidInstructorIds();
 
     // Create config from worker environment
     const config = createConfig({
@@ -45,6 +52,7 @@ export async function runSetup(env: Env): Promise<Response> {
       WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
       MAX_HOUR: env.MAX_HOUR ?? "19",
       TIMEZONE: env.TIMEZONE,
+      RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
     });
 
     // Authenticate
@@ -70,13 +78,25 @@ export async function runSetup(env: Env): Promise<Response> {
 
     const allInstructorIds = metadata.instructors.map((i) => i.instructorId);
 
-    if (allInstructorIds.length === 0) {
+    const reservationType = selectMonitoringReservationType(
+      metadata.reservationTypes,
+      config.RESERVATION_TYPE_ID,
+    );
+
+    if (!reservationType) {
+      throw new Error("No activity types found");
+    }
+
+    if (
+      reservationTypeUsesInstructor(reservationType) &&
+      allInstructorIds.length === 0
+    ) {
       throw new Error(
         "No instructors found in metadata. Cannot fetch availability.",
       );
     }
 
-    const instructorChunks = chunk(allInstructorIds, 3);
+    const activityTypeId = reservationType.reservationTypeId;
 
     // Get preferred aircraft IDs using cached metadata
     const preferredAircraftIds = metadata.aircraft
@@ -93,55 +113,59 @@ export async function runSetup(env: Env): Promise<Response> {
       preferred: preferredAircraftIds.length,
     });
 
-    // Get activity type - use first one (typically "dual")
-    const activityTypeId = metadata.reservationTypes[0]?.reservationTypeId;
-
-    if (!activityTypeId) {
-      throw new Error("No activity types found");
-    }
-
     log.info("Activity type selected", {
-      name: metadata.reservationTypes[0].reservationTypeName,
+      name: reservationType.reservationTypeName,
       activityTypeId,
     });
-    log.info("Fetching availability", { daysAhead: config.DAYS_AHEAD });
 
-    // Create scheduler for availability fetching
-    const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
+    const searchParams = {
+      customerUserGuid: getUserId(),
+      locationId: getDefaultLocationId(),
+      operatorId,
+      timeZone: config.TIMEZONE,
+      activityTypeId,
+      reservationType,
+      allInstructorIds,
+      aircraftIds,
+    };
 
-    // Collect all bookable availability
-    const bookablePromises: Promise<BookableAvailability[]>[] = [];
-
-    for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-      const day = addOperatorDays(today, offset, config.TIMEZONE);
-      const dayISO = formatOperatorIsoDate(day, config.TIMEZONE);
-
-      bookablePromises.push(
-        ...instructorChunks.map((instructors) =>
-          scheduler.getBookableAvailability({
-            customerUserGuid: getUserId(),
-            locationId: getDefaultLocationId(),
-            activityTypeId,
-            instructors,
-            aircraftIds,
-            startDate: dayISO,
-            endDate: dayISO,
-          }),
-        ),
-      );
+    const prepared = prepareAvailabilitySearch(searchParams);
+    if (!prepared) {
+      throw new Error("No instructors or aircraft available for search.");
     }
 
-    const allBookableResults: BookableAvailability[] = (
-      await Promise.all(bookablePromises)
-    ).flat();
+    log.info("Fetching availability", {
+      configuredDaysAhead: config.DAYS_AHEAD,
+      chunks: prepared.instructorChunks.length,
+    });
+
+    const searchBudget = resolveAvailabilityDaysAhead(
+      config.DAYS_AHEAD,
+      prepared.instructorChunks.length,
+    );
+    logAvailabilitySearchBudget(searchBudget, config.DAYS_AHEAD);
+
+    const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
+    const bookablePromises = buildAvailabilityFetchTasks(scheduler, {
+      params: searchParams,
+      prepared,
+      today,
+      daysAhead: searchBudget.daysAhead,
+    });
+
+    const allBookableResults = await fetchAllAvailability(bookablePromises, {
+      failFast: true,
+    });
 
     log.info("Availability search complete", {
       totalResults: allBookableResults.length,
     });
 
-    // Filter valid results using the existing validation logic
-    const validResults = allBookableResults.filter((result) =>
-      isValidBlock(result.startDateTime, result.endDateTime, config, 120),
+    // Filter valid results using reservation type duration and hour rules
+    const validResults = filterValidAvailabilityBlocks(
+      allBookableResults,
+      config,
+      reservationType.defaultLength,
     );
 
     log.info("Filtered valid time slots", { count: validResults.length });
@@ -150,14 +174,15 @@ export async function runSetup(env: Env): Promise<Response> {
     await initializeSnapshot(
       env,
       validResults,
-      config.DAYS_AHEAD,
+      searchBudget.daysAhead,
       config.TIMEZONE,
     );
 
-    const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots for the next ${config.DAYS_AHEAD} days.`;
+    const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots for the next ${searchBudget.daysAhead} days.`;
     log.info("Setup complete", {
       slotsCount: validResults.length,
-      daysAhead: config.DAYS_AHEAD,
+      configuredDaysAhead: config.DAYS_AHEAD,
+      effectiveDaysAhead: searchBudget.daysAhead,
     });
 
     // Send notification to Discord
@@ -172,7 +197,7 @@ export async function runSetup(env: Env): Promise<Response> {
         success: true,
         message: successMessage,
         slotsCount: validResults.length,
-        daysAhead: config.DAYS_AHEAD,
+        daysAhead: searchBudget.daysAhead,
       }),
       {
         status: 200,

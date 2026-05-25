@@ -11,16 +11,6 @@ vi.mock("../shared/dao/auth.js", () => ({
 
 vi.mock("../shared/blo/scheduler.js", () => ({
   SchedulerBLO: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getInstructorIds: vi.fn().mockReturnValue(["instructor-1", "instructor-2"]),
-    getAircraftMapEntries: vi.fn().mockReturnValue([
-      ["aircraft-1", "N172S"],
-      ["aircraft-2", "N172N"],
-    ]),
-    getAircraftIds: vi.fn().mockReturnValue(["aircraft-1", "aircraft-2"]),
-    getActivityTypesMapEntries: vi
-      .fn()
-      .mockReturnValue([["activity-1", "Dual Flight Training"]]),
     getBookableAvailability: vi.fn().mockResolvedValue([]),
   })),
 }));

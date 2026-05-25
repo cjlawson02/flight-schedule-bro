@@ -2,9 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
   getSnapshot,
   setSnapshot,
-  getSlots,
   getSlotsFromSnapshot,
-  cleanPastSlots,
   cleanPastSlotsFromSnapshot,
   initializeSnapshot,
 } from "./kv.js";
@@ -137,98 +135,6 @@ describe("Worker KV Operations", () => {
       await expect(setSnapshot(env, invalidSlots, metadata)).rejects.toThrow(
         "Invalid snapshot data",
       );
-    });
-  });
-
-  describe("getSlots", () => {
-    it("returns empty array when no snapshot exists", async () => {
-      const result = await getSlots(env);
-      expect(result).toEqual([]);
-    });
-
-    it("returns deserialized slots with Date objects", async () => {
-      const snapshot = {
-        slots: [
-          {
-            date: "1/15/2024",
-            startTime: "5:00:00 PM",
-            endTime: "7:00:00 PM",
-            instructor: "John Doe",
-            aircraft: "N12345",
-            instructorId: "123e4567-e89b-12d3-a456-426614174000",
-            aircraftId: "223e4567-e89b-12d3-a456-426614174000",
-            startDateTime: "2024-01-15T17:00:00.000Z",
-            endDateTime: "2024-01-15T19:00:00.000Z",
-          },
-        ],
-        metadata: {
-          lastSearchDate: "2024-01-15",
-          lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
-        },
-      };
-
-      mockKV._store.set("availability_snapshot", JSON.stringify(snapshot));
-
-      const result = await getSlots(env);
-      expect(result).toHaveLength(1);
-      expect(result[0].startDateTime).toBeInstanceOf(Date);
-      expect(result[0].endDateTime).toBeInstanceOf(Date);
-      expect(result[0].startDateTime.toISOString()).toBe(
-        "2024-01-15T17:00:00.000Z",
-      );
-    });
-  });
-
-  describe("cleanPastSlots", () => {
-    it("removes slots before specified date", async () => {
-      const now = new Date("2024-01-20T12:00:00.000Z");
-      const snapshot = {
-        slots: [
-          {
-            date: "1/15/2024",
-            startTime: "5:00:00 PM",
-            endTime: "7:00:00 PM",
-            instructor: "John Doe",
-            aircraft: "N12345",
-            instructorId: "123e4567-e89b-12d3-a456-426614174000",
-            aircraftId: "223e4567-e89b-12d3-a456-426614174000",
-            startDateTime: "2024-01-15T17:00:00.000Z", // In the past
-            endDateTime: "2024-01-15T19:00:00.000Z",
-          },
-          {
-            date: "1/25/2024",
-            startTime: "5:00:00 PM",
-            endTime: "7:00:00 PM",
-            instructor: "Jane Doe",
-            aircraft: "N67890",
-            instructorId: "223e4567-e89b-12d3-a456-426614174000",
-            aircraftId: "323e4567-e89b-12d3-a456-426614174000",
-            startDateTime: "2024-01-25T17:00:00.000Z", // In the future
-            endDateTime: "2024-01-25T19:00:00.000Z",
-          },
-        ],
-        metadata: {
-          lastSearchDate: "2024-01-15",
-          lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
-        },
-      };
-
-      mockKV._store.set("availability_snapshot", JSON.stringify(snapshot));
-
-      await cleanPastSlots(env, now);
-
-      const result = await getSlots(env);
-      expect(result).toHaveLength(1);
-      expect(result[0].aircraftId).toBe("323e4567-e89b-12d3-a456-426614174000");
-    });
-
-    it("does nothing when no snapshot exists", async () => {
-      const now = new Date("2024-01-20T12:00:00.000Z");
-      await cleanPastSlots(env, now);
-      // Should not throw
-      expect(mockKV.put).not.toHaveBeenCalled();
     });
   });
 

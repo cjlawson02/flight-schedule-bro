@@ -5,21 +5,10 @@ import type {
   APIEmbedFooter,
   RESTPostAPIWebhookWithTokenJSONBody,
 } from "discord-api-types/v10";
-
-/**
- * Zod schema for BookableAvailability stored in KV
- * Matches the structure from shared/dao/availability.ts
- * Note: Uses UUIDs only. Resolve to human-readable names at display time using metadata.
- */
-export const BookableAvailabilitySchema = z.object({
-  date: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  instructorId: z.uuid(),
-  aircraftId: z.uuid(),
-  startDateTime: z.iso.datetime(), // Stored as ISO string in KV
-  endDateTime: z.iso.datetime(), // Stored as ISO string in KV
-});
+import { ReservationTypeSchema } from "../shared/dao/reservationTypes.js";
+import { BookableAvailabilityKvSchema } from "../shared/dao/availability.js";
+import { InstructorMetadataSchema } from "../shared/dao/instructors.js";
+import { AircraftMetadataSchema } from "../shared/dao/aircraft.js";
 
 /**
  * Metadata schema for tracking snapshot state
@@ -30,28 +19,10 @@ export const MetadataSchema = z.object({
   daysAhead: z.number().int().positive(),
 });
 
-/**
- * FSP metadata schemas for caching rarely-changing data
- */
-export const InstructorSchema = z.object({
-  instructorId: z.string(),
-  displayName: z.string(),
-});
-
-export const ReservationTypeSchema = z.object({
-  reservationTypeId: z.string(),
-  reservationTypeName: z.string(),
-});
-
-export const AircraftSchema = z.object({
-  aircraftId: z.string(),
-  tailNumber: z.string(),
-});
-
 export const FspMetadataSchema = z.object({
-  instructors: z.array(InstructorSchema),
+  instructors: z.array(InstructorMetadataSchema),
   reservationTypes: z.array(ReservationTypeSchema),
-  aircraft: z.array(AircraftSchema),
+  aircraft: z.array(AircraftMetadataSchema),
   lastUpdated: z.iso.datetime(),
 });
 
@@ -59,7 +30,7 @@ export const FspMetadataSchema = z.object({
  * Complete snapshot schema for KV storage
  */
 export const SnapshotSchema = z.object({
-  slots: z.array(BookableAvailabilitySchema),
+  slots: z.array(BookableAvailabilityKvSchema),
   metadata: MetadataSchema,
 });
 
@@ -67,7 +38,7 @@ export const SnapshotSchema = z.object({
  * Discord embed field schema (aligned with Discord API)
  * @see https://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure
  */
-export const DiscordEmbedFieldSchema = z.object({
+const DiscordEmbedFieldSchema = z.object({
   name: z.string().max(256), // Discord limit: 256 characters
   value: z.string().max(1024), // Discord limit: 1024 characters
   inline: z.boolean().optional(),
@@ -77,7 +48,7 @@ export const DiscordEmbedFieldSchema = z.object({
  * Discord embed footer schema (aligned with Discord API)
  * @see https://discord.com/developers/docs/resources/channel#embed-object-embed-footer-structure
  */
-export const DiscordEmbedFooterSchema = z.object({
+const DiscordEmbedFooterSchema = z.object({
   text: z.string().max(2048), // Discord limit: 2048 characters
   icon_url: z.url().optional(),
   proxy_icon_url: z.url().optional(),
@@ -139,17 +110,14 @@ export interface Env {
   MAX_HOUR?: string;
   TIMEZONE?: string;
   NOTIFICATION_AIRCRAFT?: string; // Comma-separated aircraft tail numbers for Discord notifications
+  RESERVATION_TYPE_ID?: string;
 }
 
 /**
  * TypeScript types inferred from Zod schemas
  */
-export type BookableAvailabilityKV = z.infer<typeof BookableAvailabilitySchema>;
 export type Metadata = z.infer<typeof MetadataSchema>;
 export type Snapshot = z.infer<typeof SnapshotSchema>;
 export type FspMetadata = z.infer<typeof FspMetadataSchema>;
-export type Instructor = z.infer<typeof InstructorSchema>;
-export type ReservationType = z.infer<typeof ReservationTypeSchema>;
-export type Aircraft = z.infer<typeof AircraftSchema>;
 export type DiscordEmbed = z.infer<typeof DiscordEmbedSchema>;
 export type DiscordPayload = z.infer<typeof DiscordPayloadSchema>;

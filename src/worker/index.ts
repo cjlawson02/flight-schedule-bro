@@ -1,9 +1,18 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { createConfig } from "../shared/util/config.js";
-import { BookableAvailability } from "../shared/dao/availability.js";
-import { isValidBlock } from "../shared/util/dates.js";
 import {
-  addOperatorDays,
+  buildAvailabilityFetchTasks,
+  fetchAllAvailability,
+  filterValidAvailabilityBlocks,
+  logAvailabilitySearchBudget,
+  prepareAvailabilitySearch,
+  resolveAvailabilityDaysAhead,
+} from "../shared/blo/availabilitySearch.js";
+import { createConfig } from "../shared/util/config.js";
+import {
+  reservationTypeUsesInstructor,
+  selectMonitoringReservationType,
+} from "../shared/dao/reservationTypes.js";
+import {
   formatOperatorIsoDate,
   startOfOperatorDay,
 } from "../shared/util/flightTime.js";
@@ -15,7 +24,7 @@ import {
   getDefaultLocationId,
 } from "../shared/dao/auth.js";
 import { getExistingReservations } from "../shared/dao/existingReservations.js";
-import { chunk } from "../shared/util/array.js";
+import { clearInvalidInstructorIds } from "../shared/dao/availability.js";
 import {
   getSnapshot,
   getSlotsFromSnapshot,
@@ -24,7 +33,7 @@ import {
 } from "./kv.js";
 import { sendAvailabilityNotification } from "./discord.js";
 import { runSetup } from "./setup.js";
-import { refreshMetadata, getMetadataFromKV } from "./metadata.js";
+import { getOrFetchMetadata, refreshMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
 import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
@@ -41,6 +50,7 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     initializeWorker();
+    clearInvalidInstructorIds();
 
     log.info("Scheduled task started", { timestamp: new Date().toISOString() });
 
@@ -66,6 +76,7 @@ export default {
         WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
         MAX_HOUR: env.MAX_HOUR ?? "19",
         TIMEZONE: env.TIMEZONE,
+        RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
       });
 
       const today = startOfOperatorDay(new Date(), config.TIMEZONE);
@@ -101,14 +112,13 @@ export default {
         count: existingReservations.length,
       });
 
-      log.info("Loading FSP metadata from KV");
-      const fspMetadata = await getMetadataFromKV(env.FSP_AVAILABILITY_KV);
+      log.info("Loading FSP metadata");
+      const fspMetadata = await getOrFetchMetadata(
+        operatorId,
+        env.FSP_AVAILABILITY_KV,
+      );
 
-      if (!fspMetadata) {
-        throw new Error("No FSP metadata in KV. Run /refresh-metadata first.");
-      }
-
-      log.info("FSP metadata loaded from KV", {
+      log.info("FSP metadata loaded", {
         instructors: fspMetadata.instructors.length,
         reservationTypes: fspMetadata.reservationTypes.length,
         aircraft: fspMetadata.aircraft.length,
@@ -117,18 +127,6 @@ export default {
       const allInstructorIds = fspMetadata.instructors.map(
         (i) => i.instructorId,
       );
-
-      if (allInstructorIds.length === 0) {
-        throw new Error(
-          "No instructors found in metadata. Cannot fetch availability.",
-        );
-      }
-
-      const instructorChunks = chunk(allInstructorIds, 3); // API limit: max 3 instructors
-      log.info("Instructor chunks prepared", {
-        instructors: allInstructorIds.length,
-        chunks: instructorChunks.length,
-      });
 
       const preferredAircraftIds = fspMetadata.aircraft
         .filter((a) => config.AIRCRAFT_REGEX.test(a.tailNumber))
@@ -139,62 +137,86 @@ export default {
           ? preferredAircraftIds
           : fspMetadata.aircraft.map((a) => a.aircraftId);
 
-      // Get first activity type (typically "dual")
-      const activityTypeId = fspMetadata.reservationTypes[0]?.reservationTypeId;
+      const reservationType = selectMonitoringReservationType(
+        fspMetadata.reservationTypes,
+        config.RESERVATION_TYPE_ID,
+      );
 
-      if (!activityTypeId) {
+      if (!reservationType) {
         throw new Error("No activity types found");
       }
 
-      // Create scheduler for availability fetching
-      const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
-
-      // Step 5: Fetch current availability for the SAME date range as original search
-      const totalDays = config.DAYS_AHEAD + 1;
-      const totalRequests = totalDays * instructorChunks.length;
-      log.info("Fetching availability", {
-        daysAhead: config.DAYS_AHEAD,
-        totalDays,
-        chunks: instructorChunks.length,
-        totalRequests,
-      });
-
-      const bookablePromises: Promise<BookableAvailability[]>[] = [];
-
-      for (let offset = 0; offset <= config.DAYS_AHEAD; offset++) {
-        const day = addOperatorDays(today, offset, config.TIMEZONE);
-        const dayISO = formatOperatorIsoDate(day, config.TIMEZONE);
-
-        bookablePromises.push(
-          ...instructorChunks.map((instructors) =>
-            scheduler.getBookableAvailability({
-              customerUserGuid: getUserId(),
-              locationId: getDefaultLocationId(),
-              activityTypeId,
-              instructors, // Max 3 instructors per request (API limit)
-              aircraftIds,
-              startDate: dayISO,
-              endDate: dayISO,
-            }),
-          ),
+      if (
+        reservationTypeUsesInstructor(reservationType) &&
+        allInstructorIds.length === 0
+      ) {
+        throw new Error(
+          "No instructors found in metadata. Cannot fetch availability.",
         );
       }
+
+      const activityTypeId = reservationType.reservationTypeId;
+
+      const searchParams = {
+        customerUserGuid: getUserId(),
+        locationId: getDefaultLocationId(),
+        operatorId,
+        timeZone: config.TIMEZONE,
+        activityTypeId,
+        reservationType,
+        allInstructorIds,
+        aircraftIds,
+      };
+
+      const prepared = prepareAvailabilitySearch(searchParams);
+      if (!prepared) {
+        throw new Error("No instructors or aircraft available for search.");
+      }
+
+      log.info("Instructor chunks prepared", {
+        instructors: allInstructorIds.length,
+        chunks: prepared.instructorChunks.length,
+      });
+
+      const searchBudget = resolveAvailabilityDaysAhead(
+        config.DAYS_AHEAD,
+        prepared.instructorChunks.length,
+      );
+      logAvailabilitySearchBudget(searchBudget, config.DAYS_AHEAD);
+
+      const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);
+
+      log.info("Fetching availability", {
+        configuredDaysAhead: config.DAYS_AHEAD,
+        effectiveDaysAhead: searchBudget.daysAhead,
+        chunks: searchBudget.instructorChunkCount,
+        totalRequests: searchBudget.totalFetches,
+      });
+
+      const bookablePromises = buildAvailabilityFetchTasks(scheduler, {
+        params: searchParams,
+        prepared,
+        today,
+        daysAhead: searchBudget.daysAhead,
+      });
 
       log.info("Executing availability requests", {
         requestCount: bookablePromises.length,
       });
 
-      const allBookableResults: BookableAvailability[] = (
-        await Promise.all(bookablePromises)
-      ).flat();
+      const allBookableResults = await fetchAllAvailability(bookablePromises, {
+        failFast: true,
+      });
 
       log.info("Availability search complete", {
         totalResults: allBookableResults.length,
       });
 
       // Step 6: Filter valid results
-      const validResults = allBookableResults.filter((result) =>
-        isValidBlock(result.startDateTime, result.endDateTime, config, 120),
+      const validResults = filterValidAvailabilityBlocks(
+        allBookableResults,
+        config,
+        reservationType.defaultLength,
       );
 
       log.info("Filtered valid time slots", { count: validResults.length });
@@ -204,7 +226,7 @@ export default {
         validResults,
         previousSlots,
         metadata.lastSearchDate,
-        config.DAYS_AHEAD,
+        searchBudget.daysAhead,
         config.TIMEZONE,
       );
 
@@ -248,7 +270,7 @@ export default {
       const updatedMetadata = {
         lastSearchDate: formatOperatorIsoDate(today, config.TIMEZONE),
         lastUpdate: new Date().toISOString(),
-        daysAhead: config.DAYS_AHEAD,
+        daysAhead: searchBudget.daysAhead,
       };
 
       await setSnapshot(env, validResults, updatedMetadata);

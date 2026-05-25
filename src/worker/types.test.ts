@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { BookableAvailabilityKvSchema } from "../shared/dao/availability.js";
 import {
-  BookableAvailabilitySchema,
   MetadataSchema,
   SnapshotSchema,
-  DiscordEmbedFieldSchema,
   DiscordEmbedSchema,
   DiscordPayloadSchema,
 } from "./types.js";
 
 describe("Worker Types - Zod Schemas", () => {
-  describe("BookableAvailabilitySchema", () => {
+  describe("BookableAvailabilityKvSchema", () => {
     it("validates a valid availability object", () => {
       const valid = {
         date: "1/15/2024",
@@ -23,7 +22,7 @@ describe("Worker Types - Zod Schemas", () => {
         endDateTime: "2024-01-15T19:00:00.000Z",
       };
 
-      const result = BookableAvailabilitySchema.safeParse(valid);
+      const result = BookableAvailabilityKvSchema.safeParse(valid);
       expect(result.success).toBe(true);
     });
 
@@ -40,7 +39,7 @@ describe("Worker Types - Zod Schemas", () => {
         endDateTime: "2024-01-15T19:00:00.000Z",
       };
 
-      const result = BookableAvailabilitySchema.safeParse(invalid);
+      const result = BookableAvailabilityKvSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });
 
@@ -57,7 +56,7 @@ describe("Worker Types - Zod Schemas", () => {
         endDateTime: "2024-01-15T19:00:00.000Z",
       };
 
-      const result = BookableAvailabilitySchema.safeParse(invalid);
+      const result = BookableAvailabilityKvSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });
   });
@@ -139,30 +138,33 @@ describe("Worker Types - Zod Schemas", () => {
     });
   });
 
-  describe("DiscordEmbedFieldSchema", () => {
-    it("validates a valid embed field", () => {
-      const valid = {
-        name: "Wed, Jan 15",
-        value: "**5:00 PM - 7:00 PM**\n✈️ N12345\n👨‍✈️ John Doe",
-        inline: true,
-      };
-
-      const result = DiscordEmbedFieldSchema.safeParse(valid);
-      expect(result.success).toBe(true);
-    });
-
-    it("allows optional inline field", () => {
-      const valid = {
-        name: "Field Name",
-        value: "Field Value",
-      };
-
-      const result = DiscordEmbedFieldSchema.safeParse(valid);
-      expect(result.success).toBe(true);
-    });
-  });
-
   describe("DiscordEmbedSchema", () => {
+    it("validates embed fields", () => {
+      const valid = {
+        fields: [
+          {
+            name: "Wed, Jan 15",
+            value: "**5:00 PM - 7:00 PM**",
+            inline: true,
+          },
+        ],
+      };
+
+      const result = DiscordEmbedSchema.safeParse(valid);
+      expect(result.success).toBe(true);
+    });
+
+    it("validates embed footers", () => {
+      const valid = {
+        footer: {
+          text: "Flight Schedule Bro",
+        },
+      };
+
+      const result = DiscordEmbedSchema.safeParse(valid);
+      expect(result.success).toBe(true);
+    });
+
     it("validates a complete embed", () => {
       const valid = {
         title: "New Flight Slots Available!",

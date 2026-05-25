@@ -4,17 +4,59 @@ import {
   setMetadataInKV,
   refreshMetadata,
   getOrFetchMetadata,
+  metadataNeedsRefresh,
 } from "./metadata.js";
 import type { FspMetadata } from "./types.js";
+import { FspMetadataSchema } from "./types.js";
 import * as instructorsDao from "../shared/dao/instructors.js";
 import * as reservationTypesDao from "../shared/dao/reservationTypes.js";
-import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import * as aircraftDao from "../shared/dao/aircraft.js";
+import { createReservationTypeFixture } from "../shared/dao/reservationTypes.fixtures.js";
+
+const INSTRUCTOR_ID_1 = "123e4567-e89b-12d3-a456-426614174000";
+const INSTRUCTOR_ID_2 = "223e4567-e89b-12d3-a456-426614174001";
 
 // Mock the DAO modules
-vi.mock("../shared/dao/instructors.js");
-vi.mock("../shared/dao/reservationTypes.js");
-vi.mock("../shared/dao/aircraft.js");
+vi.mock("../shared/dao/instructors.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../shared/dao/instructors.js")>();
+  return {
+    ...actual,
+    getInstructors: vi.fn(),
+  };
+});
+vi.mock("../shared/dao/reservationTypes.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../shared/dao/reservationTypes.js")>();
+  return {
+    ...actual,
+    getReservationTypes: vi.fn(),
+  };
+});
+vi.mock("../shared/dao/aircraft.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../shared/dao/aircraft.js")>();
+  return {
+    ...actual,
+    getAircraft: vi.fn(),
+  };
+});
+
+function mockReservationType(
+  id: string,
+  name: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return createReservationTypeFixture({
+    reservationTypeId: id,
+    reservationTypeName: name,
+    aircraftEnabled: true,
+    instructorEnabled: true,
+    aircraftRequirement: 2,
+    instructorRequirement: 2,
+    ...overrides,
+  });
+}
 
 describe("Worker Metadata", () => {
   let mockKV: any;
@@ -41,11 +83,18 @@ describe("Worker Metadata", () => {
 
     it("returns parsed metadata when valid data in KV", async () => {
       const mockMetadata: FspMetadata = {
-        instructors: [{ instructorId: "id1", displayName: "John Doe" }],
-        reservationTypes: [
-          { reservationTypeId: "rt1", reservationTypeName: "Dual" },
+        instructors: [
+          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
         ],
-        aircraft: [{ aircraftId: "ac1", tailNumber: "N12345" }],
+        reservationTypes: [
+          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+        ],
+        aircraft: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+          },
+        ],
         lastUpdated: "2024-01-01T00:00:00Z",
       };
       mockKV.get.mockResolvedValue(mockMetadata);
@@ -76,11 +125,18 @@ describe("Worker Metadata", () => {
   describe("setMetadataInKV", () => {
     it("stores valid metadata in KV", async () => {
       const metadata: FspMetadata = {
-        instructors: [{ instructorId: "id1", displayName: "John Doe" }],
-        reservationTypes: [
-          { reservationTypeId: "rt1", reservationTypeName: "Dual" },
+        instructors: [
+          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
         ],
-        aircraft: [{ aircraftId: "ac1", tailNumber: "N12345" }],
+        reservationTypes: [
+          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+        ],
+        aircraft: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+          },
+        ],
         lastUpdated: "2024-01-01T00:00:00Z",
       };
 
@@ -88,8 +144,9 @@ describe("Worker Metadata", () => {
 
       expect(mockKV.put).toHaveBeenCalledWith(
         "fsp-metadata",
-        JSON.stringify(metadata),
+        expect.any(String),
       );
+      expect(JSON.parse(String(mockKV.put.mock.calls[0][1]))).toEqual(metadata);
     });
 
     it("throws error when metadata is invalid", async () => {
@@ -104,18 +161,26 @@ describe("Worker Metadata", () => {
     it("fetches metadata from API and stores in KV", async () => {
       const mockInstructors = {
         results: [
-          { instructorId: "id1", displayName: "John Doe" },
-          { instructorId: "id2", displayName: "Jane Smith" },
+          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
+          { instructorId: INSTRUCTOR_ID_2, displayName: "Jane Smith" },
         ],
       };
       const mockReservationTypes = [
-        { reservationTypeId: "rt1", reservationTypeName: "Dual" },
-        { reservationTypeId: "rt2", reservationTypeName: "Solo" },
-      ] as ReservationType[];
+        mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+        mockReservationType("22222222-2222-4222-8222-222222222222", "Solo"),
+      ];
       const mockAircraft = {
         results: [
-          { aircraftId: "ac1", tailNumber: "N12345", model: "172S" },
-          { aircraftId: "ac2", tailNumber: "N67890", model: "172N" },
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+            model: "172S",
+          },
+          {
+            aircraftId: "44444444-4444-4444-8444-444444444444",
+            tailNumber: "N67890",
+            model: "172N",
+          },
           {
             aircraftId: "00000000-0000-0000-0000-000000000000",
             tailNumber: "",
@@ -144,43 +209,65 @@ describe("Worker Metadata", () => {
     it("filters out invalid aircraft IDs", async () => {
       const mockAircraft = {
         results: [
-          { aircraftId: "ac1", tailNumber: "N12345", model: "172S" },
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+            model: "172S",
+          },
           {
             aircraftId: "00000000-0000-0000-0000-000000000000",
             tailNumber: "Invalid",
             model: "",
           },
-          { aircraftId: "ac2", tailNumber: "  ", model: "" }, // Empty after trim
-          { aircraftId: "ac3", tailNumber: "N67890", model: "172N" },
+          {
+            aircraftId: "44444444-4444-4444-8444-444444444444",
+            tailNumber: "  ",
+            model: "",
+          },
+          {
+            aircraftId: "55555555-5555-4555-8555-555555555555",
+            tailNumber: "N67890",
+            model: "172N",
+          },
         ],
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
       });
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([] as ReservationType[]);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
 
       expect(result.aircraft).toHaveLength(2);
       expect(result.aircraft).toEqual([
-        { aircraftId: "ac1", tailNumber: "N12345" },
-        { aircraftId: "ac3", tailNumber: "N67890" },
+        {
+          aircraftId: "33333333-3333-4333-8333-333333333333",
+          tailNumber: "N12345",
+        },
+        {
+          aircraftId: "55555555-5555-4555-8555-555555555555",
+          tailNumber: "N67890",
+        },
       ]);
     });
 
     it("trims aircraft tail numbers", async () => {
       const mockAircraft = {
         results: [
-          { aircraftId: "ac1", tailNumber: "  N12345  ", model: "172S" },
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "  N12345  ",
+            model: "172S",
+          },
         ],
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
         results: [],
       });
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([] as ReservationType[]);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue([]);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
@@ -189,14 +276,52 @@ describe("Worker Metadata", () => {
     });
   });
 
+  describe("metadataNeedsRefresh", () => {
+    it("detects legacy reservation types missing field metadata", () => {
+      const legacy = FspMetadataSchema.parse({
+        instructors: [],
+        reservationTypes: [
+          {
+            reservationTypeId: "11111111-1111-4111-8111-111111111111",
+            reservationTypeName: "Dual",
+          },
+        ],
+        aircraft: [],
+        lastUpdated: "2024-01-01T00:00:00Z",
+      });
+
+      expect(metadataNeedsRefresh(legacy)).toBe(true);
+    });
+
+    it("accepts reservation types with enabled fields", () => {
+      expect(
+        metadataNeedsRefresh({
+          instructors: [],
+          reservationTypes: [
+            mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+          ],
+          aircraft: [],
+          lastUpdated: "2024-01-01T00:00:00Z",
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("getOrFetchMetadata", () => {
     it("returns cached metadata when available", async () => {
       const cachedMetadata: FspMetadata = {
-        instructors: [{ instructorId: "id1", displayName: "John Doe" }],
-        reservationTypes: [
-          { reservationTypeId: "rt1", reservationTypeName: "Dual" },
+        instructors: [
+          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
         ],
-        aircraft: [{ aircraftId: "ac1", tailNumber: "N12345" }],
+        reservationTypes: [
+          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+        ],
+        aircraft: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+          },
+        ],
         lastUpdated: "2024-01-01T00:00:00Z",
       };
       mockKV.get.mockResolvedValue(cachedMetadata);
@@ -209,17 +334,79 @@ describe("Worker Metadata", () => {
       expect(instructorsDao.getInstructors).not.toHaveBeenCalled();
     });
 
+    it("refreshes legacy cached metadata missing reservation type fields", async () => {
+      const legacyMetadata = {
+        instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John" }],
+        reservationTypes: [
+          {
+            reservationTypeId: "11111111-1111-4111-8111-111111111111",
+            reservationTypeName: "Dual",
+          },
+        ],
+        aircraft: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+          },
+        ],
+        lastUpdated: "2024-01-01T00:00:00Z",
+      };
+      mockKV.get.mockResolvedValue(legacyMetadata);
+
+      const refreshed = {
+        instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John" }],
+        reservationTypes: [
+          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+        ],
+        aircraft: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+          },
+        ],
+        lastUpdated: "2026-05-25T00:00:00.000Z",
+      };
+
+      vi.mocked(instructorsDao.getInstructors).mockResolvedValue({
+        results: refreshed.instructors.map((i) => ({
+          instructorId: i.instructorId,
+          displayName: i.displayName,
+        })),
+      });
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
+        refreshed.reservationTypes,
+      );
+      vi.mocked(aircraftDao.getAircraft).mockResolvedValue({
+        results: refreshed.aircraft.map((a) => ({
+          aircraftId: a.aircraftId,
+          tailNumber: a.tailNumber,
+          model: "172S",
+        })),
+      });
+
+      const result = await getOrFetchMetadata(123, mockKV);
+
+      expect(result.reservationTypes[0].aircraftEnabled).toBe(true);
+      expect(instructorsDao.getInstructors).toHaveBeenCalled();
+    });
+
     it("fetches from API when cache is empty", async () => {
       mockKV.get.mockResolvedValue(null);
 
       const mockInstructors = {
-        results: [{ instructorId: "id1", displayName: "John" }],
+        results: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John" }],
       };
       const mockReservationTypes = [
-        { reservationTypeId: "rt1", reservationTypeName: "Dual" },
-      ] as ReservationType[];
+        mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
+      ];
       const mockAircraft = {
-        results: [{ aircraftId: "ac1", tailNumber: "N12345", model: "172S" }],
+        results: [
+          {
+            aircraftId: "33333333-3333-4333-8333-333333333333",
+            tailNumber: "N12345",
+            model: "172S",
+          },
+        ],
       };
 
       vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
