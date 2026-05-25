@@ -23,13 +23,6 @@ export function setCacheAdapter(adapter: CacheAdapter | null) {
 }
 
 /**
- * Check if caching is available
- */
-export function isCacheAvailable(): boolean {
-  return cacheAdapter !== null;
-}
-
-/**
  * Rate Limiting and Retry Strategy
  *
  * The Flight Schedule Pro API has rate limits to prevent abuse and ensure
@@ -37,7 +30,7 @@ export function isCacheAvailable(): boolean {
  * rate limiting gracefully:
  *
  * 1. **Request Queue Management**
- *    - MAX_CONCURRENT_REQUESTS = 50: Limits parallel API calls
+ *    - MAX_CONCURRENT_REQUESTS = 20: Limits parallel API calls
  *    - STAGGER_DELAY_MS = 50ms: Staggers initial requests to prevent thundering herd
  *    - Request queue: Waits for slots when at capacity
  *
@@ -46,16 +39,14 @@ export function isCacheAvailable(): boolean {
  *    - Prevents redundant requests for the same data
  *    - Configured per-request with TTL parameter
  *
- * 3. **Exponential Backoff Retry**
- *    - MAX_RETRIES = 3 attempts per request (4 total attempts: initial + 3 retries)
- *    - Base delay = 1000ms (1 second)
- *    - Exponential growth: 1s → 2s → 4s between retries
- *    - Helps handle transient errors and rate limit windows
+ * 3. **Unified Retry Budget**
+ *    - MAX_ATTEMPTS = 8 total fetch attempts per safeFetch call
+ *    - Exponential backoff for transient/network errors: 1s → 2s → 4s (capped at 30s)
+ *    - Rate-limit responses wait out the API window and release concurrency slots while waiting
  *
- * 4. **Request Chunking (in index.ts)**
- *    - Limits concurrent availability searches to 3 instructors at a time
- *    - Prevents overwhelming the API with parallel requests
- *    - See chunk() function documentation in index.ts for details
+ * 4. **Request Chunking (availabilitySearch.ts)**
+ *    - Limits availability searches to 3 instructors per request
+ *    - Worker runs cap total day-by-day fetches via resolveAvailabilityDaysAhead()
  *
  * Why This Works:
  * - Most rate limits are time-based (e.g., "X requests per minute")
@@ -72,6 +63,45 @@ export function isCacheAvailable(): boolean {
  */
 
 /**
+ * HTTP error from the FSP API. Client errors (4xx except 429) are not retried.
+ */
+export class FspHttpError extends Error {
+  readonly status: number;
+  readonly response: unknown;
+
+  constructor(status: number, response: unknown) {
+    super(
+      `HTTP error! status: ${status}, response: ${JSON.stringify(response)}`,
+    );
+    this.name = "FspHttpError";
+    this.status = status;
+    this.response = response;
+  }
+}
+
+export class FspRateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FspRateLimitError";
+  }
+}
+
+function isNonRetryableHttpError(error: unknown): error is FspHttpError {
+  if (!(error instanceof Error) || error.name !== "FspHttpError") {
+    return false;
+  }
+
+  const status = (error as FspHttpError).status;
+  return status >= 400 && status < 500 && status !== 429;
+}
+
+export function resetRequestQueueForTests(): void {
+  activeRequests = 0;
+  requestQueue.length = 0;
+  totalRequestsStarted = 0;
+}
+
+/**
  * Sleep for a given number of milliseconds
  */
 function sleep(ms: number): Promise<void> {
@@ -80,8 +110,9 @@ function sleep(ms: number): Promise<void> {
 
 // Global request queue to prevent thundering herd
 let activeRequests = 0;
-const MAX_CONCURRENT_REQUESTS = 50; // Limit concurrent requests
+const MAX_CONCURRENT_REQUESTS = 20; // Limit concurrent requests
 const STAGGER_DELAY_MS = 50; // Delay between initial requests
+const MAX_ATTEMPTS = 8;
 const requestQueue: (() => void)[] = [];
 let totalRequestsStarted = 0;
 
@@ -130,6 +161,22 @@ const RateLimitErrorSchema = z.object({
   message: z.string(),
 });
 
+function isRateLimitResponse(
+  data: unknown,
+): data is z.infer<typeof RateLimitErrorSchema> {
+  return RateLimitErrorSchema.safeParse(data).success;
+}
+
+function getRateLimitWaitMs(message: string): number {
+  const match = /(\d+)\s+seconds?/.exec(message);
+  const waitSeconds = match ? Number.parseInt(match[1], 10) : 5;
+  return waitSeconds * 1000;
+}
+
+async function waitForRateLimit(message: string): Promise<void> {
+  await sleep(getRateLimitWaitMs(message));
+}
+
 export async function safeFetch<T extends z.ZodType>(
   url: string,
   method: "GET" | "POST",
@@ -149,12 +196,13 @@ export async function safeFetch<T extends z.ZodType>(
     await acquireRequestSlot();
 
     try {
-      // Implement exponential backoff for rate limiting
-      const maxRetries = 3;
-      let retryCount = 0;
+      let attemptCount = 0;
       let lastError: Error | null = null;
+      let fetchSucceeded = false;
 
-      while (retryCount <= maxRetries) {
+      while (attemptCount < MAX_ATTEMPTS) {
+        attemptCount++;
+
         try {
           const res = await fetch(url, {
             method,
@@ -169,54 +217,74 @@ export async function safeFetch<T extends z.ZodType>(
 
           data = await res.json();
 
-          // Check if it's a rate limit error
-          const rateLimitCheck = RateLimitErrorSchema.safeParse(data);
-          if (rateLimitCheck.success) {
-            // Extract wait time from message (e.g., "Try again in 34 seconds")
-            const match = /(\d+)\s+seconds/.exec(rateLimitCheck.data.message);
-            const waitSeconds = match ? parseInt(match[1], 10) : 5;
-
-            // Use the API's suggested wait time
-            const backoffMs = waitSeconds * 1000;
-
-            await sleep(backoffMs);
-            retryCount++;
+          if (isRateLimitResponse(data)) {
+            releaseRequestSlot();
+            try {
+              await waitForRateLimit(data.message);
+            } finally {
+              await acquireRequestSlot();
+            }
             continue;
           }
 
           // Check for other HTTP errors
           if (!res.ok) {
+            if (res.status === 429) {
+              releaseRequestSlot();
+              try {
+                await waitForRateLimit(
+                  typeof data === "object" &&
+                    data !== null &&
+                    "message" in data &&
+                    typeof data.message === "string"
+                    ? data.message
+                    : "Try again in 5 seconds",
+                );
+              } finally {
+                await acquireRequestSlot();
+              }
+              continue;
+            }
+
             log.error("HTTP error from FSP API", {
               status: res.status,
               url,
               params,
               response: data,
             });
-            throw new Error(
-              `HTTP error! status: ${res.status}, response: ${JSON.stringify(
-                data,
-              )}`,
-            );
+            throw new FspHttpError(res.status, data);
           }
 
-          // Success - break out of retry loop
+          fetchSucceeded = true;
           break;
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
 
-          if (retryCount >= maxRetries) {
+          if (
+            isNonRetryableHttpError(error) ||
+            (error instanceof Error && error.name === "FspRateLimitError")
+          ) {
+            throw error;
+          }
+
+          if (attemptCount >= MAX_ATTEMPTS) {
             throw lastError;
           }
 
           // Exponential backoff for other errors
-          const backoffMs = Math.min(Math.pow(2, retryCount) * 1000, 30000);
+          const backoffMs = Math.min(
+            Math.pow(2, attemptCount - 1) * 1000,
+            30000,
+          );
 
           await sleep(backoffMs);
-          retryCount++;
         }
       }
 
-      if (!data) {
+      if (!fetchSucceeded) {
+        if (isRateLimitResponse(data)) {
+          throw new FspRateLimitError(`Rate limit exceeded: ${data.message}`);
+        }
         throw lastError ?? new Error("Failed to fetch data after retries");
       }
     } finally {
@@ -228,6 +296,10 @@ export async function safeFetch<T extends z.ZodType>(
   const result = parser.safeParse(data);
 
   if (!result.success) {
+    if (isRateLimitResponse(data)) {
+      throw new FspRateLimitError(`Rate limit exceeded: ${data.message}`);
+    }
+
     log.error("Failed to parse FSP API response", {
       response: data,
       zodError: result.error,
