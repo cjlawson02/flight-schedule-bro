@@ -34,7 +34,6 @@ const envSchema = z.object({
 
   // Optional reservation type override for automated monitoring
   RESERVATION_TYPE_ID: z
-    .string()
     .uuid("RESERVATION_TYPE_ID must be a valid UUID")
     .optional(),
 });
@@ -51,7 +50,7 @@ export interface ConfigType {
 }
 
 /** Worker env bindings used to build runtime config. */
-export type WorkerEnvInput = {
+export interface WorkerEnvInput {
   FSP_EMAIL: string;
   FSP_PASSWORD: string;
   DAYS_AHEAD: string;
@@ -60,7 +59,7 @@ export type WorkerEnvInput = {
   MAX_HOUR?: string;
   TIMEZONE?: string;
   RESERVATION_TYPE_ID?: string;
-};
+}
 
 /**
  * Create configuration from environment object

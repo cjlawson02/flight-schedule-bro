@@ -21,12 +21,12 @@ export const CLOUDFLARE_SUBREQUEST_LIMIT = 50;
 /** Conservative non-availability subrequests per worker run (auth, reservations, KV, Discord). */
 export const WORKER_AVAILABILITY_OVERHEAD = 10;
 
-export type AvailabilitySearchBudget = {
+export interface AvailabilitySearchBudget {
   daysAhead: number;
   totalFetches: number;
   capped: boolean;
   instructorChunkCount: number;
-};
+}
 
 export function resolveAvailabilityDaysAhead(
   daysAhead: number,
@@ -89,7 +89,7 @@ export function logAvailabilitySearchBudget(
   }
 }
 
-export type AvailabilitySearchParams = {
+export interface AvailabilitySearchParams {
   customerUserGuid: string;
   locationId: number;
   operatorId: number;
@@ -98,15 +98,15 @@ export type AvailabilitySearchParams = {
   reservationType: ReservationType;
   allInstructorIds: string[];
   aircraftIds: string[];
-};
+}
 
-export type PreparedAvailabilitySearch = {
+export interface PreparedAvailabilitySearch {
   searchResources: {
     instructors: string[];
     aircraftIds: string[];
   };
   instructorChunks: string[][];
-};
+}
 
 export function prepareAvailabilitySearch(
   params: AvailabilitySearchParams,

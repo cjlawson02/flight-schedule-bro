@@ -10,7 +10,6 @@ import * as authModule from "../shared/dao/auth.js";
 import * as existingReservationsModule from "../shared/dao/existingReservations.js";
 import * as metadataModule from "./metadata.js";
 import * as workerSearchModule from "../shared/blo/workerAvailabilitySearch.js";
-import { SchedulerBLO } from "../shared/blo/scheduler.js";
 
 vi.mock("./kv.js");
 vi.mock("./discord.js");

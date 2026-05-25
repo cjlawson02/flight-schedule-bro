@@ -40,12 +40,12 @@ export type BookableAvailabilityKV = z.infer<
   typeof BookableAvailabilityKvSchema
 >;
 
-type TimeSlotGroup = {
+interface TimeSlotGroup {
   date: string;
   startTime: string;
   endTime: string;
   availabilities: BookableAvailability[];
-};
+}
 
 export function groupAvailabilitiesByTimeSlot(
   availabilities: BookableAvailability[],
@@ -90,7 +90,7 @@ export const AvailabilityResultSchema = z.object({
 
 const ResponseSchema = z.array(AvailabilityResultSchema);
 
-type EnabledDays = {
+interface EnabledDays {
   sundayEnabled: boolean;
   mondayEnabled: boolean;
   tuesdayEnabled: boolean;
@@ -98,7 +98,7 @@ type EnabledDays = {
   thursdayEnabled: boolean;
   fridayEnabled: boolean;
   saturdayEnabled: boolean;
-};
+}
 
 const ALL_DAYS_ENABLED: EnabledDays = {
   sundayEnabled: true,
@@ -191,7 +191,7 @@ function parseInvalidInstructorFromResponse(response: unknown): number | null {
   return null;
 }
 
-type FetchAvailabilityParams = {
+interface FetchAvailabilityParams {
   customerUserGuid: string;
   locationId: number;
   activityTypeId: string;
@@ -202,7 +202,7 @@ type FetchAvailabilityParams = {
   operatorId: number;
   timeZone?: string;
   lengthOfReservationInMinutes?: number;
-};
+}
 
 async function fetchAvailabilityRequest(
   params: FetchAvailabilityParams,
@@ -243,7 +243,7 @@ async function fetchAvailabilityRequest(
 }
 
 export async function fetchAvailability(params: FetchAvailabilityParams) {
-  let schedulableInstructors = excludeInvalidInstructors(params.instructors);
+  const schedulableInstructors = excludeInvalidInstructors(params.instructors);
 
   if (schedulableInstructors.length === 0) {
     if (params.aircraftIds.length === 0) {

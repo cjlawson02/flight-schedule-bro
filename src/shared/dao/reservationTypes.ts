@@ -97,8 +97,8 @@ export function getFieldState(
   field: ReservationTypeField,
 ): { enabled: boolean; required: boolean } {
   const config = RESERVATION_TYPE_FIELDS[field];
-  const explicitEnabled = type[config.enabled] as boolean;
-  const requirement = type[config.requirement] as number;
+  const explicitEnabled = type[config.enabled];
+  const requirement = type[config.requirement];
   const enabled = isFieldEnabled(explicitEnabled, requirement);
 
   return {
