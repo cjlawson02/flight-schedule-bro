@@ -116,7 +116,9 @@ describe("resolveResourceId", () => {
 describe("resolveMutationResourceId", () => {
   it("uses null for disabled resources on mutation payloads", () => {
     expect(resolveMutationResourceId(false, "ac-1")).toBeNull();
-    expect(resolveMutationResourceId(true, undefined)).toBe(FSP_NIL_RESOURCE_ID);
+    expect(resolveMutationResourceId(true, undefined)).toBe(
+      FSP_NIL_RESOURCE_ID,
+    );
     expect(resolveMutationResourceId(true, "ac-1")).toBe("ac-1");
   });
 });

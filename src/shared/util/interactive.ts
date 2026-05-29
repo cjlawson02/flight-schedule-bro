@@ -341,9 +341,8 @@ export class InteractiveCLI {
       });
 
       return (
-        availableTypes.find(
-          (type) => type.reservationTypeId === selectedId,
-        ) ?? null
+        availableTypes.find((type) => type.reservationTypeId === selectedId) ??
+        null
       );
     } catch {
       return null;

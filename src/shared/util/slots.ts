@@ -38,7 +38,11 @@ export function filterSlotsForDiscordNotification(
   return slots.filter(
     (slot) =>
       !isSlotStartInPast(slot.startDateTime, now) &&
-      !isSlotStartTooSoonForDiscordNotification(slot.startDateTime, undefined, now),
+      !isSlotStartTooSoonForDiscordNotification(
+        slot.startDateTime,
+        undefined,
+        now,
+      ),
   );
 }
 

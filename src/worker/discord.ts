@@ -234,8 +234,7 @@ function buildAvailabilityContent(
     timeZone,
     "MMM d",
   );
-  const range =
-    firstDate === lastDate ? firstDate : `${firstDate}–${lastDate}`;
+  const range = firstDate === lastDate ? firstDate : `${firstDate}–${lastDate}`;
   return `🎉 ${slots.length} new flight slots · ${range}`;
 }
 

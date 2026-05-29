@@ -116,7 +116,9 @@ export function buildFullReservationRequest(
       ? (details.estimatedFlightHours ?? "")
       : undefined,
     flightRoute: flightRoute.enabled ? (details.flightRoute ?? "") : undefined,
-    flightRules: flightRules.enabled ? (details.flightRules ?? null) : undefined,
+    flightRules: flightRules.enabled
+      ? (details.flightRules ?? null)
+      : undefined,
     flightType: flightType.enabled ? (details.flightType ?? null) : undefined,
     internalComments: "",
     overrideExceptions: false,

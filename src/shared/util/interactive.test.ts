@@ -390,12 +390,12 @@ describe("InteractiveCLI", () => {
     });
 
     it("returns null when required input is cancelled", async () => {
-      vi.mocked(select)
-        .mockResolvedValueOnce(1)
-        .mockResolvedValueOnce(1);
+      vi.mocked(select).mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       vi.mocked(input).mockRejectedValue(new Error("Cancelled"));
 
-      await expect(cli.collectActivityFlightDetails(rental)).resolves.toBeNull();
+      await expect(
+        cli.collectActivityFlightDetails(rental),
+      ).resolves.toBeNull();
     });
   });
 
@@ -479,29 +479,29 @@ describe("InteractiveCLI", () => {
       );
     });
 
-  it("returns null when user cancels", async () => {
-    vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
+    it("returns null when user cancels", async () => {
+      vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
 
-    const result = await cli.selectReservationType([dualFlightTraining]);
+      const result = await cli.selectReservationType([dualFlightTraining]);
 
-    expect(result).toBeNull();
-  });
-
-  it("excludes activity types that are already selected", async () => {
-    const reservationTypes = [dualFlightTraining, rental];
-
-    vi.mocked(select).mockResolvedValue(rental.reservationTypeId);
-
-    const result = await cli.selectReservationType(reservationTypes, {
-      excludeTypeIds: [dualFlightTraining.reservationTypeId],
+      expect(result).toBeNull();
     });
 
-    expect(result).toEqual(rental);
-    expect(select).toHaveBeenCalledWith(
-      expect.objectContaining({
-        choices: [{ name: "Rental", value: rental.reservationTypeId }],
-      }),
-    );
+    it("excludes activity types that are already selected", async () => {
+      const reservationTypes = [dualFlightTraining, rental];
+
+      vi.mocked(select).mockResolvedValue(rental.reservationTypeId);
+
+      const result = await cli.selectReservationType(reservationTypes, {
+        excludeTypeIds: [dualFlightTraining.reservationTypeId],
+      });
+
+      expect(result).toEqual(rental);
+      expect(select).toHaveBeenCalledWith(
+        expect.objectContaining({
+          choices: [{ name: "Rental", value: rental.reservationTypeId }],
+        }),
+      );
+    });
   });
-});
 });

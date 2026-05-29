@@ -30,9 +30,9 @@ describe("slot start time filters", () => {
   const now = new Date("2024-01-20T18:00:00.000Z");
 
   it("detects past slot starts", () => {
-    expect(
-      isSlotStartInPast(new Date("2024-01-20T17:59:59.999Z"), now),
-    ).toBe(true);
+    expect(isSlotStartInPast(new Date("2024-01-20T17:59:59.999Z"), now)).toBe(
+      true,
+    );
     expect(isSlotStartInPast(new Date("2024-01-20T18:00:00.000Z"), now)).toBe(
       false,
     );
@@ -46,10 +46,12 @@ describe("slot start time filters", () => {
       now.getTime() + DISCORD_NOTIFICATION_MIN_LEAD_HOURS * 60 * 60 * 1000,
     );
 
-    expect(isSlotStartTooSoonForDiscordNotification(withinLead, undefined, now))
-      .toBe(true);
-    expect(isSlotStartTooSoonForDiscordNotification(afterLead, undefined, now))
-      .toBe(false);
+    expect(
+      isSlotStartTooSoonForDiscordNotification(withinLead, undefined, now),
+    ).toBe(true);
+    expect(
+      isSlotStartTooSoonForDiscordNotification(afterLead, undefined, now),
+    ).toBe(false);
   });
 
   it("filters past slots from CLI suggestions", () => {

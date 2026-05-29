@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { formatInTimeZone } from "date-fns-tz";
-import { nilToOptionalResourceId, resolveMutationResourceId } from "./aircraft.js";
+import {
+  nilToOptionalResourceId,
+  resolveMutationResourceId,
+} from "./aircraft.js";
 import { DEFAULT_TIMEZONE, parseFspLocal } from "../util/flightTime.js";
 import type { ActivityFlightDetails } from "./reservationFlightDetails.js";
 import { getFieldState, type ReservationType } from "./reservationTypes.js";
@@ -52,9 +55,7 @@ const CancellationReasonListSchema = z.array(CancellationReasonSchema);
 export type CancellationReason = z.infer<typeof CancellationReasonSchema>;
 
 const ReservationMutationResponseSchema = z.object({
-  errors: z
-    .array(z.object({ message: z.string().optional() }))
-    .default([]),
+  errors: z.array(z.object({ message: z.string().optional() })).default([]),
 });
 
 export interface UpdateReservationParams {

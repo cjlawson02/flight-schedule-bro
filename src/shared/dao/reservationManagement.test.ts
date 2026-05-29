@@ -267,7 +267,9 @@ describe("validateUpdateResourcesForType", () => {
       },
     };
 
-    expect(validateUpdateResourcesForType(detail, dualFlightTraining)).toBeNull();
+    expect(
+      validateUpdateResourcesForType(detail, dualFlightTraining),
+    ).toBeNull();
   });
 });
 

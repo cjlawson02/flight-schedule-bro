@@ -25,11 +25,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,mts,cts}": [
-      "eslint --fix",
-      "prettier --write"
+    "**/*.{ts,tsx,mts,cts}": [
+      "prettier --write",
+      "eslint --fix"
     ],
-    "*.{json,md,yml,yaml}": "prettier --write"
+    "**/*.{json,md,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260523.1",

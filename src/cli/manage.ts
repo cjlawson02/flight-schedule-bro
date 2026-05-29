@@ -131,19 +131,15 @@ async function resolveChangeActivityResources(
       return null;
     }
 
-    const resolved = await resolveMissingInstructorForUpgrade(
-      cli,
-      scheduler,
-      {
-        customerUserGuid: getUserId(),
-        locationId: detail.locationId,
-        reservationType,
-        aircraftId: searchAircraftId,
-        startTime,
-        endTime,
-        timeZone: config.TIMEZONE,
-      },
-    );
+    const resolved = await resolveMissingInstructorForUpgrade(cli, scheduler, {
+      customerUserGuid: getUserId(),
+      locationId: detail.locationId,
+      reservationType,
+      aircraftId: searchAircraftId,
+      startTime,
+      endTime,
+      timeZone: config.TIMEZONE,
+    });
     if (!resolved) {
       return null;
     }
@@ -222,7 +218,9 @@ async function handleCancelActivity(
 
   let reasonText = "";
   if (reason.requiresExplanation) {
-    const explanation = await cli.promptText("Enter a cancellation explanation:");
+    const explanation = await cli.promptText(
+      "Enter a cancellation explanation:",
+    );
     if (explanation === null) {
       return;
     }
@@ -376,9 +374,7 @@ async function handleChangeActivityType(
     flightDetails,
   );
 
-  const confirmed = await cli.confirmAction(
-    "Confirm and proceed with update?",
-  );
+  const confirmed = await cli.confirmAction("Confirm and proceed with update?");
   if (!confirmed) {
     return;
   }

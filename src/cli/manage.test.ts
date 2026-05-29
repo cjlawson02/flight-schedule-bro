@@ -98,9 +98,9 @@ describe("runManageExistingActivityWorkflow", () => {
     cli = new InteractiveCLI();
     vi.clearAllMocks();
     vi.spyOn(cli, "selectExistingActivity").mockResolvedValue(reservation);
-    vi.mocked(existingReservationsModule.getExistingReservations).mockResolvedValue(
-      [reservation],
-    );
+    vi.mocked(
+      existingReservationsModule.getExistingReservations,
+    ).mockResolvedValue([reservation]);
   });
 
   it("stops before confirm when validate-only update fails", async () => {
@@ -168,11 +168,15 @@ describe("runManageExistingActivityWorkflow", () => {
       191057,
     );
 
-    expect(reservationManagementModule.updateReservation).toHaveBeenNthCalledWith(
+    expect(
+      reservationManagementModule.updateReservation,
+    ).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ validateOnly: true }),
     );
-    expect(reservationManagementModule.updateReservation).toHaveBeenNthCalledWith(
+    expect(
+      reservationManagementModule.updateReservation,
+    ).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ validateOnly: false }),
     );
@@ -186,7 +190,9 @@ describe("runManageExistingActivityWorkflow", () => {
     vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
       "change-activity-type",
     );
-    vi.spyOn(cli, "selectReservationType").mockResolvedValue(dualFlightTraining);
+    vi.spyOn(cli, "selectReservationType").mockResolvedValue(
+      dualFlightTraining,
+    );
     vi.spyOn(cli, "confirmAction").mockResolvedValue(true);
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
       buildReservationDetail({
@@ -303,25 +309,20 @@ describe("runManageExistingActivityWorkflow", () => {
       requiresExplanation: false,
     });
     vi.spyOn(cli, "confirmAction").mockResolvedValue(true);
-    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue(
-      [
-        {
-          id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
-          name: "Scheduling Conflict (Customer)",
-          requiresExplanation: false,
-        },
-      ],
-    );
+    vi.mocked(
+      reservationManagementModule.getCancellationReasons,
+    ).mockResolvedValue([
+      {
+        id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
+        name: "Scheduling Conflict (Customer)",
+        requiresExplanation: false,
+      },
+    ]);
     vi.mocked(reservationManagementModule.cancelReservation).mockResolvedValue(
       undefined,
     );
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      {} as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
     expect(reservationManagementModule.cancelReservation).toHaveBeenCalledWith({
       reservationId: reservation.reservationId,
@@ -343,24 +344,21 @@ describe("runManageExistingActivityWorkflow", () => {
       requiresExplanation: true,
     });
     vi.spyOn(cli, "promptText").mockResolvedValue("   ");
-    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue(
-      [
-        {
-          id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
-          name: "Other",
-          requiresExplanation: true,
-        },
-      ],
-    );
+    vi.mocked(
+      reservationManagementModule.getCancellationReasons,
+    ).mockResolvedValue([
+      {
+        id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
+        name: "Other",
+        requiresExplanation: true,
+      },
+    ]);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      {} as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
-    expect(reservationManagementModule.cancelReservation).not.toHaveBeenCalled();
+    expect(
+      reservationManagementModule.cancelReservation,
+    ).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(
       "❌ Cancellation explanation is required.",
     );
@@ -371,18 +369,15 @@ describe("runManageExistingActivityWorkflow", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("cancel");
-    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue(
-      [],
-    );
+    vi.mocked(
+      reservationManagementModule.getCancellationReasons,
+    ).mockResolvedValue([]);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      {} as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
-    expect(reservationManagementModule.cancelReservation).not.toHaveBeenCalled();
+    expect(
+      reservationManagementModule.cancelReservation,
+    ).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(
       "❌ No cancellation reasons are available.",
     );

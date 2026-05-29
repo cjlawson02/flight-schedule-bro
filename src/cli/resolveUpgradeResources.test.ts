@@ -115,15 +115,19 @@ describe("resolveMissingInstructorForUpgrade", () => {
       getBookableAvailability: vi.fn().mockResolvedValue([]),
     };
 
-    const result = await resolveMissingInstructorForUpgrade(cli, scheduler as never, {
-      customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
-      locationId: 20852,
-      reservationType: dualFlightTraining,
-      aircraftId,
-      startTime,
-      endTime,
-      timeZone: LA,
-    });
+    const result = await resolveMissingInstructorForUpgrade(
+      cli,
+      scheduler as never,
+      {
+        customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
+        locationId: 20852,
+        reservationType: dualFlightTraining,
+        aircraftId,
+        startTime,
+        endTime,
+        timeZone: LA,
+      },
+    );
 
     expect(result).toBeNull();
     expect(logSpy).toHaveBeenCalledWith(
@@ -140,14 +144,18 @@ describe("resolveMissingInstructorForUpgrade", () => {
       getBookableAvailability: vi.fn().mockResolvedValue([]),
     };
 
-    const result = await resolveMissingInstructorForUpgrade(cli, scheduler as never, {
-      customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
-      locationId: 20852,
-      reservationType: dualFlightTraining,
-      startTime,
-      endTime,
-      timeZone: LA,
-    });
+    const result = await resolveMissingInstructorForUpgrade(
+      cli,
+      scheduler as never,
+      {
+        customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
+        locationId: 20852,
+        reservationType: dualFlightTraining,
+        startTime,
+        endTime,
+        timeZone: LA,
+      },
+    );
 
     expect(result).toBeNull();
     expect(logSpy).toHaveBeenCalledWith(

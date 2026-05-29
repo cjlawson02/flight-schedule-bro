@@ -157,9 +157,9 @@ describe("hasReservationOnSameDay", () => {
 
   it("returns true when a reservation exists on the same day", () => {
     const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
-    expect(
-      hasReservationOnSameDay(slotStart, existingReservations, LA),
-    ).toBe(true);
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
+      true,
+    );
   });
 });
 
