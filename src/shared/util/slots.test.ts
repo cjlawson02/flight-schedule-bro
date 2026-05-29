@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { BookableAvailability } from "../dao/availability.js";
-import { findNewSlots } from "./slots.js";
+import {
+  DISCORD_NOTIFICATION_MIN_LEAD_HOURS,
+  filterSlotsForDiscordNotification,
+  filterSlotsNotInPast,
+  findNewSlots,
+  isSlotStartInPast,
+  isSlotStartTooSoonForDiscordNotification,
+} from "./slots.js";
 
 const LA = "America/Los_Angeles";
 
@@ -18,6 +25,57 @@ function makeSlot(
     ...overrides,
   };
 }
+
+describe("slot start time filters", () => {
+  const now = new Date("2024-01-20T18:00:00.000Z");
+
+  it("detects past slot starts", () => {
+    expect(
+      isSlotStartInPast(new Date("2024-01-20T17:59:59.999Z"), now),
+    ).toBe(true);
+    expect(isSlotStartInPast(new Date("2024-01-20T18:00:00.000Z"), now)).toBe(
+      false,
+    );
+  });
+
+  it("detects slots starting within the Discord lead window", () => {
+    const withinLead = new Date(
+      now.getTime() + DISCORD_NOTIFICATION_MIN_LEAD_HOURS * 60 * 60 * 1000 - 1,
+    );
+    const afterLead = new Date(
+      now.getTime() + DISCORD_NOTIFICATION_MIN_LEAD_HOURS * 60 * 60 * 1000,
+    );
+
+    expect(isSlotStartTooSoonForDiscordNotification(withinLead, undefined, now))
+      .toBe(true);
+    expect(isSlotStartTooSoonForDiscordNotification(afterLead, undefined, now))
+      .toBe(false);
+  });
+
+  it("filters past slots from CLI suggestions", () => {
+    const slots = [
+      makeSlot({ startDateTime: new Date("2024-01-20T17:00:00.000Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-21T17:00:00.000Z") }),
+    ];
+
+    expect(filterSlotsNotInPast(slots, now)).toHaveLength(1);
+    expect(filterSlotsNotInPast(slots, now)[0].startDateTime).toEqual(
+      new Date("2024-01-21T17:00:00.000Z"),
+    );
+  });
+
+  it("filters past and near-term slots from Discord notifications", () => {
+    const slots = [
+      makeSlot({ startDateTime: new Date("2024-01-20T17:00:00.000Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-20T20:59:59.999Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-20T21:00:00.000Z") }),
+    ];
+
+    expect(filterSlotsForDiscordNotification(slots, now)).toEqual([
+      makeSlot({ startDateTime: new Date("2024-01-20T21:00:00.000Z") }),
+    ]);
+  });
+});
 
 describe("findNewSlots", () => {
   it("identifies new slots within the rolling window", () => {

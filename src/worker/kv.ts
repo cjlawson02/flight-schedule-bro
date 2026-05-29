@@ -125,22 +125,22 @@ export function getSlotsFromSnapshot(
 /**
  * Remove availability slots that are in the past from a snapshot (in-memory operation)
  * @param snapshot - Snapshot object to clean
- * @param beforeDate - Remove slots before this date (typically today)
+ * @param beforeInstant - Remove slots that start before this instant
  * @returns Cleaned snapshot with past slots removed, or null if snapshot was null
  */
 export function cleanPastSlotsFromSnapshot(
   snapshot: Snapshot | null,
-  beforeDate: Date,
+  beforeInstant: Date,
   _timeZone: string = DEFAULT_TIMEZONE,
 ): Snapshot | null {
   if (!snapshot) {
     return null;
   }
 
-  // Filter out past slots
+  const cutoffMs = beforeInstant.getTime();
   const filteredSlots = snapshot.slots.filter((slot) => {
-    const slotDate = new Date(slot.startDateTime);
-    return slotDate >= beforeDate;
+    const slotStartMs = new Date(slot.startDateTime).getTime();
+    return slotStartMs >= cutoffMs;
   });
 
   return {

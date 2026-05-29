@@ -18,6 +18,7 @@ import {
 } from "../shared/util/flightTime.js";
 import { formatInTimeZone } from "date-fns-tz";
 import { createLogger } from "../shared/util/logger.js";
+import { filterSlotsForDiscordNotification } from "../shared/util/slots.js";
 
 const log = createLogger("discord");
 
@@ -171,6 +172,7 @@ function createAvailabilityEmbeds(
     const firstSlot = chunk[0];
 
     const embed: DiscordEmbed = {
+      author: { name: "Flight Schedule Bro" },
       title:
         i === 0
           ? `🎉 New Flight Slots Available!`
@@ -204,6 +206,42 @@ function createAvailabilityEmbeds(
 }
 
 /**
+ * Short preview line for mobile push notifications (shown outside the embed).
+ */
+function buildAvailabilityContent(
+  slots: BookableAvailability[],
+  timeZone: string,
+): string {
+  if (slots.length === 1) {
+    const dateStr = formatInTimeZone(
+      slots[0].startDateTime,
+      timeZone,
+      "EEE, MMM d",
+    );
+    return `🎉 New flight slot · ${dateStr}`;
+  }
+
+  const sorted = [...slots].sort(
+    (a, b) => a.startDateTime.getTime() - b.startDateTime.getTime(),
+  );
+  const firstDate = formatInTimeZone(
+    sorted[0].startDateTime,
+    timeZone,
+    "MMM d",
+  );
+  const lastDate = formatInTimeZone(
+    sorted[sorted.length - 1].startDateTime,
+    timeZone,
+    "MMM d",
+  );
+  const range =
+    firstDate === lastDate ? firstDate : `${firstDate}–${lastDate}`;
+  return `🎉 ${slots.length} new flight slots · ${range}`;
+}
+
+const ALLOWED_MENTIONS_NONE = { parse: [] as const };
+
+/**
  * Send availability notification to Discord webhook
  * @param env - Worker environment with webhook URL
  * @param slots - Array of new availability slots to notify about
@@ -218,13 +256,14 @@ export async function sendAvailabilityNotification(
   existingReservations: ExistingReservation[] = [],
   timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
-  if (slots.length === 0) {
+  const notifyableSlots = filterSlotsForDiscordNotification(slots);
+  if (notifyableSlots.length === 0) {
     log.debug("No new slots to notify about");
     return;
   }
 
   const embeds = createAvailabilityEmbeds(
-    slots,
+    notifyableSlots,
     metadata,
     existingReservations,
     timeZone,
@@ -232,7 +271,9 @@ export async function sendAvailabilityNotification(
 
   const payload: DiscordPayload = {
     username: "Flight Schedule Bro",
+    content: buildAvailabilityContent(notifyableSlots, timeZone),
     embeds,
+    allowed_mentions: ALLOWED_MENTIONS_NONE,
   };
 
   // Validate payload before sending
@@ -262,7 +303,9 @@ export async function sendAvailabilityNotification(
       throw new Error(`Discord API error (${response.status}): ${errorText}`);
     }
 
-    log.info("Discord notification sent", { slotCount: slots.length });
+    log.info("Discord notification sent", {
+      slotCount: notifyableSlots.length,
+    });
   } catch (error) {
     log.error("Failed to send Discord notification", { error });
     throw new Error(
@@ -286,6 +329,7 @@ export async function sendSimpleNotification(
   const payload: DiscordPayload = {
     content: message,
     username: "Flight Schedule Bro",
+    allowed_mentions: ALLOWED_MENTIONS_NONE,
   };
 
   try {

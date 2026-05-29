@@ -109,7 +109,7 @@ export async function fetchAuth(
     headers: {
       "content-type": "application/x-www-form-urlencoded",
     },
-    body: `username=${email}&password=${password}&checkEmail=false`,
+    body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&checkEmail=false`,
     method: "POST",
     redirect: "manual",
   });

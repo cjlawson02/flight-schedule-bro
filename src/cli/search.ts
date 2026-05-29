@@ -16,6 +16,7 @@ import { selectPreferredAircraftIds } from "../shared/dao/aircraft.js";
 import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import { type ConfigType } from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
+import { filterSlotsNotInPast } from "../shared/util/slots.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { createProgressBar } from "../shared/util/progressBar.js";
 import { createLogger } from "../shared/util/logger.js";
@@ -114,7 +115,15 @@ export async function runCliAvailabilitySearch(options: {
       reservationType.defaultLength,
     );
 
-    const availableWithoutConflicts = validResults.filter(
+    const futureResults = filterSlotsNotInPast(validResults);
+    const pastFiltered = validResults.length - futureResults.length;
+    if (pastFiltered > 0) {
+      console.log(
+        `\n⏭️  Filtered out ${pastFiltered} time slots that already started`,
+      );
+    }
+
+    const availableWithoutConflicts = futureResults.filter(
       (result) =>
         !hasReservationOnSameDay(
           result.startDateTime,
@@ -124,7 +133,7 @@ export async function runCliAvailabilitySearch(options: {
     );
 
     const conflictsFiltered =
-      validResults.length - availableWithoutConflicts.length;
+      futureResults.length - availableWithoutConflicts.length;
     if (conflictsFiltered > 0) {
       console.log(
         `\n⏭️  Filtered out ${conflictsFiltered} time slots on days where you already have reservations`,

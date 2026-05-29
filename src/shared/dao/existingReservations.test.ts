@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   getExistingReservations,
   getReservationStart,
+  getUpcomingReservations,
   hasReservationOnSameDay,
   ExistingReservation,
 } from "./existingReservations.js";
@@ -11,6 +12,25 @@ import { parseFspLocal } from "../util/flightTime.js";
 vi.mock("./api_wrapper.js");
 
 const LA = "America/Los_Angeles";
+
+const sampleReservations: ExistingReservation[] = [
+  {
+    reservationId: "7fd24fb6-977f-4b4a-89ac-dc949030d234",
+    start: "2025-11-04T17:00:00",
+    end: "2025-11-04T19:00:00",
+    startUtc: "2025-11-05T01:00:00",
+    endUtc: "2025-11-05T03:00:00",
+    instructor: "Doug Libal",
+    resource: "N65411",
+  },
+  {
+    reservationId: "7e63e451-783a-4323-98ba-10b556d12d07",
+    start: "2025-11-06T11:00:00",
+    end: "2025-11-06T13:00:00",
+    instructor: "Jason Hull",
+    resource: "N734UZ",
+  },
+];
 
 describe("getExistingReservations", () => {
   beforeEach(() => {
@@ -86,24 +106,7 @@ describe("getReservationStart", () => {
 });
 
 describe("hasReservationOnSameDay", () => {
-  const existingReservations: ExistingReservation[] = [
-    {
-      reservationId: "7fd24fb6-977f-4b4a-89ac-dc949030d234",
-      start: "2025-11-04T17:00:00",
-      end: "2025-11-04T19:00:00",
-      startUtc: "2025-11-05T01:00:00",
-      endUtc: "2025-11-05T03:00:00",
-      instructor: "Doug Libal",
-      resource: "N65411",
-    },
-    {
-      reservationId: "7e63e451-783a-4323-98ba-10b556d12d07",
-      start: "2025-11-06T11:00:00",
-      end: "2025-11-06T13:00:00",
-      instructor: "Jason Hull",
-      resource: "N734UZ",
-    },
-  ];
+  const existingReservations = sampleReservations;
 
   it("returns true when slot is on same operator calendar day (same time)", () => {
     const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
@@ -150,5 +153,31 @@ describe("hasReservationOnSameDay", () => {
   it("returns false when there are no existing reservations", () => {
     const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
     expect(hasReservationOnSameDay(slotStart, [], LA)).toBe(false);
+  });
+
+  it("returns true when a reservation exists on the same day", () => {
+    const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
+    expect(
+      hasReservationOnSameDay(slotStart, existingReservations, LA),
+    ).toBe(true);
+  });
+});
+
+describe("getUpcomingReservations", () => {
+  it("returns only reservations that have not ended yet, sorted by start time", () => {
+    const now = parseFspLocal("2025-11-05T12:00:00", LA);
+
+    expect(getUpcomingReservations(sampleReservations, LA, now)).toEqual([
+      sampleReservations[1],
+    ]);
+  });
+
+  it("includes reservations that are currently in progress", () => {
+    const now = parseFspLocal("2025-11-04T18:00:00", LA);
+
+    expect(getUpcomingReservations(sampleReservations, LA, now)).toEqual([
+      sampleReservations[0],
+      sampleReservations[1],
+    ]);
   });
 });

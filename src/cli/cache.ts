@@ -28,6 +28,21 @@ function serializeQueryParams(params: object): string {
   return JSON.stringify(sortObject(params));
 }
 
+function cacheEntryMatchesPattern(
+  queryParams: unknown,
+  pattern: string,
+): boolean {
+  if (
+    typeof queryParams === "object" &&
+    queryParams !== null &&
+    "url" in queryParams &&
+    typeof queryParams.url === "string"
+  ) {
+    return queryParams.url.includes(pattern);
+  }
+  return false;
+}
+
 export function hashQueryParams(params: object): string {
   const serialized = serializeQueryParams(params);
   return createHash("sha256").update(serialized).digest("hex");
@@ -108,11 +123,7 @@ export async function invalidateCache(pattern?: string): Promise<void> {
         const data = await fs.readFile(filePath, "utf8");
         const { queryParams } = JSON.parse(data) as { queryParams: unknown };
 
-        // Check if this cache entry matches the pattern
-        if (
-          typeof queryParams === "object" &&
-          JSON.stringify(queryParams).includes(pattern)
-        ) {
+        if (cacheEntryMatchesPattern(queryParams, pattern)) {
           await fs.unlink(filePath).catch(() => undefined);
         }
       } catch {

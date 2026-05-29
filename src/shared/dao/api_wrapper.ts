@@ -179,7 +179,7 @@ async function waitForRateLimit(message: string): Promise<void> {
 
 export async function safeFetch<T extends z.ZodType>(
   url: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   params: Record<string, unknown> | null,
   parser: T,
   cacheTtlMs: number,
@@ -215,7 +215,29 @@ export async function safeFetch<T extends z.ZodType>(
             body: params ? JSON.stringify(params) : undefined,
           });
 
-          data = await res.json();
+          const responseText = await res.text();
+          if (responseText === "") {
+            data = null;
+          } else {
+            try {
+              data = JSON.parse(responseText);
+            } catch {
+              if (res.ok) {
+                const parseError = new Error(
+                  `Failed to parse response body from ${url.split("?")[0]}`,
+                );
+                parseError.name = "FspParseError";
+                throw parseError;
+              }
+              data = null;
+            }
+          }
+
+          if (res.ok && (res.status === 204 || responseText === "")) {
+            fetchSucceeded = true;
+            data = {};
+            break;
+          }
 
           if (isRateLimitResponse(data)) {
             releaseRequestSlot();
@@ -262,7 +284,8 @@ export async function safeFetch<T extends z.ZodType>(
 
           if (
             isNonRetryableHttpError(error) ||
-            (error instanceof Error && error.name === "FspRateLimitError")
+            (error instanceof Error && error.name === "FspRateLimitError") ||
+            (error instanceof Error && error.name === "FspParseError")
           ) {
             throw error;
           }
@@ -307,7 +330,7 @@ export async function safeFetch<T extends z.ZodType>(
     throw new Error("Failed to parse");
   }
 
-  if (!wasCacheHit && cacheAdapter) {
+  if (!wasCacheHit && cacheAdapter && cacheTtlMs > 0) {
     await cacheAdapter.setCachedResult(cacheKey, result.data);
   }
 

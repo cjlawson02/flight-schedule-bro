@@ -8,7 +8,11 @@ import {
   formatOperatorIsoDate,
   startOfOperatorDay,
 } from "../shared/util/flightTime.js";
-import { findNewSlots } from "../shared/util/slots.js";
+import {
+  filterSlotsForDiscordNotification,
+  filterSlotsNotInPast,
+  findNewSlots,
+} from "../shared/util/slots.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { getExistingReservations } from "../shared/dao/existingReservations.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
@@ -58,7 +62,8 @@ export async function runScheduledTask(env: Env): Promise<void> {
   }
 
   const { config, session } = await bootstrapWorker(env);
-  const today = startOfOperatorDay(new Date(), config.TIMEZONE);
+  const now = new Date();
+  const today = startOfOperatorDay(now, config.TIMEZONE);
   const { metadata } = snapshot;
 
   log.info("Rolling window state", {
@@ -68,7 +73,7 @@ export async function runScheduledTask(env: Env): Promise<void> {
 
   const cleanedSnapshot = cleanPastSlotsFromSnapshot(
     snapshot,
-    today,
+    now,
     config.TIMEZONE,
   );
   const previousSlots = getSlotsFromSnapshot(cleanedSnapshot);
@@ -108,10 +113,14 @@ export async function runScheduledTask(env: Env): Promise<void> {
     failFast: true,
   });
 
-  log.info("Filtered valid time slots", { count: validResults.length });
+  const bookableSlots = filterSlotsNotInPast(validResults, now);
+  log.info("Filtered valid time slots", {
+    count: bookableSlots.length,
+    removedPast: validResults.length - bookableSlots.length,
+  });
 
   const newSlots = findNewSlots(
-    validResults,
+    bookableSlots,
     previousSlots,
     metadata.lastSearchDate,
     budget.daysAhead,
@@ -122,10 +131,13 @@ export async function runScheduledTask(env: Env): Promise<void> {
   const notificationAircraftTailNumbers = env.NOTIFICATION_AIRCRAFT
     ? env.NOTIFICATION_AIRCRAFT.split(",").map((value) => value.trim())
     : [];
-  const slotsToNotify = filterSlotsForNotification(
-    newSlots,
-    fspMetadata,
-    notificationAircraftTailNumbers,
+  const slotsToNotify = filterSlotsForDiscordNotification(
+    filterSlotsForNotification(
+      newSlots,
+      fspMetadata,
+      notificationAircraftTailNumbers,
+    ),
+    now,
   );
 
   log.info("Slots selected for notification", {
@@ -142,7 +154,7 @@ export async function runScheduledTask(env: Env): Promise<void> {
     daysAhead: budget.daysAhead,
   };
 
-  await setSnapshot(env, validResults, updatedMetadata);
+  await setSnapshot(env, bookableSlots, updatedMetadata);
 
   if (slotsToNotify.length > 0) {
     log.info("Sending Discord notification");

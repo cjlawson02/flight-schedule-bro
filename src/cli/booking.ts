@@ -1,13 +1,14 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
 import { addReservationToCalendar } from "../shared/blo/macCalendar.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
-import { groupAvailabilitiesByTimeSlot } from "../shared/dao/availability.js";
 import { getDefaultLocationId } from "../shared/dao/auth.js";
 import { nilToOptionalResourceId } from "../shared/dao/aircraft.js";
+import type { ActivityFlightDetails } from "../shared/dao/reservationFlightDetails.js";
 import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { createLogger } from "../shared/util/logger.js";
+import { resolveSlotSelections } from "./timeSlotSelection.js";
 
 const log = createLogger("cli-booking");
 
@@ -17,6 +18,7 @@ export async function handleBookingFlow(
   availabilities: BookableAvailability[],
   reservationType: ReservationType,
   operatorId: number,
+  flightDetails?: ActivityFlightDetails,
 ): Promise<void> {
   try {
     const selectedAvailabilities =
@@ -26,44 +28,10 @@ export async function handleBookingFlow(
       return;
     }
 
-    const timeSlotGroups = groupAvailabilitiesByTimeSlot(
+    const finalSelections = await resolveSlotSelections(
+      cli,
       selectedAvailabilities,
     );
-    const finalSelections: BookableAvailability[] = [];
-
-    for (const { availabilities: availabilitiesForSlot } of timeSlotGroups) {
-      if (availabilitiesForSlot.length === 1) {
-        finalSelections.push(availabilitiesForSlot[0]);
-        console.log(
-          `✅ Auto-selected: ${availabilitiesForSlot[0].instructor} with ${availabilitiesForSlot[0].aircraft}`,
-        );
-      } else {
-        const selectedAircraft = await cli.selectAircraft(
-          availabilitiesForSlot[0],
-          availabilitiesForSlot,
-        );
-
-        if (!selectedAircraft) {
-          continue;
-        }
-
-        const availabilitiesForAircraft = availabilitiesForSlot.filter(
-          (avail) => avail.aircraft === selectedAircraft,
-        );
-
-        const selectedInstructor = await cli.selectInstructor(
-          availabilitiesForSlot[0],
-          availabilitiesForAircraft,
-        );
-
-        if (selectedInstructor) {
-          finalSelections.push(selectedInstructor);
-          console.log(
-            `✅ Selected: ${selectedInstructor.instructor} with ${selectedInstructor.aircraft}`,
-          );
-        }
-      }
-    }
 
     if (finalSelections.length === 0) {
       console.log("\n❌ No time slots selected for booking.");
@@ -109,6 +77,7 @@ export async function handleBookingFlow(
           endTime: selection.endDateTime,
           reservationType,
           locationId: getDefaultLocationId(),
+          flightDetails,
         });
 
         if (!response.id) {

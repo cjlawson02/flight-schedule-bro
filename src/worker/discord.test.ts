@@ -67,8 +67,34 @@ describe("Discord Integration", () => {
   });
 
   describe("sendAvailabilityNotification", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("does nothing when no slots provided", async () => {
       await sendAvailabilityNotification(env, [], metadata);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when slots start within three hours", async () => {
+      const slots: BookableAvailability[] = [
+        {
+          date: "1/15/2024",
+          startTime: "2:00:00 PM",
+          endTime: "4:00:00 PM",
+          instructorId: "123e4567-e89b-12d3-a456-426614174000",
+          aircraftId: "223e4567-e89b-12d3-a456-426614174000",
+          startDateTime: new Date("2024-01-15T14:00:00.000Z"),
+          endDateTime: new Date("2024-01-15T16:00:00.000Z"),
+        },
+      ];
+
+      await sendAvailabilityNotification(env, slots, metadata);
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -107,8 +133,11 @@ describe("Discord Integration", () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.username).toBe("Flight Schedule Bro");
+      expect(body.content).toContain("New flight slot");
+      expect(body.allowed_mentions).toEqual({ parse: [] });
       expect(body.embeds).toHaveLength(1);
       expect(body.embeds[0].title).toContain("New Flight Slots Available");
+      expect(body.embeds[0].author?.name).toBe("Flight Schedule Bro");
       expect(body.embeds[0].fields).toHaveLength(1);
     });
 
@@ -294,6 +323,15 @@ describe("Discord Integration", () => {
   });
 
   describe("Embed Color Coding", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("uses different colors for weekday vs weekend", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -324,14 +362,14 @@ describe("Discord Integration", () => {
       // Sunday (weekend)
       const weekendSlots: BookableAvailability[] = [
         {
-          date: "1/14/2024",
+          date: "1/21/2024",
           startTime: "5:00:00 PM",
           endTime: "7:00:00 PM",
 
           instructorId: "123e4567-e89b-12d3-a456-426614174000",
           aircraftId: "223e4567-e89b-12d3-a456-426614174000",
-          startDateTime: new Date("2024-01-14T17:00:00.000Z"),
-          endDateTime: new Date("2024-01-14T19:00:00.000Z"),
+          startDateTime: new Date("2024-01-21T17:00:00.000Z"),
+          endDateTime: new Date("2024-01-21T19:00:00.000Z"),
         },
       ];
 
@@ -345,6 +383,15 @@ describe("Discord Integration", () => {
   });
 
   describe("Existing Reservation Context", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("shows warning when new slot is on same day as existing reservation", async () => {
       mockFetch.mockResolvedValue({
         ok: true,

@@ -4,6 +4,8 @@ import {
   isReservableAircraft,
   FSP_NIL_RESOURCE_ID,
   nilToOptionalResourceId,
+  resolveMutationResourceId,
+  resolveResourceId,
   selectPreferredAircraftIds,
 } from "./aircraft.js";
 import * as apiWrapper from "./api_wrapper.js";
@@ -93,11 +95,29 @@ describe("isReservableAircraft", () => {
 });
 
 describe("nilToOptionalResourceId", () => {
-  it("returns undefined for nil UUIDs", () => {
+  it("returns undefined for nil UUIDs and missing values", () => {
     expect(nilToOptionalResourceId(FSP_NIL_RESOURCE_ID)).toBeUndefined();
+    expect(nilToOptionalResourceId(undefined)).toBeUndefined();
+    expect(nilToOptionalResourceId(null)).toBeUndefined();
     expect(
       nilToOptionalResourceId("cc20d524-b205-43df-9670-5db41a761f87"),
     ).toBe("cc20d524-b205-43df-9670-5db41a761f87");
+  });
+});
+
+describe("resolveResourceId", () => {
+  it("uses nil UUID for disabled resources on create payloads", () => {
+    expect(resolveResourceId(false, "ac-1")).toBe(FSP_NIL_RESOURCE_ID);
+    expect(resolveResourceId(true, undefined)).toBe(FSP_NIL_RESOURCE_ID);
+    expect(resolveResourceId(true, "ac-1")).toBe("ac-1");
+  });
+});
+
+describe("resolveMutationResourceId", () => {
+  it("uses null for disabled resources on mutation payloads", () => {
+    expect(resolveMutationResourceId(false, "ac-1")).toBeNull();
+    expect(resolveMutationResourceId(true, undefined)).toBe(FSP_NIL_RESOURCE_ID);
+    expect(resolveMutationResourceId(true, "ac-1")).toBe("ac-1");
   });
 });
 

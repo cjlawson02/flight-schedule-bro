@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type {
   APIEmbed,
+  APIEmbedAuthor,
   APIEmbedField,
   APIEmbedFooter,
   RESTPostAPIWebhookWithTokenJSONBody,
@@ -50,11 +51,19 @@ const DiscordEmbedFooterSchema = z.object({
   proxy_icon_url: z.url().optional(),
 }) satisfies z.ZodType<APIEmbedFooter>;
 
+const DiscordEmbedAuthorSchema = z.object({
+  name: z.string().max(256),
+  url: z.url().optional(),
+  icon_url: z.url().optional(),
+  proxy_icon_url: z.url().optional(),
+}) satisfies z.ZodType<APIEmbedAuthor>;
+
 /**
  * Discord embed schema (aligned with Discord API)
  * @see https://discord.com/developers/docs/resources/channel#embed-object
  */
 export const DiscordEmbedSchema = z.object({
+  author: DiscordEmbedAuthorSchema.optional(),
   title: z.string().max(256).optional(), // Discord limit: 256 characters
   description: z.string().max(4096).optional(), // Discord limit: 4096 characters
   color: z.number().int().min(0).max(0xffffff).optional(), // Discord: 0x000000 to 0xFFFFFF

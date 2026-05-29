@@ -250,6 +250,48 @@ describe("Worker KV Operations", () => {
       expect(result!.metadata).toEqual(snapshot.metadata);
     });
 
+    it("removes slots earlier today that already started", () => {
+      const now = new Date("2024-01-20T18:00:00.000Z");
+      const snapshot = {
+        slots: [
+          {
+            date: "1/20/2024",
+            startTime: "9:00:00 AM",
+            endTime: "11:00:00 AM",
+            instructor: "John Doe",
+            aircraft: "N12345",
+            instructorId: "123e4567-e89b-12d3-a456-426614174000",
+            aircraftId: "223e4567-e89b-12d3-a456-426614174000",
+            startDateTime: "2024-01-20T17:00:00.000Z",
+            endDateTime: "2024-01-20T19:00:00.000Z",
+          },
+          {
+            date: "1/20/2024",
+            startTime: "8:00:00 PM",
+            endTime: "10:00:00 PM",
+            instructor: "Jane Doe",
+            aircraft: "N67890",
+            instructorId: "223e4567-e89b-12d3-a456-426614174000",
+            aircraftId: "323e4567-e89b-12d3-a456-426614174000",
+            startDateTime: "2024-01-21T04:00:00.000Z",
+            endDateTime: "2024-01-21T06:00:00.000Z",
+          },
+        ],
+        metadata: {
+          lastSearchDate: "2024-01-20",
+          lastUpdate: "2024-01-20T12:00:00.000Z",
+          daysAhead: 60,
+        },
+      };
+
+      const result = cleanPastSlotsFromSnapshot(snapshot, now);
+      expect(result).not.toBeNull();
+      expect(result!.slots).toHaveLength(1);
+      expect(result!.slots[0].aircraftId).toBe(
+        "323e4567-e89b-12d3-a456-426614174000",
+      );
+    });
+
     it("preserves all slots when all are in the future", () => {
       const now = new Date("2024-01-10T12:00:00.000Z");
       const snapshot = {

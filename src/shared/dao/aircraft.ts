@@ -27,8 +27,34 @@ export function isReservableAircraft(
   );
 }
 
-export function nilToOptionalResourceId(id: string): string | undefined {
-  return id === FSP_NIL_RESOURCE_ID ? undefined : id;
+export function nilToOptionalResourceId(
+  id: string | null | undefined,
+): string | undefined {
+  if (id === undefined || id === null || id === FSP_NIL_RESOURCE_ID) {
+    return undefined;
+  }
+  return id;
+}
+
+export function resolveResourceId(
+  enabled: boolean,
+  resourceId: string | undefined,
+): string {
+  if (!enabled) {
+    return FSP_NIL_RESOURCE_ID;
+  }
+  return resourceId ?? FSP_NIL_RESOURCE_ID;
+}
+
+/** PUT/DELETE mutations use null (not the nil UUID) for disabled resources. */
+export function resolveMutationResourceId(
+  enabled: boolean,
+  resourceId: string | undefined,
+): string | null {
+  if (!enabled) {
+    return null;
+  }
+  return resourceId ?? FSP_NIL_RESOURCE_ID;
 }
 
 export function selectPreferredAircraftIds(

@@ -1,10 +1,30 @@
-import { checkbox, select, confirm } from "@inquirer/prompts";
+import { checkbox, select, confirm, input } from "@inquirer/prompts";
 import type { ReservationType } from "../dao/reservationTypes.js";
-import { pickReservationType } from "../dao/reservationTypes.js";
+import { getFieldState, pickReservationType } from "../dao/reservationTypes.js";
+import {
+  FLIGHT_RULES_IFR,
+  FLIGHT_RULES_VFR,
+  FLIGHT_TYPE_CROSS_COUNTRY,
+  FLIGHT_TYPE_LOCAL,
+  type ActivityFlightDetails,
+} from "../dao/reservationFlightDetails.js";
 import {
   groupAvailabilitiesByTimeSlot,
   type BookableAvailability,
 } from "../dao/availability.js";
+import type { CancellationReason } from "../dao/reservationManagement.js";
+import type { ExistingReservation } from "../dao/existingReservations.js";
+import {
+  getReservationEnd,
+  getReservationStart,
+} from "../dao/existingReservations.js";
+import {
+  formatOperatorDisplayDate,
+  formatOperatorDisplayTime,
+} from "../util/flightTime.js";
+
+export type CliMainAction = "book" | "manage-existing-activity" | "exit";
+export type ManageActivityAction = "change-activity-type" | "cancel" | "back";
 
 /**
  * Interactive CLI utility for user interaction during booking flow
@@ -36,6 +56,59 @@ export class InteractiveCLI {
   }
 
   /**
+   * Format a row using the same columns as time slot selection.
+   */
+  private formatActivityRow(
+    date: string,
+    startTime: string,
+    endTime: string,
+    aircraft: string,
+    instructor: string,
+  ): string {
+    const formattedDate = this.formatDate(date);
+    const formattedStart = this.formatTime(startTime);
+    const formattedEnd = this.formatTime(endTime);
+
+    return `${formattedDate.padEnd(12)} │ ${(
+      formattedStart +
+      " - " +
+      formattedEnd
+    ).padEnd(20)} │ ${aircraft.padEnd(20)} │ ${instructor}`;
+  }
+
+  formatExistingActivity(
+    reservation: ExistingReservation,
+    timeZone: string,
+  ): string {
+    const start = getReservationStart(reservation, timeZone);
+    const end = getReservationEnd(reservation, timeZone);
+
+    return this.formatActivityAtTime(
+      start,
+      end,
+      timeZone,
+      reservation.resource ?? "—",
+      reservation.instructor ?? "—",
+    );
+  }
+
+  formatActivityAtTime(
+    start: Date,
+    end: Date,
+    timeZone: string,
+    aircraft: string,
+    instructor: string,
+  ): string {
+    return this.formatActivityRow(
+      formatOperatorDisplayDate(start, timeZone),
+      formatOperatorDisplayTime(start, timeZone),
+      formatOperatorDisplayTime(end, timeZone),
+      aircraft,
+      instructor,
+    );
+  }
+
+  /**
    * Format a time slot group for display with columns and borders
    */
   private formatTimeSlot(group: {
@@ -44,7 +117,6 @@ export class InteractiveCLI {
     endTime: string;
     availabilities: BookableAvailability[];
   }): string {
-    // Dedupe instructors for cleaner display
     const instructorList = [
       ...new Set(group.availabilities.map((a) => a.instructor)),
     ].join(", ");
@@ -52,15 +124,25 @@ export class InteractiveCLI {
       ...new Set(group.availabilities.map((a) => a.aircraft)),
     ].join(", ");
 
-    const formattedDate = this.formatDate(group.date);
-    const formattedStart = this.formatTime(group.startTime);
-    const formattedEnd = this.formatTime(group.endTime);
+    return this.formatActivityRow(
+      group.date,
+      group.startTime,
+      group.endTime,
+      aircraftList,
+      instructorList,
+    );
+  }
 
-    return `${formattedDate.padEnd(12)} │ ${(
-      formattedStart +
-      " - " +
-      formattedEnd
-    ).padEnd(20)} │ ${aircraftList.padEnd(20)} │ ${instructorList}`;
+  private buildTimeSlotChoices(availabilities: BookableAvailability[]) {
+    const timeSlotGroups = groupAvailabilitiesByTimeSlot(availabilities);
+
+    return {
+      timeSlotGroups,
+      choices: timeSlotGroups.map((group, index) => ({
+        name: this.formatTimeSlot(group),
+        value: index,
+      })),
+    };
   }
 
   /**
@@ -75,13 +157,8 @@ export class InteractiveCLI {
       return [];
     }
 
-    const timeSlotGroups = groupAvailabilitiesByTimeSlot(availabilities);
-
-    // Create choices with group index as value
-    const choices = timeSlotGroups.map((group, index) => ({
-      name: this.formatTimeSlot(group),
-      value: index,
-    }));
+    const { timeSlotGroups, choices } =
+      this.buildTimeSlotChoices(availabilities);
 
     try {
       const selectedIndices = await checkbox({
@@ -208,18 +285,49 @@ export class InteractiveCLI {
   }
 
   /**
+   * Main menu for choosing between booking or managing existing activities.
+   */
+  async selectMainAction(): Promise<CliMainAction | null> {
+    try {
+      return await select({
+        message: "What do you want to do?",
+        choices: [
+          { name: "Book a new activity", value: "book" },
+          {
+            name: "Manage existing activity",
+            value: "manage-existing-activity",
+          },
+          { name: "Exit", value: "exit" },
+        ],
+        loop: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Select a reservation type for booking or search.
    */
   async selectReservationType(
     reservationTypes: ReservationType[],
-    options?: { preferredTypeId?: string },
+    options?: { preferredTypeId?: string; excludeTypeIds?: string[] },
   ): Promise<ReservationType | null> {
+    const excluded = new Set(options?.excludeTypeIds ?? []);
+    const availableTypes = reservationTypes.filter(
+      (type) => !excluded.has(type.reservationTypeId),
+    );
+
+    if (availableTypes.length === 0) {
+      return null;
+    }
+
     const preferred = pickReservationType(
-      reservationTypes,
+      availableTypes,
       options?.preferredTypeId,
     );
 
-    const choices = reservationTypes.map((type) => ({
+    const choices = availableTypes.map((type) => ({
       name: type.reservationTypeName,
       value: type.reservationTypeId,
     }));
@@ -233,10 +341,151 @@ export class InteractiveCLI {
       });
 
       return (
-        reservationTypes.find(
+        availableTypes.find(
           (type) => type.reservationTypeId === selectedId,
         ) ?? null
       );
+    } catch {
+      return null;
+    }
+  }
+
+  async selectExistingActivity(
+    reservations: ExistingReservation[],
+    timeZone: string,
+  ): Promise<ExistingReservation | null> {
+    if (reservations.length === 0) {
+      console.log("\nNo existing activities.");
+      return null;
+    }
+
+    const choices = reservations.map((reservation) => ({
+      name: this.formatExistingActivity(reservation, timeZone),
+      value: reservation.reservationId,
+    }));
+
+    try {
+      const selectedId = await select({
+        message: "Select an activity",
+        choices: [...choices, { name: "Back", value: "__back__" }],
+        pageSize: 15,
+        loop: false,
+      });
+
+      if (selectedId === "__back__") {
+        return null;
+      }
+
+      return (
+        reservations.find(
+          (reservation) => reservation.reservationId === selectedId,
+        ) ?? null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  async selectManageActivityAction(): Promise<ManageActivityAction | null> {
+    try {
+      return await select({
+        message: "What would you like to do with this activity?",
+        choices: [
+          { name: "Change activity type", value: "change-activity-type" },
+          { name: "Cancel activity", value: "cancel" },
+          { name: "Back", value: "back" },
+        ],
+        loop: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async collectActivityFlightDetails(
+    reservationType: ReservationType,
+  ): Promise<ActivityFlightDetails | null> {
+    const details: ActivityFlightDetails = {};
+
+    if (getFieldState(reservationType, "flightType").enabled) {
+      try {
+        details.flightType = await select({
+          message: "Flight type:",
+          choices: [
+            { name: "Local", value: FLIGHT_TYPE_LOCAL },
+            { name: "Cross Country", value: FLIGHT_TYPE_CROSS_COUNTRY },
+          ],
+          loop: false,
+        });
+      } catch {
+        return null;
+      }
+    }
+
+    if (getFieldState(reservationType, "flightRules").enabled) {
+      try {
+        details.flightRules = await select({
+          message: "Flight rules:",
+          choices: [
+            { name: "VFR", value: FLIGHT_RULES_VFR },
+            { name: "IFR", value: FLIGHT_RULES_IFR },
+          ],
+          loop: false,
+        });
+      } catch {
+        return null;
+      }
+    }
+
+    if (getFieldState(reservationType, "flightHours").enabled) {
+      const required = getFieldState(reservationType, "flightHours").required;
+      const estimatedFlightHours = await this.promptText(
+        required
+          ? "Estimated flight hours:"
+          : "Estimated flight hours (optional):",
+      );
+      if (estimatedFlightHours === null) {
+        return null;
+      }
+      details.estimatedFlightHours = estimatedFlightHours.trim();
+    }
+
+    if (getFieldState(reservationType, "flightRoute").enabled) {
+      const required = getFieldState(reservationType, "flightRoute").required;
+      const flightRoute = await this.promptText(
+        required ? "Flight route/legs:" : "Flight route/legs (optional):",
+      );
+      if (flightRoute === null) {
+        return null;
+      }
+      details.flightRoute = flightRoute.trim();
+    }
+
+    return details;
+  }
+
+  async selectCancellationReason(
+    reasons: CancellationReason[],
+  ): Promise<CancellationReason | null> {
+    try {
+      const reasonId = await select({
+        message: "Select a cancellation reason:",
+        choices: reasons.map((reason) => ({
+          name: reason.name,
+          value: reason.id,
+        })),
+        loop: false,
+      });
+
+      return reasons.find((reason) => reason.id === reasonId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async promptText(message: string): Promise<string | null> {
+    try {
+      return await input({ message });
     } catch {
       return null;
     }

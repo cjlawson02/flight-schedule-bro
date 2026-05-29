@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { InteractiveCLI } from "./interactive.js";
-import { checkbox, select, confirm } from "@inquirer/prompts";
+import { checkbox, select, confirm, input } from "@inquirer/prompts";
 import {
   createReservationTypeFixture,
   dualFlightTraining,
@@ -11,6 +11,7 @@ vi.mock("@inquirer/prompts", () => ({
   checkbox: vi.fn(),
   select: vi.fn(),
   confirm: vi.fn(),
+  input: vi.fn(),
 }));
 
 describe("InteractiveCLI", () => {
@@ -265,6 +266,155 @@ describe("InteractiveCLI", () => {
     });
   });
 
+  describe("selectMainAction", () => {
+    it("prompts user to choose between booking and managing existing activities", async () => {
+      vi.mocked(select).mockResolvedValue("manage-existing-activity");
+
+      const result = await cli.selectMainAction();
+
+      expect(result).toBe("manage-existing-activity");
+      expect(select).toHaveBeenCalledWith({
+        message: "What do you want to do?",
+        choices: [
+          { name: "Book a new activity", value: "book" },
+          {
+            name: "Manage existing activity",
+            value: "manage-existing-activity",
+          },
+          { name: "Exit", value: "exit" },
+        ],
+        loop: false,
+      });
+    });
+
+    it("returns null when user cancels", async () => {
+      vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
+
+      const result = await cli.selectMainAction();
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("selectManageActivityAction", () => {
+    it("prompts for change activity type or cancel", async () => {
+      vi.mocked(select).mockResolvedValue("cancel");
+
+      const result = await cli.selectManageActivityAction();
+
+      expect(result).toBe("cancel");
+      expect(select).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "What would you like to do with this activity?",
+        }),
+      );
+    });
+  });
+
+  describe("selectExistingActivity", () => {
+    it("returns the selected activity", async () => {
+      const reservation = {
+        reservationId: "845b8008-68d8-4b3f-bb6c-80753adc9ef5",
+        start: "2026-05-27T16:00:00",
+        end: "2026-05-27T18:00:00",
+        resource: "N713RE",
+        instructor: "Thomas Lindstaedt",
+      };
+      vi.mocked(select).mockResolvedValue(reservation.reservationId);
+
+      const result = await cli.selectExistingActivity(
+        [reservation],
+        "America/Los_Angeles",
+      );
+
+      expect(result).toEqual(reservation);
+      expect(select).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Select an activity",
+          pageSize: 15,
+        }),
+      );
+    });
+
+    it("returns null when back is selected", async () => {
+      vi.mocked(select).mockResolvedValue("__back__");
+
+      const result = await cli.selectExistingActivity(
+        [
+          {
+            reservationId: "845b8008-68d8-4b3f-bb6c-80753adc9ef5",
+            start: "2026-05-27T16:00:00",
+            end: "2026-05-27T18:00:00",
+          },
+        ],
+        "America/Los_Angeles",
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("selectCancellationReason", () => {
+    it("returns the selected cancellation reason", async () => {
+      vi.mocked(select).mockResolvedValue(
+        "f69bc957-035a-4beb-9125-e8b0c2686f3e",
+      );
+
+      const result = await cli.selectCancellationReason([
+        {
+          id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
+          name: "Scheduling Conflict (Customer)",
+          requiresExplanation: false,
+        },
+      ]);
+
+      expect(result?.name).toBe("Scheduling Conflict (Customer)");
+    });
+  });
+
+  describe("collectActivityFlightDetails", () => {
+    it("collects rental flight detail fields", async () => {
+      vi.mocked(select).mockResolvedValueOnce(1).mockResolvedValueOnce(1);
+      vi.mocked(input)
+        .mockResolvedValueOnce("1.5")
+        .mockResolvedValueOnce("KSBP-KPRB");
+
+      const result = await cli.collectActivityFlightDetails(rental);
+
+      expect(result).toEqual({
+        flightType: 1,
+        flightRules: 1,
+        estimatedFlightHours: "1.5",
+        flightRoute: "KSBP-KPRB",
+      });
+    });
+
+    it("returns null when required input is cancelled", async () => {
+      vi.mocked(select)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(1);
+      vi.mocked(input).mockRejectedValue(new Error("Cancelled"));
+
+      await expect(cli.collectActivityFlightDetails(rental)).resolves.toBeNull();
+    });
+  });
+
+  describe("promptText", () => {
+    it("returns entered text", async () => {
+      vi.mocked(input).mockResolvedValue("Weather moved in");
+
+      await expect(cli.promptText("Explain:")).resolves.toBe(
+        "Weather moved in",
+      );
+    });
+
+    it("returns null when user cancels", async () => {
+      vi.mocked(input).mockRejectedValue(new Error("Cancelled"));
+
+      await expect(cli.promptText("Explain:")).resolves.toBeNull();
+    });
+  });
+
   describe("selectReservationType", () => {
     it("prompts user to select a reservation type", async () => {
       const reservationTypes = [
@@ -329,12 +479,29 @@ describe("InteractiveCLI", () => {
       );
     });
 
-    it("returns null when user cancels", async () => {
-      vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
+  it("returns null when user cancels", async () => {
+    vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
 
-      const result = await cli.selectReservationType([dualFlightTraining]);
+    const result = await cli.selectReservationType([dualFlightTraining]);
 
-      expect(result).toBeNull();
-    });
+    expect(result).toBeNull();
   });
+
+  it("excludes activity types that are already selected", async () => {
+    const reservationTypes = [dualFlightTraining, rental];
+
+    vi.mocked(select).mockResolvedValue(rental.reservationTypeId);
+
+    const result = await cli.selectReservationType(reservationTypes, {
+      excludeTypeIds: [dualFlightTraining.reservationTypeId],
+    });
+
+    expect(result).toEqual(rental);
+    expect(select).toHaveBeenCalledWith(
+      expect.objectContaining({
+        choices: [{ name: "Rental", value: rental.reservationTypeId }],
+      }),
+    );
+  });
+});
 });

@@ -42,14 +42,17 @@ const mockMetadata: FspMetadata = {
 };
 
 function makeSlot(aircraftId: string): BookableAvailability {
+  const startDateTime = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  const endDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000);
+
   return {
     date: "1/20/2024",
     startTime: "5:00:00 PM",
     endTime: "7:00:00 PM",
     instructorId: "123e4567-e89b-12d3-a456-426614174000",
     aircraftId,
-    startDateTime: new Date("2024-01-20T17:00:00.000Z"),
-    endDateTime: new Date("2024-01-20T19:00:00.000Z"),
+    startDateTime,
+    endDateTime,
   };
 }
 
@@ -126,6 +129,32 @@ describe("runScheduledTask", () => {
 
   it("updates the snapshot before sending Discord notifications", async () => {
     const callOrder: string[] = [];
+    const now = new Date("2024-01-20T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const notifyableSlot = {
+      ...makeSlot("ac-1"),
+      startDateTime: new Date("2024-01-20T21:00:00.000Z"),
+      endDateTime: new Date("2024-01-20T23:00:00.000Z"),
+    };
+
+    vi.mocked(
+      workerSearchModule.executeWorkerAvailabilitySearch,
+    ).mockResolvedValue({
+      validResults: [notifyableSlot],
+      budget: {
+        daysAhead: 14,
+        totalFetches: 1,
+        capped: false,
+        instructorChunkCount: 1,
+      },
+      reservationType: {
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Dual",
+      } as never,
+      today: new Date("2024-01-20T08:00:00.000Z"),
+    });
 
     vi.mocked(kvModule.setSnapshot).mockImplementation(async () => {
       callOrder.push("setSnapshot");
@@ -137,6 +166,8 @@ describe("runScheduledTask", () => {
     );
 
     await runScheduledTask(mockEnv);
+
+    vi.useRealTimers();
 
     expect(callOrder).toEqual(["setSnapshot", "sendAvailabilityNotification"]);
   });
@@ -171,6 +202,41 @@ describe("runScheduledTask", () => {
     expect(
       existingReservationsModule.getExistingReservations,
     ).toHaveBeenCalledWith(mockSession.operatorId, "America/Los_Angeles");
+  });
+
+  it("does not send Discord when new slots start within three hours", async () => {
+    const now = new Date("2024-01-20T18:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const soonSlot = {
+      ...makeSlot("ac-1"),
+      startDateTime: new Date("2024-01-20T20:00:00.000Z"),
+      endDateTime: new Date("2024-01-20T22:00:00.000Z"),
+    };
+
+    vi.mocked(
+      workerSearchModule.executeWorkerAvailabilitySearch,
+    ).mockResolvedValue({
+      validResults: [soonSlot],
+      budget: {
+        daysAhead: 14,
+        totalFetches: 1,
+        capped: false,
+        instructorChunkCount: 1,
+      },
+      reservationType: {
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Dual",
+      } as never,
+      today: new Date("2024-01-20T08:00:00.000Z"),
+    });
+
+    await runScheduledTask(mockEnv);
+
+    expect(discordModule.sendAvailabilityNotification).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 });
 

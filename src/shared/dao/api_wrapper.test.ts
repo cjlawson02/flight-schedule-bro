@@ -12,17 +12,34 @@ vi.mock("./auth.js", () => ({
 }));
 
 const ResponseSchema = z.object({ ok: z.boolean() });
+const EmptyResponseSchema = z.object({});
+
+function mockFetchResponse(options: {
+  ok: boolean;
+  status: number;
+  body: string;
+}): Response {
+  return {
+    ok: options.ok,
+    status: options.status,
+    text: async () => options.body,
+  } as Response;
+}
 
 describe("safeFetch", () => {
   beforeEach(() => {
     resetRequestQueueForTests();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: async () => [{ code: 1011, message: "Instructor is not valid." }],
-      }),
+      vi.fn().mockResolvedValue(
+        mockFetchResponse({
+          ok: false,
+          status: 400,
+          body: JSON.stringify([
+            { code: 1011, message: "Instructor is not valid." },
+          ]),
+        }),
+      ),
     );
   });
 
@@ -48,19 +65,23 @@ describe("safeFetch", () => {
 
   it("retries rate limit responses until success", async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          statusCode: 429,
-          message: "Rate limit is exceeded. Try again in 0 seconds.",
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({
+            statusCode: 429,
+            message: "Rate limit is exceeded. Try again in 0 seconds.",
+          }),
         }),
-      } as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ ok: true }),
-      } as any);
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({ ok: true }),
+        }),
+      );
 
     await expect(
       safeFetch(
@@ -76,14 +97,16 @@ describe("safeFetch", () => {
   });
 
   it("throws a rate limit error instead of failing zod parse", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        statusCode: 429,
-        message: "Rate limit is exceeded. Try again in 0 seconds.",
+    vi.mocked(fetch).mockResolvedValue(
+      mockFetchResponse({
+        ok: true,
+        status: 200,
+        body: JSON.stringify({
+          statusCode: 429,
+          message: "Rate limit is exceeded. Try again in 0 seconds.",
+        }),
       }),
-    } as any);
+    );
 
     await expect(
       safeFetch(
@@ -96,5 +119,45 @@ describe("safeFetch", () => {
     ).rejects.toBeInstanceOf(FspRateLimitError);
 
     expect(fetch).toHaveBeenCalledTimes(8);
+  });
+
+  it("accepts 204 responses with an empty body", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockFetchResponse({
+        ok: true,
+        status: 204,
+        body: "",
+      }),
+    );
+
+    await expect(
+      safeFetch(
+        "https://example.com/test",
+        "DELETE",
+        { foo: "bar" },
+        EmptyResponseSchema,
+        0,
+      ),
+    ).resolves.toEqual({});
+  });
+
+  it("rejects ok responses with non-json bodies", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockFetchResponse({
+        ok: true,
+        status: 200,
+        body: "<html>bad gateway</html>",
+      }),
+    );
+
+    await expect(
+      safeFetch(
+        "https://example.com/test",
+        "DELETE",
+        { foo: "bar" },
+        ResponseSchema,
+        0,
+      ),
+    ).rejects.toThrow(/Failed to parse response body/);
   });
 });

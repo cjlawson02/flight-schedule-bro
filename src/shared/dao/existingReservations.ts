@@ -46,6 +46,20 @@ export function getReservationEnd(
   );
 }
 
+export function getUpcomingReservations(
+  reservations: ExistingReservation[],
+  timeZone: string = DEFAULT_TIMEZONE,
+  now: Date = new Date(),
+): ExistingReservation[] {
+  return reservations
+    .filter((reservation) => getReservationEnd(reservation, timeZone) >= now)
+    .sort(
+      (left, right) =>
+        getReservationStart(left, timeZone).getTime() -
+        getReservationStart(right, timeZone).getTime(),
+    );
+}
+
 /**
  * Fetch existing reservations for the user
  * @param operatorId - The operator ID

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { FSP_NIL_RESOURCE_ID } from "./aircraft.js";
+import { resolveResourceId } from "./aircraft.js";
+import type { ActivityFlightDetails } from "./reservationFlightDetails.js";
 import { type ReservationType, getFieldState } from "./reservationTypes.js";
 import { safeFetch, invalidateCache } from "./api_wrapper.js";
 
@@ -13,6 +14,7 @@ export interface ReservationBookingParams {
   endTime: Date;
   reservationType: ReservationType;
   locationId: number;
+  flightDetails?: ActivityFlightDetails;
 }
 
 const UserReservationRequestSchema = z.object({
@@ -66,16 +68,6 @@ type UserReservationRequest = z.infer<typeof UserReservationRequestSchema>;
 type FullReservationRequest = z.infer<typeof FullReservationRequestSchema>;
 export type ReservationResponse = z.infer<typeof ReservationResponseSchema>;
 
-function resolveResourceId(
-  enabled: boolean,
-  resourceId: string | undefined,
-): string {
-  if (!enabled) {
-    return FSP_NIL_RESOURCE_ID;
-  }
-  return resourceId ?? FSP_NIL_RESOURCE_ID;
-}
-
 export function buildUserReservationRequest(params: {
   reservationType: ReservationType;
   aircraftId?: string;
@@ -104,11 +96,13 @@ export function buildUserReservationRequest(params: {
 export function buildFullReservationRequest(
   reservationType: ReservationType,
   reservationData: UserReservationRequest,
+  flightDetails?: ActivityFlightDetails,
 ): FullReservationRequest {
   const flightHours = getFieldState(reservationType, "flightHours");
   const flightRoute = getFieldState(reservationType, "flightRoute");
   const flightRules = getFieldState(reservationType, "flightRules");
   const flightType = getFieldState(reservationType, "flightType");
+  const details = flightDetails ?? {};
 
   return {
     ...reservationData,
@@ -118,10 +112,12 @@ export function buildFullReservationRequest(
     client: "V4",
     comments: "",
     equipmentIds: [],
-    estimatedFlightHours: flightHours.enabled ? "" : undefined,
-    flightRoute: flightRoute.enabled ? "" : undefined,
-    flightRules: flightRules.enabled ? null : undefined,
-    flightType: flightType.enabled ? null : undefined,
+    estimatedFlightHours: flightHours.enabled
+      ? (details.estimatedFlightHours ?? "")
+      : undefined,
+    flightRoute: flightRoute.enabled ? (details.flightRoute ?? "") : undefined,
+    flightRules: flightRules.enabled ? (details.flightRules ?? null) : undefined,
+    flightType: flightType.enabled ? (details.flightType ?? null) : undefined,
     internalComments: "",
     overrideExceptions: false,
     recurring: false,
@@ -147,10 +143,15 @@ export function buildFullReservationRequest(
 export async function createReservation(
   reservationType: ReservationType,
   reservationData: UserReservationRequest,
+  flightDetails?: ActivityFlightDetails,
 ): Promise<ReservationResponse> {
   try {
     const requestData = FullReservationRequestSchema.parse(
-      buildFullReservationRequest(reservationType, reservationData),
+      buildFullReservationRequest(
+        reservationType,
+        reservationData,
+        flightDetails,
+      ),
     );
 
     const response = await safeFetch(

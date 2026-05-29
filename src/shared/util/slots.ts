@@ -5,6 +5,43 @@ import {
   parseOperatorDateString,
 } from "./flightTime.js";
 
+/** Minimum hours before slot start before a Discord notification is sent. */
+export const DISCORD_NOTIFICATION_MIN_LEAD_HOURS = 3;
+
+export function isSlotStartInPast(
+  startDateTime: Date,
+  now: Date = new Date(),
+): boolean {
+  return startDateTime.getTime() < now.getTime();
+}
+
+export function isSlotStartTooSoonForDiscordNotification(
+  startDateTime: Date,
+  minLeadHours: number = DISCORD_NOTIFICATION_MIN_LEAD_HOURS,
+  now: Date = new Date(),
+): boolean {
+  const minStartMs = now.getTime() + minLeadHours * 60 * 60 * 1000;
+  return startDateTime.getTime() < minStartMs;
+}
+
+export function filterSlotsNotInPast(
+  slots: BookableAvailability[],
+  now: Date = new Date(),
+): BookableAvailability[] {
+  return slots.filter((slot) => !isSlotStartInPast(slot.startDateTime, now));
+}
+
+export function filterSlotsForDiscordNotification(
+  slots: BookableAvailability[],
+  now: Date = new Date(),
+): BookableAvailability[] {
+  return slots.filter(
+    (slot) =>
+      !isSlotStartInPast(slot.startDateTime, now) &&
+      !isSlotStartTooSoonForDiscordNotification(slot.startDateTime, undefined, now),
+  );
+}
+
 function createSlotKey(slot: BookableAvailability): string {
   return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
 }

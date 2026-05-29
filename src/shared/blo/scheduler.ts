@@ -187,6 +187,7 @@ export class SchedulerBLO {
       return await createReservation(
         params.reservationType,
         reservationRequest,
+        params.flightDetails,
       );
     } catch (error) {
       // If error already has a code property, re-throw it
