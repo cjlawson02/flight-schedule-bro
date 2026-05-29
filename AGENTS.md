@@ -45,6 +45,17 @@ npm run worker:tail
 - Integration tests: `*.integration.test.ts`
 - Uses Vitest framework with globals enabled
 
+### Quality checks
+
+```bash
+npm run check          # format + lint + typecheck + test (same as CI)
+npm run lint           # ESLint
+npm run typecheck      # tsc --noEmit
+npm run format:check   # Prettier (no writes)
+```
+
+Husky runs on every commit: `lint-staged` (ESLint + Prettier on staged files), then `typecheck` and `test`.
+
 ## Architecture
 
 ### Dual-Runtime Design
