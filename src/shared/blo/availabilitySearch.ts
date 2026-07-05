@@ -1,13 +1,10 @@
-import {
-  BookableAvailability,
-  prepareInstructorChunks,
-} from "../dao/availability.js";
+import { BookableAvailability } from "../dao/availability.js";
 import {
   getAvailabilitySearchResources,
   type ReservationType,
 } from "../dao/reservationTypes.js";
+import { estimatePagesPerDay } from "../dao/schedule.js";
 import { SchedulerBLO } from "./scheduler.js";
-import { chunk } from "../util/array.js";
 import { type ConfigType } from "../util/config.js";
 import { isValidBlock } from "../util/dates.js";
 import { addOperatorDays, formatOperatorIsoDate } from "../util/flightTime.js";
@@ -21,96 +18,94 @@ export const CLOUDFLARE_SUBREQUEST_LIMIT = 50;
 /** Conservative non-availability subrequests per worker run (auth, reservations, KV, Discord). */
 export const WORKER_AVAILABILITY_OVERHEAD = 10;
 
-export interface AvailabilitySearchBudget {
+export interface ScheduleSearchBudget {
   daysAhead: number;
   totalFetches: number;
   capped: boolean;
-  instructorChunkCount: number;
+  pagesPerDay: number;
 }
 
-export function resolveAvailabilityDaysAhead(
+export function resolveScheduleSearchBudget(
   daysAhead: number,
-  instructorChunkCount: number,
+  pagesPerDay: number,
   options: {
     subrequestLimit?: number;
     overhead?: number;
   } = {},
-): AvailabilitySearchBudget {
+): ScheduleSearchBudget {
   const subrequestLimit =
     options.subrequestLimit ?? CLOUDFLARE_SUBREQUEST_LIMIT;
   const overhead = options.overhead ?? WORKER_AVAILABILITY_OVERHEAD;
   const maxAvailabilityFetches = subrequestLimit - overhead;
 
-  if (instructorChunkCount === 0) {
+  if (pagesPerDay === 0) {
     return {
       daysAhead: 0,
       totalFetches: 0,
       capped: false,
-      instructorChunkCount,
+      pagesPerDay,
     };
   }
 
-  if (instructorChunkCount > maxAvailabilityFetches) {
+  if (pagesPerDay > maxAvailabilityFetches) {
     throw new Error(
-      `Instructor chunk count (${instructorChunkCount}) exceeds Cloudflare subrequest budget (${maxAvailabilityFetches} availability fetches). Reduce instructors or set RESERVATION_TYPE_ID to an aircraft-only type.`,
+      `Schedule pages per day (${pagesPerDay}) exceeds Cloudflare subrequest budget (${maxAvailabilityFetches} availability fetches).`,
     );
   }
 
-  const maxDayCount = Math.floor(maxAvailabilityFetches / instructorChunkCount);
+  const maxDayCount = Math.floor(maxAvailabilityFetches / pagesPerDay);
   const effectiveDaysAhead = Math.min(daysAhead, Math.max(0, maxDayCount - 1));
-  const totalFetches = (effectiveDaysAhead + 1) * instructorChunkCount;
+  const totalFetches = (effectiveDaysAhead + 1) * pagesPerDay;
 
   return {
     daysAhead: effectiveDaysAhead,
     totalFetches,
     capped: effectiveDaysAhead < daysAhead,
-    instructorChunkCount,
+    pagesPerDay,
   };
 }
 
-export function logAvailabilitySearchBudget(
-  budget: AvailabilitySearchBudget,
+export function logScheduleSearchBudget(
+  budget: ScheduleSearchBudget,
   configuredDaysAhead: number,
 ): void {
   if (budget.capped) {
     log.warn("Reducing DAYS_AHEAD to stay under Cloudflare subrequest limit", {
       configuredDaysAhead,
       effectiveDaysAhead: budget.daysAhead,
-      instructorChunks: budget.instructorChunkCount,
+      pagesPerDay: budget.pagesPerDay,
       availabilityFetches: budget.totalFetches,
       subrequestLimit: CLOUDFLARE_SUBREQUEST_LIMIT,
     });
   } else {
-    log.info("Availability search budget", {
+    log.info("Schedule search budget", {
       daysAhead: budget.daysAhead,
-      instructorChunks: budget.instructorChunkCount,
+      pagesPerDay: budget.pagesPerDay,
       availabilityFetches: budget.totalFetches,
     });
   }
 }
 
 export interface AvailabilitySearchParams {
-  customerUserGuid: string;
   locationId: number;
-  operatorId: number;
   timeZone: string;
   activityTypeId: string;
   reservationType: ReservationType;
   allInstructorIds: string[];
   aircraftIds: string[];
+  durationMinutes?: number;
 }
 
-export interface PreparedAvailabilitySearch {
+export interface PreparedScheduleSearch {
   searchResources: {
     instructors: string[];
     aircraftIds: string[];
   };
-  instructorChunks: string[][];
 }
 
-export function prepareAvailabilitySearch(
+export function prepareScheduleSearch(
   params: AvailabilitySearchParams,
-): PreparedAvailabilitySearch | null {
+): PreparedScheduleSearch | null {
   const searchResources = getAvailabilitySearchResources(
     params.reservationType,
     params.allInstructorIds,
@@ -124,48 +119,44 @@ export function prepareAvailabilitySearch(
     return null;
   }
 
-  const instructorChunks = prepareInstructorChunks(
-    chunk(searchResources.instructors, 3),
-    searchResources.aircraftIds,
-  );
-
-  if (instructorChunks.length === 0) {
-    return null;
-  }
-
-  return { searchResources, instructorChunks };
+  return { searchResources };
 }
 
-export function buildAvailabilityFetchTasks(
+export function estimateSchedulePagesPerDay(
+  instructorCount: number,
+  aircraftCount: number,
+): number {
+  return estimatePagesPerDay(instructorCount + aircraftCount);
+}
+
+export function buildScheduleFetchTasks(
   scheduler: SchedulerBLO,
   options: {
     params: AvailabilitySearchParams;
-    prepared: PreparedAvailabilitySearch;
+    prepared: PreparedScheduleSearch;
     today: Date;
     daysAhead: number;
   },
 ): Promise<BookableAvailability[]>[] {
   const { params, prepared, today, daysAhead } = options;
+  const durationMinutes =
+    params.durationMinutes ?? params.reservationType.defaultLength;
   const tasks: Promise<BookableAvailability[]>[] = [];
 
   for (let offset = 0; offset <= daysAhead; offset++) {
     const day = addOperatorDays(today, offset, params.timeZone);
     const dayISO = formatOperatorIsoDate(day, params.timeZone);
 
-    for (const instructors of prepared.instructorChunks) {
-      tasks.push(
-        scheduler.getBookableAvailability({
-          customerUserGuid: params.customerUserGuid,
-          locationId: params.locationId,
-          activityTypeId: params.activityTypeId,
-          instructors,
-          aircraftIds: prepared.searchResources.aircraftIds,
-          startDate: dayISO,
-          endDate: dayISO,
-          lengthOfReservationInMinutes: params.reservationType.defaultLength,
-        }),
-      );
-    }
+    tasks.push(
+      scheduler.getBookableAvailability({
+        locationId: params.locationId,
+        activityTypeId: params.activityTypeId,
+        instructorIds: prepared.searchResources.instructors,
+        aircraftIds: prepared.searchResources.aircraftIds,
+        startDate: dayISO,
+        lengthOfReservationInMinutes: durationMinutes,
+      }),
+    );
   }
 
   return tasks;

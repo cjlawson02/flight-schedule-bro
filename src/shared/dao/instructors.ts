@@ -22,3 +22,16 @@ export async function getInstructors(operatorId: number) {
     3 * 24 * 60 * 60 * 1000,
   );
 }
+
+export function selectPreferredInstructorIds(
+  instructors: Pick<InstructorMetadata, "instructorId" | "displayName">[],
+  regex: RegExp,
+): string[] {
+  const preferred = instructors
+    .filter((instructor) => regex.test(instructor.displayName))
+    .map((instructor) => instructor.instructorId);
+
+  return preferred.length > 0
+    ? preferred
+    : instructors.map((instructor) => instructor.instructorId);
+}

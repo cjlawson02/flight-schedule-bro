@@ -1,4 +1,9 @@
 import { checkbox, select, confirm, input } from "@inquirer/prompts";
+import {
+  selectPreferredAircraftIds,
+  type AircraftMetadata,
+} from "../dao/aircraft.js";
+import { selectPreferredInstructorIds } from "../dao/instructors.js";
 import type { ReservationType } from "../dao/reservationTypes.js";
 import { getFieldState, pickReservationType } from "../dao/reservationTypes.js";
 import {
@@ -25,6 +30,67 @@ import {
 
 export type CliMainAction = "book" | "manage-existing-activity" | "exit";
 export type ManageActivityAction = "change-activity-type" | "cancel" | "back";
+
+/** Common reservation lengths offered in the CLI duration prompt (minutes). */
+export const CLI_DURATION_OPTIONS_MINUTES = [180, 150, 120, 90, 60, 45, 30];
+
+export function formatDurationChoice(minutes: number): string {
+  const wholeHours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+
+  if (remainder === 0) {
+    return wholeHours === 1 ? "1 hour" : `${wholeHours} hours`;
+  }
+
+  if (remainder === 30 && wholeHours > 0) {
+    return `${wholeHours}.5 hours`;
+  }
+
+  return `${minutes} minutes`;
+}
+
+export function buildDurationChoices(
+  defaultLength: number,
+): { name: string; value: number }[] {
+  const optionSet = new Set([defaultLength, ...CLI_DURATION_OPTIONS_MINUTES]);
+
+  return [...optionSet]
+    .sort((a, b) => b - a)
+    .map((minutes) => ({
+      name: formatDurationChoice(minutes),
+      value: minutes,
+    }));
+}
+
+export function buildTailNumberChoices(
+  aircraft: Pick<AircraftMetadata, "aircraftId" | "tailNumber">[],
+  defaultSelectedIds: string[],
+): { name: string; value: string; checked?: boolean }[] {
+  const selected = new Set(defaultSelectedIds);
+
+  return [...aircraft]
+    .sort((a, b) => a.tailNumber.localeCompare(b.tailNumber))
+    .map((entry) => ({
+      name: entry.tailNumber,
+      value: entry.aircraftId,
+      checked: selected.has(entry.aircraftId),
+    }));
+}
+
+export function buildInstructorChoices(
+  instructors: { instructorId: string; displayName: string }[],
+  defaultSelectedIds: string[],
+): { name: string; value: string; checked?: boolean }[] {
+  const selected = new Set(defaultSelectedIds);
+
+  return [...instructors]
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .map((entry) => ({
+      name: entry.displayName,
+      value: entry.instructorId,
+      checked: selected.has(entry.instructorId),
+    }));
+}
 
 /**
  * Interactive CLI utility for user interaction during booking flow
@@ -300,6 +366,88 @@ export class InteractiveCLI {
           { name: "Exit", value: "exit" },
         ],
         loop: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Select reservation duration in minutes.
+   */
+  async selectDurationMinutes(
+    reservationType: ReservationType,
+  ): Promise<number | null> {
+    const choices = buildDurationChoices(reservationType.defaultLength);
+
+    try {
+      return await select({
+        message: "Duration",
+        choices,
+        loop: false,
+        default: reservationType.defaultLength,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Multi-select interface for choosing instructors to search.
+   */
+  async selectInstructors(
+    instructors: { instructorId: string; displayName: string }[],
+    preferredRegex: RegExp,
+  ): Promise<string[] | null> {
+    if (instructors.length === 0) {
+      return null;
+    }
+
+    const defaultSelectedIds = selectPreferredInstructorIds(
+      instructors,
+      preferredRegex,
+    );
+    const choices = buildInstructorChoices(instructors, defaultSelectedIds);
+
+    try {
+      return await checkbox({
+        message: "Instructors",
+        choices,
+        pageSize: 15,
+        loop: false,
+        validate: (selected) =>
+          selected.length > 0 || "Select at least one instructor",
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Multi-select interface for choosing tail numbers to search.
+   */
+  async selectTailNumbers(
+    aircraft: Pick<AircraftMetadata, "aircraftId" | "tailNumber">[],
+    preferredRegex: RegExp,
+  ): Promise<string[] | null> {
+    if (aircraft.length === 0) {
+      return null;
+    }
+
+    const defaultSelectedIds = selectPreferredAircraftIds(
+      aircraft,
+      preferredRegex,
+    );
+    const choices = buildTailNumberChoices(aircraft, defaultSelectedIds);
+
+    try {
+      return await checkbox({
+        message: "Tail numbers",
+        choices,
+        pageSize: 15,
+        loop: false,
+        validate: (selected) =>
+          selected.length > 0 || "Select at least one tail number",
       });
     } catch {
       return null;

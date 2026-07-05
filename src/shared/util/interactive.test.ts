@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { InteractiveCLI } from "./interactive.js";
+import {
+  InteractiveCLI,
+  buildDurationChoices,
+  buildInstructorChoices,
+  buildTailNumberChoices,
+  formatDurationChoice,
+} from "./interactive.js";
 import { checkbox, select, confirm, input } from "@inquirer/prompts";
 import {
   createReservationTypeFixture,
@@ -415,6 +421,108 @@ describe("InteractiveCLI", () => {
     });
   });
 
+  describe("selectDurationMinutes", () => {
+    it("returns selected duration", async () => {
+      vi.mocked(select).mockResolvedValue(90);
+
+      const result = await cli.selectDurationMinutes(dualFlightTraining);
+
+      expect(result).toBe(90);
+    });
+
+    it("returns null when user cancels", async () => {
+      vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
+
+      const result = await cli.selectDurationMinutes(dualFlightTraining);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("selectInstructors", () => {
+    const instructors = [
+      { instructorId: "inst-2", displayName: "Jane Smith" },
+      { instructorId: "inst-1", displayName: "John Doe" },
+      { instructorId: "inst-3", displayName: "Doug Libal" },
+    ];
+
+    it("prompts with regex matches pre-selected", async () => {
+      vi.mocked(checkbox).mockResolvedValue(["inst-3"]);
+
+      const result = await cli.selectInstructors(instructors, /Doug Libal/i);
+
+      expect(result).toEqual(["inst-3"]);
+      expect(checkbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Instructors",
+          choices: [
+            { name: "Doug Libal", value: "inst-3", checked: true },
+            { name: "Jane Smith", value: "inst-2", checked: false },
+            { name: "John Doe", value: "inst-1", checked: false },
+          ],
+        }),
+      );
+    });
+
+    it("returns null when no instructors are available", async () => {
+      const result = await cli.selectInstructors([], /Doug Libal/i);
+
+      expect(result).toBeNull();
+      expect(checkbox).not.toHaveBeenCalled();
+    });
+
+    it("returns null when user cancels", async () => {
+      vi.mocked(checkbox).mockRejectedValue(new Error("Cancelled"));
+
+      const result = await cli.selectInstructors(instructors, /Doug Libal/i);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("selectTailNumbers", () => {
+    const aircraft = [
+      { aircraftId: "ac-1", tailNumber: "N65411" },
+      { aircraftId: "ac-2", tailNumber: "N734UZ" },
+      { aircraftId: "ac-3", tailNumber: "N713RE" },
+      { aircraftId: "ac-4", tailNumber: "N737BC" },
+    ];
+
+    it("prompts with regex matches pre-selected", async () => {
+      vi.mocked(checkbox).mockResolvedValue(["ac-1", "ac-4"]);
+
+      const result = await cli.selectTailNumbers(aircraft, /65411|737BC/i);
+
+      expect(result).toEqual(["ac-1", "ac-4"]);
+      expect(checkbox).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Tail numbers",
+          choices: [
+            { name: "N65411", value: "ac-1", checked: true },
+            { name: "N713RE", value: "ac-3", checked: false },
+            { name: "N734UZ", value: "ac-2", checked: false },
+            { name: "N737BC", value: "ac-4", checked: true },
+          ],
+        }),
+      );
+    });
+
+    it("returns null when no aircraft are available", async () => {
+      const result = await cli.selectTailNumbers([], /65411|737BC/i);
+
+      expect(result).toBeNull();
+      expect(checkbox).not.toHaveBeenCalled();
+    });
+
+    it("returns null when user cancels", async () => {
+      vi.mocked(checkbox).mockRejectedValue(new Error("Cancelled"));
+
+      const result = await cli.selectTailNumbers(aircraft, /65411|737BC/i);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("selectReservationType", () => {
     it("prompts user to select a reservation type", async () => {
       const reservationTypes = [
@@ -503,5 +611,70 @@ describe("InteractiveCLI", () => {
         }),
       );
     });
+  });
+});
+
+describe("duration choices", () => {
+  it("formats whole and half-hour durations", () => {
+    expect(formatDurationChoice(60)).toBe("1 hour");
+    expect(formatDurationChoice(120)).toBe("2 hours");
+    expect(formatDurationChoice(90)).toBe("1.5 hours");
+    expect(formatDurationChoice(45)).toBe("45 minutes");
+  });
+
+  it("includes standard duration options sorted longest first", () => {
+    const choices = buildDurationChoices(120);
+
+    expect(choices.map((choice) => choice.value)).toEqual([
+      180, 150, 120, 90, 60, 45, 30,
+    ]);
+    expect(choices[2].name).toBe("2 hours");
+  });
+
+  it("adds non-standard defaults without duplicating options", () => {
+    const choices = buildDurationChoices(75);
+
+    expect(choices.map((choice) => choice.value)).toEqual([
+      180, 150, 120, 90, 75, 60, 45, 30,
+    ]);
+    expect(choices.find((choice) => choice.value === 75)?.name).toBe(
+      "75 minutes",
+    );
+  });
+});
+
+describe("tail number choices", () => {
+  it("sorts tail numbers alphabetically and marks defaults checked", () => {
+    const choices = buildTailNumberChoices(
+      [
+        { aircraftId: "ac-2", tailNumber: "N734UZ" },
+        { aircraftId: "ac-1", tailNumber: "N172S" },
+        { aircraftId: "ac-3", tailNumber: "N713RE" },
+      ],
+      ["ac-1", "ac-3"],
+    );
+
+    expect(choices).toEqual([
+      { name: "N172S", value: "ac-1", checked: true },
+      { name: "N713RE", value: "ac-3", checked: true },
+      { name: "N734UZ", value: "ac-2", checked: false },
+    ]);
+  });
+});
+
+describe("instructor choices", () => {
+  it("sorts instructors alphabetically and marks defaults checked", () => {
+    const choices = buildInstructorChoices(
+      [
+        { instructorId: "inst-2", displayName: "Jane Smith" },
+        { instructorId: "inst-1", displayName: "John Doe" },
+      ],
+      ["inst-1"],
+    );
+
+    expect(choices).toEqual([
+      { name: "Jane Smith", value: "inst-2", checked: false },
+      { name: "John Doe", value: "inst-1", checked: true },
+    ]);
   });
 });

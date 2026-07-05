@@ -60,7 +60,7 @@ describe("workerPipeline", () => {
         daysAhead: 14,
         totalFetches: 1,
         capped: false,
-        instructorChunkCount: 1,
+        pagesPerDay: 1,
       },
       reservationType: dualFlightTraining,
       today: new Date("2024-01-15T08:00:00.000Z"),
@@ -95,9 +95,7 @@ describe("workerPipeline", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: {
-          customerUserGuid: mockSession.userId,
           locationId: mockSession.defaultLocationId,
-          operatorId: mockSession.operatorId,
         },
       }),
     );

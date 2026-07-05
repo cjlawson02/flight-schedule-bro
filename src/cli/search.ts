@@ -1,13 +1,12 @@
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
 import {
-  buildAvailabilityFetchTasks,
+  buildScheduleFetchTasks,
   fetchAllAvailability,
   filterValidAvailabilityBlocks,
-  prepareAvailabilitySearch,
+  prepareScheduleSearch,
 } from "../shared/blo/availabilitySearch.js";
-import { getInvalidInstructorIds } from "../shared/dao/availability.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
-import { getDefaultLocationId, getUserId } from "../shared/dao/auth.js";
+import { getDefaultLocationId } from "../shared/dao/auth.js";
 import {
   getExistingReservations,
   hasReservationOnSameDay,
@@ -16,7 +15,7 @@ import { selectPreferredAircraftIds } from "../shared/dao/aircraft.js";
 import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import { type ConfigType } from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
-import { filterSlotsNotInPast } from "../shared/util/slots.js";
+import { filterSlotsBookable } from "../shared/util/slots.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { createProgressBar } from "../shared/util/progressBar.js";
 import { createLogger } from "../shared/util/logger.js";
@@ -28,47 +27,50 @@ export async function runCliAvailabilitySearch(options: {
   config: ConfigType;
   reservationType: ReservationType;
   operatorId: number;
+  durationMinutes: number;
+  aircraftIds?: string[];
+  instructorIds?: string[];
 }): Promise<BookableAvailability[]> {
-  const { scheduler, config, reservationType, operatorId } = options;
+  const {
+    scheduler,
+    config,
+    reservationType,
+    operatorId,
+    durationMinutes,
+    aircraftIds: selectedAircraftIds,
+    instructorIds: selectedInstructorIds,
+  } = options;
   const today = startOfOperatorDay(new Date(), config.TIMEZONE);
-  const allInstructorIds = scheduler.getInstructorIds();
-  const aircraftIds = selectPreferredAircraftIds(
-    Array.from(
-      scheduler.getAircraftMapEntries(),
-      ([aircraftId, tailNumber]) => ({
-        aircraftId,
-        tailNumber,
-      }),
-    ),
-    config.AIRCRAFT_REGEX,
-  );
+  const allInstructorIds =
+    selectedInstructorIds ?? scheduler.getInstructorIds();
+  const aircraftIds =
+    selectedAircraftIds ??
+    selectPreferredAircraftIds(
+      Array.from(
+        scheduler.getAircraftMapEntries(),
+        ([aircraftId, tailNumber]) => ({
+          aircraftId,
+          tailNumber,
+        }),
+      ),
+      config.AIRCRAFT_REGEX,
+    );
 
   const searchParams = {
-    customerUserGuid: getUserId(),
     locationId: getDefaultLocationId(),
-    operatorId,
     timeZone: config.TIMEZONE,
     activityTypeId: reservationType.reservationTypeId,
     reservationType,
     allInstructorIds,
     aircraftIds,
+    durationMinutes,
   };
 
-  const prepared = prepareAvailabilitySearch(searchParams);
+  const prepared = prepareScheduleSearch(searchParams);
   if (!prepared) {
     throw new Error(
       `"${reservationType.reservationTypeName}" has no instructors or aircraft to search with.`,
     );
-  }
-
-  const skippedInstructors = allInstructorIds.filter((id) =>
-    getInvalidInstructorIds().has(id),
-  );
-  if (skippedInstructors.length > 0) {
-    log.warn("Skipped instructors not valid for scheduleMatch", {
-      count: skippedInstructors.length,
-      instructorIds: skippedInstructors,
-    });
   }
 
   log.info("Checking existing reservations");
@@ -80,7 +82,7 @@ export async function runCliAvailabilitySearch(options: {
     count: existingReservations.length,
   });
 
-  const bookablePromises = buildAvailabilityFetchTasks(scheduler, {
+  const bookablePromises = buildScheduleFetchTasks(scheduler, {
     params: searchParams,
     prepared,
     today,
@@ -112,14 +114,14 @@ export async function runCliAvailabilitySearch(options: {
     const validResults = filterValidAvailabilityBlocks(
       allBookableResults,
       config,
-      reservationType.defaultLength,
+      durationMinutes,
     );
 
-    const futureResults = filterSlotsNotInPast(validResults);
-    const pastFiltered = validResults.length - futureResults.length;
-    if (pastFiltered > 0) {
+    const futureResults = filterSlotsBookable(validResults);
+    const leadTimeFiltered = validResults.length - futureResults.length;
+    if (leadTimeFiltered > 0) {
       console.log(
-        `\n⏭️  Filtered out ${pastFiltered} time slots that already started`,
+        `\n⏭️  Filtered out ${leadTimeFiltered} time slots that already started or start within 24 hours`,
       );
     }
 

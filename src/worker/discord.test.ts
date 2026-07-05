@@ -50,6 +50,8 @@ const createMockMetadata = (): FspMetadata => ({
   lastUpdated: new Date().toISOString(),
 });
 
+const fakeNow = new Date("2024-01-14T12:00:00.000Z");
+
 describe("Discord Integration", () => {
   let metadata: FspMetadata;
 
@@ -69,7 +71,7 @@ describe("Discord Integration", () => {
   describe("sendAvailabilityNotification", () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+      vi.setSystemTime(fakeNow);
     });
 
     afterEach(() => {
@@ -81,16 +83,16 @@ describe("Discord Integration", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("does nothing when slots start within three hours", async () => {
+    it("does nothing when slots start within 24 hours", async () => {
       const slots: BookableAvailability[] = [
         {
           date: "1/15/2024",
-          startTime: "2:00:00 PM",
-          endTime: "4:00:00 PM",
+          startTime: "11:00:00 AM",
+          endTime: "1:00:00 PM",
           instructorId: "123e4567-e89b-12d3-a456-426614174000",
           aircraftId: "223e4567-e89b-12d3-a456-426614174000",
-          startDateTime: new Date("2024-01-15T14:00:00.000Z"),
-          endDateTime: new Date("2024-01-15T16:00:00.000Z"),
+          startDateTime: new Date("2024-01-15T11:00:00.000Z"),
+          endDateTime: new Date("2024-01-15T13:00:00.000Z"),
         },
       ];
 
@@ -325,7 +327,7 @@ describe("Discord Integration", () => {
   describe("Embed Color Coding", () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+      vi.setSystemTime(fakeNow);
     });
 
     afterEach(() => {
@@ -385,7 +387,7 @@ describe("Discord Integration", () => {
   describe("Existing Reservation Context", () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+      vi.setSystemTime(fakeNow);
     });
 
     afterEach(() => {

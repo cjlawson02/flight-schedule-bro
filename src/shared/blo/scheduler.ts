@@ -1,10 +1,11 @@
-import { FSP_NIL_RESOURCE_ID } from "../dao/aircraft.js";
 import { type ReservationType } from "../dao/reservationTypes.js";
 import { fetchFspMetadata, type FspMetadata } from "./fspMetadata.js";
+import { BookableAvailability } from "../dao/availability.js";
+import { fetchScheduleDay } from "../dao/schedule.js";
 import {
-  fetchAvailability,
-  BookableAvailability,
-} from "../dao/availability.js";
+  buildScheduleFilterIds,
+  computeBookableAvailabilityFromSnapshot,
+} from "./scheduleAvailability.js";
 import {
   buildUserReservationRequest,
   createReservation,
@@ -12,14 +13,16 @@ import {
   ReservationBookingParams,
 } from "../dao/reservations.js";
 import { getPilotId, getAuthSession } from "../dao/auth.js";
+import { FspHttpError } from "../dao/api_wrapper.js";
 import {
   DEFAULT_TIMEZONE,
   formatFspLocalDateTime,
-  formatOperatorDisplayDate,
-  formatOperatorDisplayTime,
-  parseFspLocal,
 } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
+import {
+  BOOKING_MIN_LEAD_HOURS,
+  isSlotStartTooSoonForBooking,
+} from "../util/slots.js";
 
 const log = createLogger("scheduler");
 
@@ -34,6 +37,10 @@ export class SchedulerBLO {
   constructor(operatorId: number, timeZone: string = DEFAULT_TIMEZONE) {
     this.operatorId = operatorId;
     this.timeZone = timeZone;
+  }
+
+  getTimeZone(): string {
+    return this.timeZone;
   }
 
   /**
@@ -54,6 +61,10 @@ export class SchedulerBLO {
 
   getAircraftMapEntries() {
     return this.aircraftMap.entries();
+  }
+
+  getInstructorMapEntries() {
+    return this.instructorsMap.entries();
   }
 
   getOperatorId(): number {
@@ -100,66 +111,52 @@ export class SchedulerBLO {
   }
 
   /**
-   * Get enhanced availability results that include booking context
-   * @param params - Availability search parameters
-   * @returns Promise<BookableAvailability[]> - Enhanced availability with booking context
+   * Get bookable availability from the FSP Schedule v2 grid snapshot.
    */
   async getBookableAvailability(params: {
-    customerUserGuid: string;
     locationId: number;
     activityTypeId: string;
-    instructors: string[];
     aircraftIds: string[];
+    instructorIds: string[];
     startDate: string;
-    endDate: string;
     lengthOfReservationInMinutes?: number;
   }): Promise<BookableAvailability[]> {
     const reservationType = this.reservationTypesMap.get(params.activityTypeId);
-    const results = await fetchAvailability({
-      customerUserGuid: params.customerUserGuid,
-      locationId: params.locationId,
-      activityTypeId: params.activityTypeId,
-      instructors: params.instructors,
-      aircraftIds: params.aircraftIds,
-      startDate: params.startDate,
-      endDate: params.endDate,
+    const durationMinutes =
+      params.lengthOfReservationInMinutes ??
+      reservationType?.defaultLength ??
+      120;
+
+    const filters = buildScheduleFilterIds(
+      params.aircraftIds,
+      params.instructorIds,
+    );
+
+    const snapshot = await fetchScheduleDay({
       operatorId: this.operatorId,
+      locationId: params.locationId,
+      start: params.startDate,
       timeZone: this.timeZone,
-      lengthOfReservationInMinutes:
-        params.lengthOfReservationInMinutes ?? reservationType?.defaultLength,
+      aircraftIds: filters.aircraftIds,
+      instructorIds: filters.instructorIds,
+      reservationTypeIds: filters.reservationTypeIds,
     });
 
-    const bookableResults: BookableAvailability[] = [];
-
-    for (const result of results) {
-      for (const timeBlock of result.timeBlocks) {
-        const startDateTime = parseFspLocal(timeBlock.startAt, this.timeZone);
-        const endDateTime = parseFspLocal(timeBlock.endAt, this.timeZone);
-        const instructorId = result.flightInstructorId ?? FSP_NIL_RESOURCE_ID;
-        const aircraftId = result.aircraftId ?? FSP_NIL_RESOURCE_ID;
-
-        bookableResults.push({
-          date: formatOperatorDisplayDate(startDateTime, this.timeZone),
-          startTime: formatOperatorDisplayTime(startDateTime, this.timeZone),
-          endTime: formatOperatorDisplayTime(endDateTime, this.timeZone),
-          instructorId,
-          aircraftId,
-          instructor:
-            instructorId === FSP_NIL_RESOURCE_ID
-              ? undefined
-              : (this.instructorsMap.get(instructorId) ??
-                `Instructor ${instructorId}`),
-          aircraft:
-            aircraftId === FSP_NIL_RESOURCE_ID
-              ? undefined
-              : (this.aircraftMap.get(aircraftId) ?? `Aircraft ${aircraftId}`),
-          startDateTime,
-          endDateTime,
-        });
-      }
+    if (!reservationType) {
+      return [];
     }
 
-    return bookableResults;
+    return computeBookableAvailabilityFromSnapshot({
+      snapshot,
+      day: params.startDate,
+      timeZone: this.timeZone,
+      reservationType,
+      aircraftIds: params.aircraftIds,
+      instructorIds: params.instructorIds,
+      durationMinutes,
+      instructorsMap: this.instructorsMap,
+      aircraftMap: this.aircraftMap,
+    });
   }
 
   /**
@@ -172,6 +169,14 @@ export class SchedulerBLO {
     params: ReservationBookingParams,
   ): Promise<ReservationResponse> {
     try {
+      if (isSlotStartTooSoonForBooking(params.startTime)) {
+        const err = new Error(
+          `Cannot book reservations within ${BOOKING_MIN_LEAD_HOURS} hours of start time`,
+        );
+        (err as Error & { code: string }).code = "BOOKING_TOO_SOON";
+        throw err;
+      }
+
       // Construct the reservation request using CONFIG values and stored pilot ID
       const reservationRequest = buildUserReservationRequest({
         reservationType: params.reservationType,
@@ -188,8 +193,13 @@ export class SchedulerBLO {
         params.reservationType,
         reservationRequest,
         params.flightDetails,
+        params.overrideExceptions ? { overrideExceptions: true } : undefined,
       );
     } catch (error) {
+      if (error instanceof FspHttpError) {
+        throw error;
+      }
+
       // If error already has a code property, re-throw it
       if (error instanceof Error && "code" in error) {
         throw error;

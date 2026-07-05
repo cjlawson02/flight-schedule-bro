@@ -88,12 +88,15 @@ src/
 │   └── metadata.ts   # FSP metadata caching
 ├── shared/           # Code shared between CLI and Worker
 │   ├── blo/          # Business Logic Objects
-│   │   ├── scheduler.ts    # Core scheduling logic
-│   │   └── calendar.ts     # Calendar integration (CLI only)
+│   │   ├── scheduler.ts           # Core scheduling logic
+│   │   ├── scheduleGaps.ts        # Interval/gap computation from schedule grid
+│   │   ├── scheduleAvailability.ts # Schedule snapshot → BookableAvailability
+│   │   └── calendar.ts            # Calendar integration (CLI only)
 │   ├── dao/          # Data Access Objects (Flight Schedule Pro API)
 │   │   ├── api_wrapper.ts  # Fetch wrapper with rate limiting & caching
 │   │   ├── auth.ts         # Authentication
-│   │   ├── availability.ts # Availability search
+│   │   ├── availability.ts # BookableAvailability types and grouping helpers
+│   │   ├── schedule.ts     # Schedule v2 grid API client
 │   │   ├── aircraft.ts     # Aircraft data
 │   │   ├── instructors.ts  # Instructor data
 │   │   ├── reservationTypes.ts # Reservation types
@@ -102,7 +105,6 @@ src/
 │   └── util/         # Utilities
 │       ├── config.ts       # Environment variable validation
 │       ├── dates.ts        # Date/time utilities & validation
-│       ├── array.ts        # Array helpers (chunking)
 │       ├── interactive.ts  # CLI prompts (CLI only)
 │       └── progressBar.ts  # Progress display (CLI only)
 ```
@@ -114,8 +116,17 @@ src/
 - Central orchestrator for availability searches and bookings
 - Maintains maps of instructors, aircraft, and activity types
 - Call `initialize()` before use to populate metadata
-- `getBookableAvailability()` returns enriched results with display names
+- `getBookableAvailability()` fetches the FSP Schedule v2 grid and computes gaps
 - `bookReservation()` handles reservation creation
+
+**Schedule Snapshot Search** (`src/shared/dao/schedule.ts`, `src/shared/blo/scheduleGaps.ts`)
+
+- Uses `POST /api/v2/schedule` per day (CLI, worker, and activity-type upgrades)
+- Paginates resources (50 per page) and merges events, unavailability, and closings
+- Gap computation intersects aircraft and instructor free windows at 30-minute steps
+- Worker subrequest budget: `(daysAhead + 1) × pagesPerDay` (typically ~39 days max)
+- CLI supports duration selection: 60, 90, or 120 minutes (defaults to reservation type `defaultLength`)
+- 5-minute cache TTL per schedule page
 
 **API Wrapper with Rate Limiting** (`src/shared/dao/api_wrapper.ts`)
 
@@ -127,12 +138,6 @@ src/
   - Caching: 30-minute TTL (configurable)
 - Automatically retries on 429 (rate limit) and 5xx errors
 - Uses Zod for runtime type validation
-
-**Chunking Strategy** (`src/shared/util/array.ts`)
-
-- FSP API limits to 3 instructors per availability request
-- `chunk()` helper splits instructor arrays into groups of 3
-- Used in both CLI and Worker to avoid API errors
 
 **Worker Rolling Window Algorithm** (`src/worker/index.ts`)
 
@@ -157,14 +162,12 @@ src/
 
 ## Important API Constraints
 
-1. **Instructor Limit**: Max 3 instructors per availability request (enforced by FSP API)
-2. **Rate Limiting**: FSP API has rate limits - use chunking and exponential backoff
+1. **Schedule Pagination**: Resource pages are capped at 50; worker budget uses `pagesPerDay` estimate
+2. **Rate Limiting**: FSP API has rate limits - use caching and exponential backoff
 3. **Cloudflare Worker Limits**:
-   - 50 subrequest limit (stay under with `DAYS_AHEAD` config)
+   - 50 subrequest limit (stay under with `DAYS_AHEAD` config and `pagesPerDay` estimate)
    - KV operations count toward limits
-4. **Time Zones**: All times are local timezone, formatted as `YYYY-MM-DDTHH:mm`
-
-## Worker-Specific Concepts
+4. **Time Zones**: All times are local timezone; schedule grid uses `YYYY-MM-DD HH:mm:ss`
 
 **KV Snapshot Structure**:
 

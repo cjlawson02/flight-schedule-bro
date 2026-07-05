@@ -3,15 +3,26 @@ import { SchedulerBLO } from "./scheduler.js";
 import { parseFspLocal } from "../util/flightTime.js";
 
 const LA = "America/Los_Angeles";
+const bookableStart = parseFspLocal("2030-07-15T10:00:00", LA);
+const bookableEnd = parseFspLocal("2030-07-15T12:00:00", LA);
 
 import { dualFlightTraining as mockDualReservationType } from "../dao/reservationTypes.fixtures.js";
 import * as fspMetadataModule from "./fspMetadata.js";
-import * as availabilityDAO from "../dao/availability.js";
+import * as scheduleDAO from "../dao/schedule.js";
+import * as scheduleAvailability from "./scheduleAvailability.js";
 import * as reservationsDAO from "../dao/reservations.js";
 import * as authDAO from "../dao/auth.js";
 
 vi.mock("./fspMetadata.js");
-vi.mock("../dao/availability.js");
+vi.mock("../dao/schedule.js");
+vi.mock("./scheduleAvailability.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./scheduleAvailability.js")>();
+  return {
+    ...actual,
+    computeBookableAvailabilityFromSnapshot: vi.fn(),
+  };
+});
 vi.mock("../dao/reservations.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../dao/reservations.js")>();
@@ -92,8 +103,8 @@ describe("SchedulerBLO", () => {
       await scheduler.bookReservation({
         aircraftId: "33333333-3333-4333-8333-333333333333",
         instructorId: "44444444-4444-4444-8444-444444444444",
-        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
-        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
+        startTime: bookableStart,
+        endTime: bookableEnd,
         reservationType: mockDualReservationType,
         locationId: 1,
       });
@@ -103,6 +114,7 @@ describe("SchedulerBLO", () => {
         expect.objectContaining({
           pilotId: "123e4567-e89b-12d3-a456-426614174000",
         }),
+        undefined,
         undefined,
       );
     });
@@ -178,186 +190,96 @@ describe("SchedulerBLO", () => {
   });
 
   describe("getBookableAvailability", () => {
+    const emptySnapshot = {
+      resources: [],
+      events: [],
+      unavailability: [],
+      closings: [],
+    };
+
     beforeEach(async () => {
       vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
         createMockMetadata({
           instructors: [{ instructorId: "inst-1", displayName: "John Doe" }],
-          reservationTypes: [],
+          reservationTypes: [mockDualReservationType],
           aircraft: [{ aircraftId: "ac-1", tailNumber: "N12345" }],
         }),
       );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
+      vi.mocked(scheduleDAO.fetchScheduleDay).mockResolvedValue(emptySnapshot);
       await scheduler.initialize();
     });
 
-    it("fetches availability and enriches with human-readable names", async () => {
-      const mockAvailability = [
-        {
-          flightInstructorId: "inst-1",
-          aircraftId: "ac-1",
-          timeBlocks: [
-            {
-              startAt: "2024-07-15T10:00:00",
-              endAt: "2024-07-15T12:00:00",
-            },
-          ],
-        },
-      ];
-
-      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability,
-      );
-
-      const params = {
-        customerUserGuid: "user-123",
-        locationId: 1,
-        activityTypeId: mockDualReservationType.reservationTypeId,
-        instructors: ["inst-1"],
-        aircraftIds: ["ac-1"],
-        startDate: "2024-07-15",
-        endDate: "2024-07-16",
-      };
-
-      const result = await scheduler.getBookableAvailability(params);
-
-      expect(availabilityDAO.fetchAvailability).toHaveBeenCalledWith({
-        ...params,
-        operatorId: mockOperatorId,
-        timeZone: LA,
-      });
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        instructor: "John Doe", // Enriched name
-        aircraft: "N12345", // Enriched name
+    it("fetches schedule snapshot and computes bookable availability", async () => {
+      const slot = {
+        date: "7/15/2024",
+        startTime: "10:00:00 AM",
+        endTime: "12:00:00 PM",
         instructorId: "inst-1",
         aircraftId: "ac-1",
-      });
+        instructor: "John Doe",
+        aircraft: "N12345",
+        startDateTime: parseFspLocal("2024-07-15T10:00:00", LA),
+        endDateTime: parseFspLocal("2024-07-15T12:00:00", LA),
+      };
 
-      // Check date/time formatting
-      expect(result[0].date).toBeDefined();
-      expect(result[0].startTime).toBeDefined();
-      expect(result[0].endTime).toBeDefined();
-      expect(result[0].startDateTime).toBeInstanceOf(Date);
-      expect(result[0].endDateTime).toBeInstanceOf(Date);
-    });
-
-    it("handles multiple time blocks for the same instructor/aircraft", async () => {
-      const mockAvailability = [
-        {
-          flightInstructorId: "inst-1",
-          aircraftId: "ac-1",
-          timeBlocks: [
-            {
-              startAt: "2024-07-15T10:00:00",
-              endAt: "2024-07-15T12:00:00",
-            },
-            {
-              startAt: "2024-07-15T14:00:00",
-              endAt: "2024-07-15T16:00:00",
-            },
-          ],
-        },
-      ];
-
-      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability,
-      );
+      vi.mocked(
+        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
+      ).mockReturnValue([slot]);
 
       const result = await scheduler.getBookableAvailability({
-        customerUserGuid: "user-123",
         locationId: 1,
         activityTypeId: mockDualReservationType.reservationTypeId,
-        instructors: ["inst-1"],
+        instructorIds: ["inst-1"],
         aircraftIds: ["ac-1"],
         startDate: "2024-07-15",
-        endDate: "2024-07-16",
       });
 
-      expect(result).toHaveLength(2); // Two time blocks
-    });
-
-    it("falls back to ID if instructor name not found", async () => {
-      const mockAvailability = [
-        {
-          flightInstructorId: "unknown-instructor",
-          aircraftId: "ac-1",
-          timeBlocks: [
-            {
-              startAt: "2024-07-15T10:00:00",
-              endAt: "2024-07-15T12:00:00",
-            },
-          ],
-        },
-      ];
-
-      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability,
+      expect(scheduleDAO.fetchScheduleDay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operatorId: mockOperatorId,
+          locationId: 1,
+          start: "2024-07-15",
+          timeZone: LA,
+        }),
       );
-
-      const result = await scheduler.getBookableAvailability({
-        customerUserGuid: "user-123",
-        locationId: 1,
-        activityTypeId: mockDualReservationType.reservationTypeId,
-        instructors: ["unknown-instructor"],
-        aircraftIds: ["ac-1"],
-        startDate: "2024-07-15",
-        endDate: "2024-07-16",
-      });
-
-      expect(result[0].instructorId).toBe("unknown-instructor"); // Falls back to ID
-    });
-
-    it("falls back to ID if aircraft name not found", async () => {
-      const mockAvailability = [
-        {
-          flightInstructorId: "inst-1",
-          aircraftId: "unknown-aircraft",
-          timeBlocks: [
-            {
-              startAt: "2024-07-15T10:00:00",
-              endAt: "2024-07-15T12:00:00",
-            },
-          ],
-        },
-      ];
-
-      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue(
-        mockAvailability,
+      expect(
+        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          day: "2024-07-15",
+          aircraftIds: ["ac-1"],
+          instructorIds: ["inst-1"],
+          durationMinutes: mockDualReservationType.defaultLength,
+        }),
       );
-
-      const result = await scheduler.getBookableAvailability({
-        customerUserGuid: "user-123",
-        locationId: 1,
-        activityTypeId: mockDualReservationType.reservationTypeId,
-        instructors: ["inst-1"],
-        aircraftIds: ["unknown-aircraft"],
-        startDate: "2024-07-15",
-        endDate: "2024-07-16",
-      });
-
-      expect(result[0].aircraftId).toBe("unknown-aircraft");
+      expect(result).toEqual([slot]);
     });
 
-    it("uses explicit lengthOfReservationInMinutes without initialize metadata", async () => {
-      vi.mocked(availabilityDAO.fetchAvailability).mockResolvedValue([]);
+    it("passes explicit lengthOfReservationInMinutes", async () => {
+      vi.mocked(
+        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
+      ).mockReturnValue([]);
 
       const workerScheduler = new SchedulerBLO(mockOperatorId, LA);
+      workerScheduler.hydrateFromMetadata(
+        createMockMetadata({
+          reservationTypes: [mockDualReservationType],
+        }),
+      );
 
       await workerScheduler.getBookableAvailability({
-        customerUserGuid: "user-123",
         locationId: 1,
         activityTypeId: mockDualReservationType.reservationTypeId,
-        instructors: ["inst-1"],
+        instructorIds: ["inst-1"],
         aircraftIds: ["ac-1"],
         startDate: "2024-07-15",
-        endDate: "2024-07-15",
         lengthOfReservationInMinutes: 90,
       });
 
-      expect(availabilityDAO.fetchAvailability).toHaveBeenCalledWith(
-        expect.objectContaining({ lengthOfReservationInMinutes: 90 }),
-      );
+      expect(
+        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
+      ).toHaveBeenCalledWith(expect.objectContaining({ durationMinutes: 90 }));
     });
   });
 
@@ -389,8 +311,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
         instructorId: "44444444-4444-4444-8444-444444444444",
-        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
-        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
+        startTime: bookableStart,
+        endTime: bookableEnd,
         reservationType: mockDualReservationType,
         locationId: 1,
       };
@@ -403,13 +325,14 @@ describe("SchedulerBLO", () => {
         {
           aircraftId: "33333333-3333-4333-8333-333333333333",
           instructorId: "44444444-4444-4444-8444-444444444444",
-          start: "2024-07-15T10:00",
-          end: "2024-07-15T12:00",
+          start: "2030-07-15T10:00",
+          end: "2030-07-15T12:00",
           reservationTypeId: mockDualReservationType.reservationTypeId,
           locationId: 1,
           operatorId: mockOperatorId,
           pilotId: "pilot-123",
         },
+        undefined,
         undefined,
       );
     });
@@ -423,8 +346,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
         instructorId: "44444444-4444-4444-8444-444444444444",
-        startTime: parseFspLocal("2024-07-15T14:30:45", LA),
-        endTime: parseFspLocal("2024-07-15T16:30:45", LA),
+        startTime: parseFspLocal("2030-07-15T14:30:45", LA),
+        endTime: parseFspLocal("2030-07-15T16:30:45", LA),
         reservationType: mockDualReservationType,
         locationId: 1,
       };
@@ -433,8 +356,8 @@ describe("SchedulerBLO", () => {
 
       const call = vi.mocked(reservationsDAO.createReservation).mock
         .calls[0][1];
-      expect(call.start).toBe("2024-07-15T14:30");
-      expect(call.end).toBe("2024-07-15T16:30");
+      expect(call.start).toBe("2030-07-15T14:30");
+      expect(call.end).toBe("2030-07-15T16:30");
     });
 
     it("wraps errors with BOOKING_FAILED code", async () => {
@@ -445,8 +368,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
         instructorId: "44444444-4444-4444-8444-444444444444",
-        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
-        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
+        startTime: bookableStart,
+        endTime: bookableEnd,
         reservationType: mockDualReservationType,
         locationId: 1,
       };
@@ -473,8 +396,8 @@ describe("SchedulerBLO", () => {
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
         instructorId: "44444444-4444-4444-8444-444444444444",
-        startTime: parseFspLocal("2024-07-15T10:00:00", LA),
-        endTime: parseFspLocal("2024-07-15T12:00:00", LA),
+        startTime: bookableStart,
+        endTime: bookableEnd,
         reservationType: mockDualReservationType,
         locationId: 1,
       };
@@ -485,6 +408,27 @@ describe("SchedulerBLO", () => {
         expect(error.code).toBe("VALIDATION_ERROR");
         expect(error.message).toBe("Validation failed");
       }
+    });
+
+    it("rejects bookings within 24 hours of start time", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(parseFspLocal("2024-07-15T10:00:00", LA));
+
+      const params = {
+        aircraftId: "33333333-3333-4333-8333-333333333333",
+        instructorId: "44444444-4444-4444-8444-444444444444",
+        startTime: parseFspLocal("2024-07-16T09:59:00", LA),
+        endTime: parseFspLocal("2024-07-16T11:59:00", LA),
+        reservationType: mockDualReservationType,
+        locationId: 1,
+      };
+
+      await expect(scheduler.bookReservation(params)).rejects.toThrow(
+        "Cannot book reservations within 24 hours of start time",
+      );
+      expect(reservationsDAO.createReservation).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
   });
 });

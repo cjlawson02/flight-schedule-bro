@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { getInstructors } from "./instructors.js";
+import { getInstructors, selectPreferredInstructorIds } from "./instructors.js";
 import * as apiWrapper from "./api_wrapper.js";
 
 vi.mock("./api_wrapper.js");
@@ -39,5 +39,25 @@ describe("getInstructors", () => {
     const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
     expect(url).toContain("api-external.flightschedulepro.com/api/instructors");
     expect(url).toContain("operatorId=54321");
+  });
+});
+
+describe("selectPreferredInstructorIds", () => {
+  const instructors = [
+    { instructorId: "inst-1", displayName: "Doug Libal" },
+    { instructorId: "inst-2", displayName: "Jane Smith" },
+  ];
+
+  it("returns regex matches when found", () => {
+    expect(selectPreferredInstructorIds(instructors, /Doug Libal/i)).toEqual([
+      "inst-1",
+    ]);
+  });
+
+  it("falls back to all instructors when no matches", () => {
+    expect(selectPreferredInstructorIds(instructors, /Nobody/i)).toEqual([
+      "inst-1",
+      "inst-2",
+    ]);
   });
 });

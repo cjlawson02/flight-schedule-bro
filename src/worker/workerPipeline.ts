@@ -6,7 +6,6 @@ import {
 import type { FspMetadata } from "../shared/blo/fspMetadata.js";
 import { createWorkerConfig, type ConfigType } from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
-import { clearInvalidInstructorIds } from "../shared/dao/availability.js";
 import { fetchAuth, type AuthSession } from "../shared/dao/auth.js";
 import { getOrFetchMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
@@ -19,7 +18,6 @@ export interface WorkerBootstrap {
 
 export async function bootstrapWorker(env: Env): Promise<WorkerBootstrap> {
   initializeWorker();
-  clearInvalidInstructorIds();
 
   const config = createWorkerConfig(env);
   const session = await fetchAuth(config.EMAIL, config.PASSWORD);
@@ -60,9 +58,7 @@ export async function runWorkerAvailabilitySearchFlow(options: {
     fspMetadata: options.fspMetadata,
     scheduler: options.scheduler,
     auth: {
-      customerUserGuid: options.session.userId,
       locationId: options.session.defaultLocationId,
-      operatorId: options.session.operatorId,
     },
     today,
     failFast: options.failFast,

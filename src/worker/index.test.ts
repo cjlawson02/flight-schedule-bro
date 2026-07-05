@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { Env } from "./types.js";
-import { chunk } from "../shared/util/array.js";
 import { findNewSlots } from "../shared/util/slots.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
 
@@ -25,26 +24,6 @@ function makeSlot(
 // The scheduled handler is harder to unit test due to dependencies
 
 describe("Worker Index - Helper Functions", () => {
-  describe("chunk function", () => {
-    it("chunks array into specified size", () => {
-      const arr = [1, 2, 3, 4, 5, 6, 7];
-      const result = chunk(arr, 3);
-      expect(result).toEqual([[1, 2, 3], [4, 5, 6], [7]]);
-    });
-
-    it("returns single chunk when array smaller than size", () => {
-      const arr = [1, 2];
-      const result = chunk(arr, 5);
-      expect(result).toEqual([[1, 2]]);
-    });
-
-    it("handles empty array", () => {
-      const arr: number[] = [];
-      const result = chunk(arr, 3);
-      expect(result).toEqual([]);
-    });
-  });
-
   describe("findNewSlots function", () => {
     it("identifies new slots not in previous snapshot", () => {
       const previousSlots = [

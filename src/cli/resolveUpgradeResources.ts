@@ -1,11 +1,8 @@
 import type { BookableAvailability } from "../shared/dao/availability.js";
-import { prepareInstructorChunks } from "../shared/dao/availability.js";
-import { fetchAllAvailability } from "../shared/blo/availabilitySearch.js";
 import { FSP_NIL_RESOURCE_ID } from "../shared/dao/aircraft.js";
 import type { ReservationType } from "../shared/dao/reservationTypes.js";
 import { getFieldState } from "../shared/dao/reservationTypes.js";
 import type { SchedulerBLO } from "../shared/blo/scheduler.js";
-import { chunk } from "../shared/util/array.js";
 import { formatOperatorIsoDate } from "../shared/util/flightTime.js";
 import type { InteractiveCLI } from "../shared/util/interactive.js";
 
@@ -46,7 +43,6 @@ export function filterAvailabilitiesForSlot(
 export async function findInstructorsForSlot(
   scheduler: SchedulerBLO,
   params: {
-    customerUserGuid: string;
     locationId: number;
     activityTypeId: string;
     aircraftId?: string;
@@ -62,29 +58,19 @@ export async function findInstructorsForSlot(
   );
   const aircraftIds = params.aircraftId ? [params.aircraftId] : [];
 
-  const instructorChunks = prepareInstructorChunks(
-    chunk(params.instructorIds, 3),
-    aircraftIds,
-  );
-
-  if (instructorChunks.length === 0) {
+  if (params.instructorIds.length === 0) {
     return [];
   }
 
-  const tasks = instructorChunks.map((instructors) =>
-    scheduler.getBookableAvailability({
-      customerUserGuid: params.customerUserGuid,
-      locationId: params.locationId,
-      activityTypeId: params.activityTypeId,
-      instructors,
-      aircraftIds,
-      startDate: searchDate,
-      endDate: searchDate,
-      lengthOfReservationInMinutes: durationMinutes,
-    }),
-  );
+  const results = await scheduler.getBookableAvailability({
+    locationId: params.locationId,
+    activityTypeId: params.activityTypeId,
+    instructorIds: params.instructorIds,
+    aircraftIds,
+    startDate: searchDate,
+    lengthOfReservationInMinutes: durationMinutes,
+  });
 
-  const results = await fetchAllAvailability(tasks);
   return filterAvailabilitiesForSlot(results, {
     aircraftId: params.aircraftId,
     startTime: params.startTime,
@@ -104,7 +90,6 @@ export async function resolveMissingInstructorForUpgrade(
   cli: InteractiveCLI,
   scheduler: SchedulerBLO,
   params: {
-    customerUserGuid: string;
     locationId: number;
     reservationType: ReservationType;
     aircraftId?: string;
@@ -116,7 +101,6 @@ export async function resolveMissingInstructorForUpgrade(
   console.log("\n🔍 Searching for available instructors at this time...");
 
   const matchingInstructors = await findInstructorsForSlot(scheduler, {
-    customerUserGuid: params.customerUserGuid,
     locationId: params.locationId,
     activityTypeId: params.reservationType.reservationTypeId,
     aircraftId: params.aircraftId,

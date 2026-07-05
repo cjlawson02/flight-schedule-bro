@@ -9,25 +9,24 @@ import { startOfOperatorDay } from "../util/flightTime.js";
 import type { FspMetadata } from "./fspMetadata.js";
 import { SchedulerBLO } from "./scheduler.js";
 import {
-  buildAvailabilityFetchTasks,
+  buildScheduleFetchTasks,
+  estimateSchedulePagesPerDay,
   fetchAllAvailability,
   filterValidAvailabilityBlocks,
-  logAvailabilitySearchBudget,
-  prepareAvailabilitySearch,
-  resolveAvailabilityDaysAhead,
-  type AvailabilitySearchBudget,
+  logScheduleSearchBudget,
+  prepareScheduleSearch,
+  resolveScheduleSearchBudget,
+  type ScheduleSearchBudget,
 } from "./availabilitySearch.js";
 import { selectPreferredAircraftIds } from "../dao/aircraft.js";
 
 export interface WorkerAuthContext {
-  customerUserGuid: string;
   locationId: number;
-  operatorId: number;
 }
 
 export interface WorkerAvailabilitySearchResult {
   validResults: BookableAvailability[];
-  budget: AvailabilitySearchBudget;
+  budget: ScheduleSearchBudget;
   reservationType: ReservationType;
   today: Date;
 }
@@ -86,9 +85,7 @@ export async function executeWorkerAvailabilitySearch(options: {
     buildWorkerSearchResources(config, fspMetadata);
 
   const searchParams = {
-    customerUserGuid: auth.customerUserGuid,
     locationId: auth.locationId,
-    operatorId: auth.operatorId,
     timeZone: config.TIMEZONE,
     activityTypeId: reservationType.reservationTypeId,
     reservationType,
@@ -96,18 +93,20 @@ export async function executeWorkerAvailabilitySearch(options: {
     aircraftIds,
   };
 
-  const prepared = prepareAvailabilitySearch(searchParams);
+  const prepared = prepareScheduleSearch(searchParams);
   if (!prepared) {
     throw new Error("No instructors or aircraft available for search.");
   }
 
-  const budget = resolveAvailabilityDaysAhead(
-    config.DAYS_AHEAD,
-    prepared.instructorChunks.length,
+  const pagesPerDay = estimateSchedulePagesPerDay(
+    prepared.searchResources.instructors.length,
+    prepared.searchResources.aircraftIds.length,
   );
-  logAvailabilitySearchBudget(budget, config.DAYS_AHEAD);
 
-  const bookablePromises = buildAvailabilityFetchTasks(scheduler, {
+  const budget = resolveScheduleSearchBudget(config.DAYS_AHEAD, pagesPerDay);
+  logScheduleSearchBudget(budget, config.DAYS_AHEAD);
+
+  const bookablePromises = buildScheduleFetchTasks(scheduler, {
     params: searchParams,
     prepared,
     today,

@@ -56,6 +56,7 @@ const config = {
   EMAIL: "test@example.com",
   PASSWORD: "password",
   AIRCRAFT_REGEX: /172S/i,
+  INSTRUCTOR_REGEX: /Doug Libal/i,
   DAYS_AHEAD: 14,
   TIMEZONE: "America/Los_Angeles",
 };

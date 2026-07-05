@@ -5,6 +5,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { fetchICalContent } from "../dao/fetchIcal.js";
 import { getErrorMessage } from "../util/errors.js";
+import { DEFAULT_TIMEZONE } from "../util/flightTime.js";
+import { tagICalWithTimeZone } from "../util/icalTimezone.js";
 
 const execAsync = promisify(exec);
 
@@ -15,12 +17,16 @@ const execAsync = promisify(exec);
 export async function addReservationToCalendar(
   operatorId: number,
   reservationId: string,
+  timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   let tempFilePath: string | null = null;
 
   try {
     const iCalContent = await fetchICalContent(operatorId, reservationId);
-    const normalizedContent = iCalContent.replace(/\r\n/g, "\n");
+    const normalizedContent = tagICalWithTimeZone(
+      iCalContent.replace(/\r\n/g, "\n"),
+      timeZone,
+    );
     tempFilePath = join(tmpdir(), `flight-reservation-${reservationId}.ics`);
     await writeFile(tempFilePath, normalizedContent, "ascii");
     await execAsync(`open -a Calendar "${tempFilePath}"`);

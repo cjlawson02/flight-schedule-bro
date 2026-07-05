@@ -109,4 +109,97 @@ describe("createReservation", () => {
     // Verify that cache invalidation was not called
     expect(invalidateCache).not.toHaveBeenCalled();
   });
+
+  it("should send overrideExceptions when requested", async () => {
+    const { safeFetch } = await import("./api_wrapper.js");
+
+    (safeFetch as any).mockResolvedValue({
+      errors: [],
+      id: "reservation-123",
+    });
+
+    const reservationData = {
+      aircraftId: "00000000-0000-0000-0000-000000000000",
+      end: "2025-11-04T19:00:00",
+      instructorId: "00000000-0000-0000-0000-000000000000",
+      locationId: 1,
+      operatorId: 123,
+      pilotId: "00000000-0000-0000-0000-000000000000",
+      start: "2025-11-04T17:00:00",
+      reservationTypeId: "00000000-0000-0000-0000-000000000000",
+    };
+
+    await createReservation(mockReservationType, reservationData, undefined, {
+      overrideExceptions: true,
+    });
+
+    expect(safeFetch).toHaveBeenCalledWith(
+      "https://api-external.flightschedulepro.com/api/V2/Reservation",
+      "POST",
+      expect.objectContaining({ overrideExceptions: true }),
+      expect.anything(),
+      0,
+    );
+  });
+
+  it("should treat overridden warnings as success when reservation id is returned", async () => {
+    const { safeFetch } = await import("./api_wrapper.js");
+
+    (safeFetch as any).mockResolvedValue({
+      errors: [
+        {
+          message:
+            "The time based maintenance reminder (100Hr Inspection) is expired.",
+        },
+      ],
+      id: "reservation-123",
+    });
+
+    const reservationData = {
+      aircraftId: "00000000-0000-0000-0000-000000000000",
+      end: "2025-11-04T19:00:00",
+      instructorId: "00000000-0000-0000-0000-000000000000",
+      locationId: 1,
+      operatorId: 123,
+      pilotId: "00000000-0000-0000-0000-000000000000",
+      start: "2025-11-04T17:00:00",
+      reservationTypeId: "00000000-0000-0000-0000-000000000000",
+    };
+
+    const result = await createReservation(
+      mockReservationType,
+      reservationData,
+      undefined,
+      { overrideExceptions: true },
+    );
+
+    expect(result.id).toBe("reservation-123");
+    expect(invalidateCache).toHaveBeenCalledWith(
+      "api/V2/Reservation?dateTypeFilter=1",
+    );
+  });
+
+  it("should rethrow FspHttpError without wrapping", async () => {
+    const { safeFetch, FspHttpError } = await import("./api_wrapper.js");
+    const apiError = new FspHttpError(400, {
+      errors: [{ message: "Expired inspection", overridable: true }],
+    });
+
+    (safeFetch as any).mockRejectedValue(apiError);
+
+    const reservationData = {
+      aircraftId: "00000000-0000-0000-0000-000000000000",
+      end: "2025-11-04T19:00:00",
+      instructorId: "00000000-0000-0000-0000-000000000000",
+      locationId: 1,
+      operatorId: 123,
+      pilotId: "00000000-0000-0000-0000-000000000000",
+      start: "2025-11-04T17:00:00",
+      reservationTypeId: "00000000-0000-0000-0000-000000000000",
+    };
+
+    await expect(
+      createReservation(mockReservationType, reservationData),
+    ).rejects.toBe(apiError);
+  });
 });

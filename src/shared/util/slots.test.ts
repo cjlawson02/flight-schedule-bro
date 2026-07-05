@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { BookableAvailability } from "../dao/availability.js";
 import {
+  BOOKING_MIN_LEAD_HOURS,
   DISCORD_NOTIFICATION_MIN_LEAD_HOURS,
+  filterSlotsBookable,
   filterSlotsForDiscordNotification,
   filterSlotsNotInPast,
   findNewSlots,
   isSlotStartInPast,
+  isSlotStartTooSoonForBooking,
   isSlotStartTooSoonForDiscordNotification,
 } from "./slots.js";
 
@@ -69,12 +72,36 @@ describe("slot start time filters", () => {
   it("filters past and near-term slots from Discord notifications", () => {
     const slots = [
       makeSlot({ startDateTime: new Date("2024-01-20T17:00:00.000Z") }),
-      makeSlot({ startDateTime: new Date("2024-01-20T20:59:59.999Z") }),
-      makeSlot({ startDateTime: new Date("2024-01-20T21:00:00.000Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-21T17:59:59.999Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-21T18:00:00.000Z") }),
     ];
 
     expect(filterSlotsForDiscordNotification(slots, now)).toEqual([
-      makeSlot({ startDateTime: new Date("2024-01-20T21:00:00.000Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-21T18:00:00.000Z") }),
+    ]);
+  });
+
+  it("detects slots starting within the booking lead window", () => {
+    const withinLead = new Date(
+      now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000 - 1,
+    );
+    const afterLead = new Date(
+      now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000,
+    );
+
+    expect(isSlotStartTooSoonForBooking(withinLead, undefined, now)).toBe(true);
+    expect(isSlotStartTooSoonForBooking(afterLead, undefined, now)).toBe(false);
+  });
+
+  it("filters slots that start within 24 hours from bookable results", () => {
+    const slots = [
+      makeSlot({ startDateTime: new Date("2024-01-20T17:00:00.000Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-20T20:59:59.999Z") }),
+      makeSlot({ startDateTime: new Date("2024-01-21T18:01:00.000Z") }),
+    ];
+
+    expect(filterSlotsBookable(slots, now)).toEqual([
+      makeSlot({ startDateTime: new Date("2024-01-21T18:01:00.000Z") }),
     ]);
   });
 });

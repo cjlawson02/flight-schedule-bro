@@ -1,0 +1,436 @@
+{
+  "total": 14,
+  "pageIndex": 1,
+  "pageSize": 50,
+  "results": {
+    "resources": [
+      {
+        "Id": "44459586-f253-4024-b505-4a6accba58ed",
+        "Name": "Redbird",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "21a1e325-423f-4a6e-b028-28ab7eb2889c",
+        "Name": "N5532S",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "4641e076-f325-4b8f-bff3-8c673baf2033",
+        "Name": "N425PK",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "N737BC",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "N65411",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "984eb28a-00d7-4ee8-b5e2-19de17435703",
+        "Name": "N734UZ",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "7ebdeb59-6680-45da-a4d2-822e8ff9f5b0",
+        "Name": "N4374U",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "ad2b4bb1-1946-4c20-b1f5-51fb4039597c",
+        "Name": "N713RE",
+        "ResourceTypeId": 1,
+        "LocationId": 20852
+      },
+      {
+        "Id": "f7d24ed7-0c35-4ada-ae64-ef05b65c8cb7",
+        "Name": "Scott Settle",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      },
+      {
+        "Id": "dd0d2885-b3fc-421d-9290-12f296228575",
+        "Name": "Thomas Lindstaedt",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      },
+      {
+        "Id": "aadc448a-cfce-459d-a425-772e408e4dc1",
+        "Name": "Jason Hull",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      },
+      {
+        "Id": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "Doug Libal",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      },
+      {
+        "Id": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "Emily Horzen",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      },
+      {
+        "Id": "bc8dbb05-d939-4539-bdf6-d4633333a169",
+        "Name": "Nate Platt",
+        "ResourceTypeId": 2,
+        "LocationId": 20852
+      }
+    ],
+    "events": [
+      {
+        "ResourceId": "4641e076-f325-4b8f-bff3-8c673baf2033",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 17:00:00",
+        "ReservationId": "31e9d4b9-5e4d-406e-ab12-d98708e2ea4c",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "",
+        "StartDate": "2026-07-13 08:00:00",
+        "EndDate": "2026-07-13 10:00:00",
+        "ReservationId": "cf189584-5fb5-406b-a2dd-6790a66d92ad",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "256b925e-ee10-4ea5-b1b3-bee40f8fa78d",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:30:00",
+        "ReservationId": "05454a2b-4b46-4795-ac55-a8dd847b1a92",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "",
+        "StartDate": "2026-07-13 16:00:00",
+        "EndDate": "2026-07-13 18:00:00",
+        "ReservationId": "6b0e9f76-4c87-4ce4-a7e3-53354e89cec9",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "5e4b5d89-c631-457a-88e3-839be499f891",
+        "Name": "",
+        "StartDate": "2026-07-13 18:00:00",
+        "EndDate": "2026-07-13 20:00:00",
+        "ReservationId": "fc827465-72f7-451e-a076-5a434341df2c",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "",
+        "StartDate": "2026-07-13 07:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "76215017-ec8c-4990-867b-cbc601dd8127",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:00:00",
+        "ReservationId": "f1c67f01-6089-4a31-a03a-7be52458be6a",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "",
+        "StartDate": "2026-07-13 14:00:00",
+        "EndDate": "2026-07-13 16:00:00",
+        "ReservationId": "19277a00-d535-4e0f-9388-8ac2ee1eabe4",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "",
+        "StartDate": "2026-07-13 16:00:00",
+        "EndDate": "2026-07-13 18:00:00",
+        "ReservationId": "14f4b49b-e3d2-42a0-9d95-1f15c9b57c8d",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "cc20d524-b205-43df-9670-5db41a761f87",
+        "Name": "",
+        "StartDate": "2026-07-13 18:00:00",
+        "EndDate": "2026-07-13 20:30:00",
+        "ReservationId": "e81f58e1-ff20-407f-8bd9-5eaa0339f77e",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "984eb28a-00d7-4ee8-b5e2-19de17435703",
+        "Name": "maintenance",
+        "StartDate": "2026-07-06 06:00:00",
+        "EndDate": "2026-07-27 23:30:00",
+        "ReservationId": "66292f60-69db-49e6-9c99-90b9707f599f",
+        "Cls": "sch-rt-0-0280ba54-9c1c-4652-b601-fbbb9bc4f24e",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "7ebdeb59-6680-45da-a4d2-822e8ff9f5b0",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "59fe7672-7435-449a-a84b-c6bbc210823b",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "ad2b4bb1-1946-4c20-b1f5-51fb4039597c",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:00:00",
+        "ReservationId": "7c1b5e85-5f10-4059-8e1e-012f614bbe45",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "ad2b4bb1-1946-4c20-b1f5-51fb4039597c",
+        "Name": "",
+        "StartDate": "2026-07-13 15:30:00",
+        "EndDate": "2026-07-13 16:30:00",
+        "ReservationId": "f566e3c9-1ddb-4611-8823-5081cd0ca818",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 1
+      },
+      {
+        "ResourceId": "f7d24ed7-0c35-4ada-ae64-ef05b65c8cb7",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 17:00:00",
+        "ReservationId": "31e9d4b9-5e4d-406e-ab12-d98708e2ea4c",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "dd0d2885-b3fc-421d-9290-12f296228575",
+        "Name": "",
+        "StartDate": "2026-07-13 14:00:00",
+        "EndDate": "2026-07-13 16:00:00",
+        "ReservationId": "19277a00-d535-4e0f-9388-8ac2ee1eabe4",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "dd0d2885-b3fc-421d-9290-12f296228575",
+        "Name": "",
+        "StartDate": "2026-07-13 16:00:00",
+        "EndDate": "2026-07-13 18:00:00",
+        "ReservationId": "6b0e9f76-4c87-4ce4-a7e3-53354e89cec9",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "aadc448a-cfce-459d-a425-772e408e4dc1",
+        "Name": "",
+        "StartDate": "2026-07-13 07:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "76215017-ec8c-4990-867b-cbc601dd8127",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "aadc448a-cfce-459d-a425-772e408e4dc1",
+        "Name": "",
+        "StartDate": "2026-07-13 18:00:00",
+        "EndDate": "2026-07-13 20:30:00",
+        "ReservationId": "e81f58e1-ff20-407f-8bd9-5eaa0339f77e",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 08:00:00",
+        "EndDate": "2026-07-13 10:00:00",
+        "ReservationId": "cf189584-5fb5-406b-a2dd-6790a66d92ad",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "256b925e-ee10-4ea5-b1b3-bee40f8fa78d",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:30:00",
+        "ReservationId": "05454a2b-4b46-4795-ac55-a8dd847b1a92",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 15:00:00",
+        "EndDate": "2026-07-13 17:00:00",
+        "ReservationId": "f566e3c9-1ddb-4611-8823-5081cd0ca818",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 10:00:00",
+        "EndDate": "2026-07-13 12:00:00",
+        "ReservationId": "59fe7672-7435-449a-a84b-c6bbc210823b",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:00:00",
+        "ReservationId": "7c1b5e85-5f10-4059-8e1e-012f614bbe45",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 16:00:00",
+        "EndDate": "2026-07-13 18:00:00",
+        "ReservationId": "14f4b49b-e3d2-42a0-9d95-1f15c9b57c8d",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 18:00:00",
+        "EndDate": "2026-07-13 20:00:00",
+        "ReservationId": "fc827465-72f7-451e-a076-5a434341df2c",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      },
+      {
+        "ResourceId": "bc8dbb05-d939-4539-bdf6-d4633333a169",
+        "Name": "",
+        "StartDate": "2026-07-13 12:00:00",
+        "EndDate": "2026-07-13 14:00:00",
+        "ReservationId": "f1c67f01-6089-4a31-a03a-7be52458be6a",
+        "Cls": "sch-rt-0-09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
+        "ResourceTypeId": 2
+      }
+    ],
+    "unavailability": [
+      {
+        "ResourceId": "f7d24ed7-0c35-4ada-ae64-ef05b65c8cb7",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "dd0d2885-b3fc-421d-9290-12f296228575",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-13 07:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "dd0d2885-b3fc-421d-9290-12f296228575",
+        "Name": "",
+        "StartDate": "2026-07-13 17:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "aadc448a-cfce-459d-a425-772e408e4dc1",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-13 06:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "aadc448a-cfce-459d-a425-772e408e4dc1",
+        "Name": "",
+        "StartDate": "2026-07-13 22:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-13 08:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "f046d666-35dd-4ebf-b71b-6feb90677291",
+        "Name": "",
+        "StartDate": "2026-07-13 20:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-13 06:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "7c594fa7-06dc-4ac1-8179-c8132e6b03eb",
+        "Name": "",
+        "StartDate": "2026-07-13 20:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "bc8dbb05-d939-4539-bdf6-d4633333a169",
+        "Name": "",
+        "StartDate": "2026-07-13 00:00:00",
+        "EndDate": "2026-07-13 08:00:00",
+        "Cls": "instUnavailable"
+      },
+      {
+        "ResourceId": "bc8dbb05-d939-4539-bdf6-d4633333a169",
+        "Name": "",
+        "StartDate": "2026-07-13 20:00:00",
+        "EndDate": "2026-07-14 00:00:00",
+        "Cls": "instUnavailable"
+      }
+    ],
+    "closings": []
+  }
+}

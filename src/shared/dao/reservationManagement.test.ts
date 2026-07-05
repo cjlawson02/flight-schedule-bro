@@ -305,9 +305,7 @@ describe("updateReservation", () => {
     expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
       "api/V2/Reservation?dateTypeFilter=1",
     );
-    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
-      "scheduleMatch/availability",
-    );
+    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/v2/schedule");
   });
 
   it("does not invalidate cache for validate-only updates", async () => {
@@ -356,9 +354,7 @@ describe("cancelReservation", () => {
     expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
       "api/V2/Reservation?dateTypeFilter=1",
     );
-    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
-      "scheduleMatch/availability",
-    );
+    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/v2/schedule");
   });
 
   it("throws when cancellation returns errors", async () => {

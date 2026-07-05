@@ -11,6 +11,7 @@ describe("isValidBlock", () => {
     EMAIL: "test@example.com",
     PASSWORD: "password123",
     AIRCRAFT_REGEX: /172S|172N/i,
+    INSTRUCTOR_REGEX: /Doug Libal/i,
     DAYS_AHEAD: 60,
     TIMEZONE: LA,
   };

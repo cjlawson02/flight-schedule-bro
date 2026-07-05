@@ -127,7 +127,7 @@ export function reservationTypeRequiresInstructor(
   return getFieldState(type, "instructor").required;
 }
 
-export function supportsScheduleMatchSearch(type: ReservationType): boolean {
+export function supportsAvailabilitySearch(type: ReservationType): boolean {
   return (
     reservationTypeUsesAircraft(type) || reservationTypeUsesInstructor(type)
   );
@@ -163,7 +163,7 @@ export function pickReservationType(
         reservationTypeRequiresAircraft(type) &&
         reservationTypeRequiresInstructor(type),
     ) ??
-    types.find((type) => supportsScheduleMatchSearch(type)) ??
+    types.find((type) => supportsAvailabilitySearch(type)) ??
     types[0]
   );
 }
@@ -198,9 +198,9 @@ export function selectMonitoringReservationType(
     return picked;
   }
 
-  if (supportsScheduleMatchSearch(picked)) {
+  if (supportsAvailabilitySearch(picked)) {
     log.warn(
-      "Using first schedule-match reservation type as monitoring fallback",
+      "Using first availability-search reservation type as monitoring fallback",
       {
         reservationTypeName: picked.reservationTypeName,
         reservationTypeId: picked.reservationTypeId,

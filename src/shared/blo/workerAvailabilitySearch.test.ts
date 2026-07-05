@@ -16,6 +16,7 @@ describe("buildWorkerSearchResources", () => {
         EMAIL: "test@example.com",
         PASSWORD: "password",
         AIRCRAFT_REGEX: /172S/i,
+        INSTRUCTOR_REGEX: /Doug Libal/i,
         DAYS_AHEAD: 14,
         TIMEZONE: "America/Los_Angeles",
       },
@@ -44,6 +45,7 @@ describe("buildWorkerSearchResources", () => {
           EMAIL: "test@example.com",
           PASSWORD: "password",
           AIRCRAFT_REGEX: /172S/i,
+          INSTRUCTOR_REGEX: /Doug Libal/i,
           DAYS_AHEAD: 14,
           TIMEZONE: "America/Los_Angeles",
         },
@@ -62,7 +64,7 @@ describe("executeWorkerAvailabilitySearch", () => {
   it("uses explicit auth context instead of global getters", async () => {
     vi.spyOn(
       availabilitySearchModule,
-      "buildAvailabilityFetchTasks",
+      "buildScheduleFetchTasks",
     ).mockReturnValue([]);
     vi.spyOn(
       availabilitySearchModule,
@@ -72,13 +74,11 @@ describe("executeWorkerAvailabilitySearch", () => {
       availabilitySearchModule,
       "filterValidAvailabilityBlocks",
     ).mockReturnValue([]);
-    vi.spyOn(
-      availabilitySearchModule,
-      "prepareAvailabilitySearch",
-    ).mockReturnValue({
-      searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
-      instructorChunks: [["inst-1"]],
-    });
+    vi.spyOn(availabilitySearchModule, "prepareScheduleSearch").mockReturnValue(
+      {
+        searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
+      },
+    );
 
     const scheduler = new SchedulerBLO(123, "America/Los_Angeles");
 
@@ -89,6 +89,7 @@ describe("executeWorkerAvailabilitySearch", () => {
         EMAIL: "test@example.com",
         PASSWORD: "password",
         AIRCRAFT_REGEX: /172S/i,
+        INSTRUCTOR_REGEX: /Doug Libal/i,
         DAYS_AHEAD: 14,
         TIMEZONE: "America/Los_Angeles",
       },
@@ -100,22 +101,18 @@ describe("executeWorkerAvailabilitySearch", () => {
       },
       scheduler,
       auth: {
-        customerUserGuid: "explicit-user",
         locationId: 999,
-        operatorId: 123,
       },
       today: new Date("2024-07-15T12:00:00.000Z"),
     });
 
     expect(
-      availabilitySearchModule.buildAvailabilityFetchTasks,
+      availabilitySearchModule.buildScheduleFetchTasks,
     ).toHaveBeenCalledWith(
       scheduler,
       expect.objectContaining({
         params: expect.objectContaining({
-          customerUserGuid: "explicit-user",
           locationId: 999,
-          operatorId: 123,
         }),
       }),
     );

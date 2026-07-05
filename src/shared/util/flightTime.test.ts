@@ -58,6 +58,7 @@ describe("isValidBlock with operator timezone", () => {
     EMAIL: "test@example.com",
     PASSWORD: "password",
     AIRCRAFT_REGEX: /172S/i,
+    INSTRUCTOR_REGEX: /Doug Libal/i,
     DAYS_AHEAD: 60,
     TIMEZONE: LA,
   };

@@ -36,6 +36,7 @@ const testConfig = {
   EMAIL: "test@example.com",
   PASSWORD: "password",
   AIRCRAFT_REGEX: /172S/i,
+  INSTRUCTOR_REGEX: /Doug Libal/i,
   DAYS_AHEAD: 1,
   TIMEZONE: "America/Chicago",
 };
@@ -49,15 +50,12 @@ describe("runCliAvailabilitySearch", () => {
     vi.mocked(
       existingReservationsModule.getExistingReservations,
     ).mockResolvedValue([]);
-    vi.mocked(
-      availabilitySearchModule.prepareAvailabilitySearch,
-    ).mockReturnValue({
+    vi.mocked(availabilitySearchModule.prepareScheduleSearch).mockReturnValue({
       searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
-      instructorChunks: [["inst-1"]],
     });
-    vi.mocked(
-      availabilitySearchModule.buildAvailabilityFetchTasks,
-    ).mockReturnValue([Promise.resolve([])]);
+    vi.mocked(availabilitySearchModule.buildScheduleFetchTasks).mockReturnValue(
+      [Promise.resolve([])],
+    );
     vi.mocked(availabilitySearchModule.fetchAllAvailability).mockResolvedValue(
       [],
     );
@@ -78,11 +76,61 @@ describe("runCliAvailabilitySearch", () => {
       config: testConfig,
       reservationType: dualFlightTraining,
       operatorId: 123,
+      durationMinutes: 120,
     });
 
     expect(
       existingReservationsModule.getExistingReservations,
     ).toHaveBeenCalledWith(123, "America/Chicago");
+  });
+
+  it("uses explicitly selected aircraft ids when provided", async () => {
+    const scheduler = {
+      getInstructorIds: () => ["inst-1"],
+      getAircraftMapEntries: () =>
+        [
+          ["ac-1", "N172S"] as [string, string],
+          ["ac-2", "N734UZ"] as [string, string],
+        ][Symbol.iterator](),
+    };
+
+    await runCliAvailabilitySearch({
+      scheduler: scheduler as never,
+      config: testConfig,
+      reservationType: dualFlightTraining,
+      operatorId: 123,
+      durationMinutes: 120,
+      aircraftIds: ["ac-2"],
+    });
+
+    expect(availabilitySearchModule.prepareScheduleSearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aircraftIds: ["ac-2"],
+      }),
+    );
+  });
+
+  it("uses explicitly selected instructor ids when provided", async () => {
+    const scheduler = {
+      getInstructorIds: () => ["inst-1", "inst-2"],
+      getAircraftMapEntries: () =>
+        [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
+    };
+
+    await runCliAvailabilitySearch({
+      scheduler: scheduler as never,
+      config: testConfig,
+      reservationType: dualFlightTraining,
+      operatorId: 123,
+      durationMinutes: 120,
+      instructorIds: ["inst-2"],
+    });
+
+    expect(availabilitySearchModule.prepareScheduleSearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allInstructorIds: ["inst-2"],
+      }),
+    );
   });
 
   it("filters out slots on days with existing reservations", async () => {
@@ -126,6 +174,7 @@ describe("runCliAvailabilitySearch", () => {
       config: testConfig,
       reservationType: dualFlightTraining,
       operatorId: 123,
+      durationMinutes: 120,
     });
 
     expect(results).toEqual([]);

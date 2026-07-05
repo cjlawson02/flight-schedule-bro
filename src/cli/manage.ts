@@ -4,7 +4,6 @@ import {
   getExistingReservations,
   getUpcomingReservations,
 } from "../shared/dao/existingReservations.js";
-import { getUserId } from "../shared/dao/auth.js";
 import type { ActivityFlightDetails } from "../shared/dao/reservationFlightDetails.js";
 import {
   formatFlightRules,
@@ -132,7 +131,6 @@ async function resolveChangeActivityResources(
     }
 
     const resolved = await resolveMissingInstructorForUpgrade(cli, scheduler, {
-      customerUserGuid: getUserId(),
       locationId: detail.locationId,
       reservationType,
       aircraftId: searchAircraftId,

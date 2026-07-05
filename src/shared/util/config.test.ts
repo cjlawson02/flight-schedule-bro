@@ -56,6 +56,9 @@ describe("config", () => {
 
     expect(config.DAYS_AHEAD).toBe(60);
     expect(config.TIMEZONE).toBe("America/Los_Angeles");
+    expect(config.AIRCRAFT_REGEX.test("N65411")).toBe(true);
+    expect(config.AIRCRAFT_REGEX.test("N737BC")).toBe(true);
+    expect(config.INSTRUCTOR_REGEX.test("Doug Libal")).toBe(true);
   });
 
   it("parses regex pattern correctly", async () => {

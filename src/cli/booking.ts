@@ -5,12 +5,63 @@ import { getDefaultLocationId } from "../shared/dao/auth.js";
 import { nilToOptionalResourceId } from "../shared/dao/aircraft.js";
 import type { ActivityFlightDetails } from "../shared/dao/reservationFlightDetails.js";
 import type { ReservationType } from "../shared/dao/reservationTypes.js";
+import type { ReservationResponse } from "../shared/dao/reservations.js";
+import {
+  areAllErrorsOverridable,
+  formatFspError,
+  formatFspValidationErrors,
+  parseFspValidationErrors,
+} from "../shared/dao/fspErrors.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { createLogger } from "../shared/util/logger.js";
 import { resolveSlotSelections } from "./timeSlotSelection.js";
 
 const log = createLogger("cli-booking");
+
+async function bookSelectionWithOverridePrompt(
+  cli: InteractiveCLI,
+  scheduler: SchedulerBLO,
+  selection: BookableAvailability,
+  reservationType: ReservationType,
+  flightDetails?: ActivityFlightDetails,
+): Promise<ReservationResponse> {
+  const bookingParams = {
+    aircraftId: nilToOptionalResourceId(selection.aircraftId),
+    instructorId: nilToOptionalResourceId(selection.instructorId),
+    startTime: selection.startDateTime,
+    endTime: selection.endDateTime,
+    reservationType,
+    locationId: getDefaultLocationId(),
+    flightDetails,
+  };
+
+  try {
+    return await scheduler.bookReservation(bookingParams);
+  } catch (error) {
+    const validationErrors = parseFspValidationErrors(error);
+    if (!areAllErrorsOverridable(validationErrors)) {
+      throw error;
+    }
+
+    console.log(
+      `\n⚠️  ${selection.date} ${selection.startTime} - FSP warnings:`,
+    );
+    console.log(`   ${formatFspValidationErrors(validationErrors)}`);
+
+    const shouldOverride = await cli.confirmAction(
+      "   Override warnings and book anyway? (y/n): ",
+    );
+    if (!shouldOverride) {
+      throw error;
+    }
+
+    return await scheduler.bookReservation({
+      ...bookingParams,
+      overrideExceptions: true,
+    });
+  }
+}
 
 export async function handleBookingFlow(
   cli: InteractiveCLI,
@@ -70,15 +121,13 @@ export async function handleBookingFlow(
         console.log(
           `📤 Booking request: Aircraft ID=${selection.aircraftId}, Instructor ID=${selection.instructorId}`,
         );
-        const response = await scheduler.bookReservation({
-          aircraftId: nilToOptionalResourceId(selection.aircraftId),
-          instructorId: nilToOptionalResourceId(selection.instructorId),
-          startTime: selection.startDateTime,
-          endTime: selection.endDateTime,
+        const response = await bookSelectionWithOverridePrompt(
+          cli,
+          scheduler,
+          selection,
           reservationType,
-          locationId: getDefaultLocationId(),
           flightDetails,
-        });
+        );
 
         if (!response.id) {
           throw new Error("Reservation created without an id");
@@ -94,10 +143,10 @@ export async function handleBookingFlow(
       } catch (error) {
         results.failed.push({
           availability: selection,
-          error: getErrorMessage(error),
+          error: formatFspError(error),
         });
         console.log(
-          `❌ Failed: ${selection.date} ${selection.startTime} - ${getErrorMessage(error)}`,
+          `❌ Failed: ${selection.date} ${selection.startTime} - ${formatFspError(error)}`,
         );
       }
     }
@@ -157,6 +206,7 @@ export async function handleBookingFlow(
                 await addReservationToCalendar(
                   operatorId,
                   booking.reservationId,
+                  scheduler.getTimeZone(),
                 );
                 console.log("     ✅ Added to calendar successfully");
               } catch (error) {
@@ -173,7 +223,7 @@ export async function handleBookingFlow(
     }
   } catch (error) {
     log.error("An error occurred during the booking process", {
-      message: getErrorMessage(error),
+      message: formatFspError(error),
       error,
     });
   }

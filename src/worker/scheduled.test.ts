@@ -42,8 +42,8 @@ const mockMetadata: FspMetadata = {
 };
 
 function makeSlot(aircraftId: string): BookableAvailability {
-  const startDateTime = new Date(Date.now() + 5 * 60 * 60 * 1000);
-  const endDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000);
+  const startDateTime = new Date("2026-07-06T03:14:34.700Z");
+  const endDateTime = new Date("2026-07-06T05:14:34.700Z");
 
   return {
     date: "1/20/2024",
@@ -63,10 +63,11 @@ describe("filterSlotsForNotification", () => {
   });
 
   it("filters slots to configured tail numbers", () => {
-    const slots = [makeSlot("ac-1"), makeSlot("ac-2")];
-    expect(filterSlotsForNotification(slots, mockMetadata, ["N172S"])).toEqual([
-      makeSlot("ac-1"),
-    ]);
+    const slot1 = makeSlot("ac-1");
+    const slot2 = makeSlot("ac-2");
+    expect(
+      filterSlotsForNotification([slot1, slot2], mockMetadata, ["N172S"]),
+    ).toEqual([slot1]);
   });
 });
 
@@ -114,7 +115,7 @@ describe("runScheduledTask", () => {
         daysAhead: 14,
         totalFetches: 1,
         capped: false,
-        instructorChunkCount: 1,
+        pagesPerDay: 1,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",
@@ -135,8 +136,8 @@ describe("runScheduledTask", () => {
 
     const notifyableSlot = {
       ...makeSlot("ac-1"),
-      startDateTime: new Date("2024-01-20T21:00:00.000Z"),
-      endDateTime: new Date("2024-01-20T23:00:00.000Z"),
+      startDateTime: new Date("2024-01-21T12:00:00.000Z"),
+      endDateTime: new Date("2024-01-21T14:00:00.000Z"),
     };
 
     vi.mocked(
@@ -147,7 +148,7 @@ describe("runScheduledTask", () => {
         daysAhead: 14,
         totalFetches: 1,
         capped: false,
-        instructorChunkCount: 1,
+        pagesPerDay: 1,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",
@@ -180,9 +181,7 @@ describe("runScheduledTask", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: {
-          customerUserGuid: mockSession.userId,
           locationId: mockSession.defaultLocationId,
-          operatorId: mockSession.operatorId,
         },
       }),
     );
@@ -204,7 +203,7 @@ describe("runScheduledTask", () => {
     ).toHaveBeenCalledWith(mockSession.operatorId, "America/Los_Angeles");
   });
 
-  it("does not send Discord when new slots start within three hours", async () => {
+  it("does not send Discord when new slots start within 24 hours", async () => {
     const now = new Date("2024-01-20T18:00:00.000Z");
     vi.useFakeTimers();
     vi.setSystemTime(now);
@@ -223,7 +222,7 @@ describe("runScheduledTask", () => {
         daysAhead: 14,
         totalFetches: 1,
         capped: false,
-        instructorChunkCount: 1,
+        pagesPerDay: 1,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",

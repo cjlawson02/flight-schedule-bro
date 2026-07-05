@@ -119,7 +119,6 @@ describe("resolveMissingInstructorForUpgrade", () => {
       cli,
       scheduler as never,
       {
-        customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
         locationId: 20852,
         reservationType: dualFlightTraining,
         aircraftId,
@@ -148,7 +147,6 @@ describe("resolveMissingInstructorForUpgrade", () => {
       cli,
       scheduler as never,
       {
-        customerUserGuid: "354ccb15-6534-4c59-851d-c6b4d2694320",
         locationId: 20852,
         reservationType: dualFlightTraining,
         startTime,

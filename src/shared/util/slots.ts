@@ -6,7 +6,10 @@ import {
 } from "./flightTime.js";
 
 /** Minimum hours before slot start before a Discord notification is sent. */
-export const DISCORD_NOTIFICATION_MIN_LEAD_HOURS = 3;
+export const DISCORD_NOTIFICATION_MIN_LEAD_HOURS = 24;
+
+/** Minimum hours before slot start before a reservation can be booked. */
+export const BOOKING_MIN_LEAD_HOURS = 24;
 
 export function isSlotStartInPast(
   startDateTime: Date,
@@ -24,11 +27,31 @@ export function isSlotStartTooSoonForDiscordNotification(
   return startDateTime.getTime() < minStartMs;
 }
 
+export function isSlotStartTooSoonForBooking(
+  startDateTime: Date,
+  minLeadHours: number = BOOKING_MIN_LEAD_HOURS,
+  now: Date = new Date(),
+): boolean {
+  const minStartMs = now.getTime() + minLeadHours * 60 * 60 * 1000;
+  return startDateTime.getTime() < minStartMs;
+}
+
 export function filterSlotsNotInPast(
   slots: BookableAvailability[],
   now: Date = new Date(),
 ): BookableAvailability[] {
   return slots.filter((slot) => !isSlotStartInPast(slot.startDateTime, now));
+}
+
+export function filterSlotsBookable(
+  slots: BookableAvailability[],
+  now: Date = new Date(),
+): BookableAvailability[] {
+  return slots.filter(
+    (slot) =>
+      !isSlotStartInPast(slot.startDateTime, now) &&
+      !isSlotStartTooSoonForBooking(slot.startDateTime, undefined, now),
+  );
 }
 
 export function filterSlotsForDiscordNotification(

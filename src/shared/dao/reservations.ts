@@ -2,7 +2,7 @@ import { z } from "zod";
 import { resolveResourceId } from "./aircraft.js";
 import type { ActivityFlightDetails } from "./reservationFlightDetails.js";
 import { type ReservationType, getFieldState } from "./reservationTypes.js";
-import { safeFetch, invalidateCache } from "./api_wrapper.js";
+import { FspHttpError, safeFetch, invalidateCache } from "./api_wrapper.js";
 
 /**
  * Parameters for booking a reservation
@@ -15,6 +15,7 @@ export interface ReservationBookingParams {
   reservationType: ReservationType;
   locationId: number;
   flightDetails?: ActivityFlightDetails;
+  overrideExceptions?: boolean;
 }
 
 const UserReservationRequestSchema = z.object({
@@ -97,6 +98,7 @@ export function buildFullReservationRequest(
   reservationType: ReservationType,
   reservationData: UserReservationRequest,
   flightDetails?: ActivityFlightDetails,
+  overrideExceptions = false,
 ): FullReservationRequest {
   const flightHours = getFieldState(reservationType, "flightHours");
   const flightRoute = getFieldState(reservationType, "flightRoute");
@@ -121,7 +123,7 @@ export function buildFullReservationRequest(
       : undefined,
     flightType: flightType.enabled ? (details.flightType ?? null) : undefined,
     internalComments: "",
-    overrideExceptions: false,
+    overrideExceptions,
     recurring: false,
     recurringForceReservations: null,
     recurringOverrideExceptions: null,
@@ -146,6 +148,7 @@ export async function createReservation(
   reservationType: ReservationType,
   reservationData: UserReservationRequest,
   flightDetails?: ActivityFlightDetails,
+  options?: { overrideExceptions?: boolean },
 ): Promise<ReservationResponse> {
   try {
     const requestData = FullReservationRequestSchema.parse(
@@ -153,6 +156,7 @@ export async function createReservation(
         reservationType,
         reservationData,
         flightDetails,
+        options?.overrideExceptions ?? false,
       ),
     );
 
@@ -165,8 +169,8 @@ export async function createReservation(
       0,
     );
 
-    // Check if there are errors in the response
-    if (response.errors.length > 0) {
+    // FSP may return overridden warnings alongside a created reservation id.
+    if (response.errors.length > 0 && !response.id) {
       const errorMessages = response.errors
         .map((error) => error.message ?? "Unknown error")
         .join(", ");
@@ -182,6 +186,10 @@ export async function createReservation(
 
     return response;
   } catch (error) {
+    if (error instanceof FspHttpError) {
+      throw error;
+    }
+
     // If error already has a code property, re-throw it
     if (error instanceof Error && "code" in error) {
       throw error;

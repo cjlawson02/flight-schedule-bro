@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildAvailabilityFetchTasks,
+  buildScheduleFetchTasks,
   fetchAllAvailability,
   filterValidAvailabilityBlocks,
-  prepareAvailabilitySearch,
-  resolveAvailabilityDaysAhead,
+  prepareScheduleSearch,
+  resolveScheduleSearchBudget,
   CLOUDFLARE_SUBREQUEST_LIMIT,
   WORKER_AVAILABILITY_OVERHEAD,
 } from "./availabilitySearch.js";
@@ -16,54 +16,52 @@ import {
 } from "../dao/reservationTypes.fixtures.js";
 import { parseFspLocal } from "../util/flightTime.js";
 
-describe("resolveAvailabilityDaysAhead", () => {
+describe("resolveScheduleSearchBudget", () => {
   it("keeps configured DAYS_AHEAD when within the subrequest budget", () => {
-    expect(resolveAvailabilityDaysAhead(12, 3)).toEqual({
+    expect(resolveScheduleSearchBudget(12, 1)).toEqual({
       daysAhead: 12,
-      totalFetches: 39,
+      totalFetches: 13,
       capped: false,
-      instructorChunkCount: 3,
+      pagesPerDay: 1,
     });
   });
 
-  it("caps DAYS_AHEAD when instructor chunk count increases", () => {
-    expect(resolveAvailabilityDaysAhead(12, 4)).toEqual({
-      daysAhead: 9,
+  it("caps DAYS_AHEAD when pages per day increases", () => {
+    expect(resolveScheduleSearchBudget(60, 2)).toEqual({
+      daysAhead: 19,
       totalFetches: 40,
       capped: true,
-      instructorChunkCount: 4,
+      pagesPerDay: 2,
     });
   });
 
   it("stays under the Cloudflare subrequest budget", () => {
-    for (const chunkCount of [1, 2, 3, 4, 5, 10]) {
-      const budget = resolveAvailabilityDaysAhead(60, chunkCount);
+    for (const pagesPerDay of [1, 2, 3, 4, 5]) {
+      const budget = resolveScheduleSearchBudget(60, pagesPerDay);
       expect(
         budget.totalFetches + WORKER_AVAILABILITY_OVERHEAD,
       ).toBeLessThanOrEqual(CLOUDFLARE_SUBREQUEST_LIMIT);
     }
   });
 
-  it("throws when chunk count alone exceeds the availability budget", () => {
-    expect(() => resolveAvailabilityDaysAhead(12, 41)).toThrow(
+  it("throws when pages per day alone exceeds the availability budget", () => {
+    expect(() => resolveScheduleSearchBudget(12, 41)).toThrow(
       /subrequest budget/i,
     );
   });
 });
 
-describe("prepareAvailabilitySearch", () => {
+describe("prepareScheduleSearch", () => {
   const baseParams = {
-    customerUserGuid: "customer-1",
     locationId: 20852,
-    operatorId: 191057,
     timeZone: "America/Los_Angeles",
     activityTypeId: dualFlightTraining.reservationTypeId,
     allInstructorIds: ["inst-1", "inst-2"],
     aircraftIds: ["ac-1"],
   };
 
-  it("prepares instructor chunks for dual instruction", () => {
-    const prepared = prepareAvailabilitySearch({
+  it("prepares search resources for dual instruction", () => {
+    const prepared = prepareScheduleSearch({
       ...baseParams,
       reservationType: dualFlightTraining,
     });
@@ -73,12 +71,11 @@ describe("prepareAvailabilitySearch", () => {
         instructors: ["inst-1", "inst-2"],
         aircraftIds: ["ac-1"],
       },
-      instructorChunks: [["inst-1", "inst-2"]],
     });
   });
 
-  it("prepares aircraft-only chunks for rental types", () => {
-    const prepared = prepareAvailabilitySearch({
+  it("prepares aircraft-only resources for rental types", () => {
+    const prepared = prepareScheduleSearch({
       ...baseParams,
       reservationType: rental,
     });
@@ -88,12 +85,11 @@ describe("prepareAvailabilitySearch", () => {
         instructors: [],
         aircraftIds: ["ac-1"],
       },
-      instructorChunks: [[]],
     });
   });
 
   it("returns null when no search resources are available", () => {
-    const prepared = prepareAvailabilitySearch({
+    const prepared = prepareScheduleSearch({
       ...baseParams,
       reservationType: groundTraining,
       allInstructorIds: [],
@@ -104,36 +100,37 @@ describe("prepareAvailabilitySearch", () => {
   });
 });
 
-describe("buildAvailabilityFetchTasks", () => {
+describe("buildScheduleFetchTasks", () => {
   const baseParams = {
-    customerUserGuid: "customer-1",
     locationId: 20852,
-    operatorId: 191057,
     timeZone: "America/Los_Angeles",
     activityTypeId: dualFlightTraining.reservationTypeId,
     allInstructorIds: ["inst-1"],
     aircraftIds: ["ac-1"],
   };
 
-  it("passes reservation type defaultLength without scheduler.initialize()", () => {
+  it("passes selected duration to schedule snapshot search", () => {
     const reservationType = { ...dualFlightTraining, defaultLength: 90 };
     const getBookableAvailability = vi.fn().mockResolvedValue([]);
     const scheduler = {
       getBookableAvailability,
     } as Pick<SchedulerBLO, "getBookableAvailability"> as SchedulerBLO;
 
-    buildAvailabilityFetchTasks(scheduler, {
-      params: { ...baseParams, reservationType },
+    buildScheduleFetchTasks(scheduler, {
+      params: {
+        ...baseParams,
+        reservationType,
+        durationMinutes: 60,
+      },
       prepared: {
         searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
-        instructorChunks: [["inst-1"]],
       },
       today: parseFspLocal("2024-07-15T12:00:00", "America/Los_Angeles"),
       daysAhead: 0,
     });
 
     expect(getBookableAvailability).toHaveBeenCalledWith(
-      expect.objectContaining({ lengthOfReservationInMinutes: 90 }),
+      expect.objectContaining({ lengthOfReservationInMinutes: 60 }),
     );
   });
 });
@@ -145,11 +142,12 @@ describe("filterValidAvailabilityBlocks", () => {
     EMAIL: "test@example.com",
     PASSWORD: "password",
     AIRCRAFT_REGEX: /172S/i,
+    INSTRUCTOR_REGEX: /Doug Libal/i,
     DAYS_AHEAD: 12,
     TIMEZONE: "America/Los_Angeles",
   };
 
-  it("keeps slots matching reservation type defaultLength", () => {
+  it("keeps slots matching expected duration", () => {
     const validSlot = {
       date: "Mon 7/15",
       startTime: "3:00:00 PM",

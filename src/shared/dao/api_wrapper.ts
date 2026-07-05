@@ -44,9 +44,8 @@ export function setCacheAdapter(adapter: CacheAdapter | null) {
  *    - Exponential backoff for transient/network errors: 1s → 2s → 4s (capped at 30s)
  *    - Rate-limit responses wait out the API window and release concurrency slots while waiting
  *
- * 4. **Request Chunking (availabilitySearch.ts)**
- *    - Limits availability searches to 3 instructors per request
- *    - Worker runs cap total day-by-day fetches via resolveAvailabilityDaysAhead()
+ * 4. **Schedule snapshot pagination**
+ *    - One paginated schedule fetch per search day via resolveScheduleSearchBudget()
  *
  * Why This Works:
  * - Most rate limits are time-based (e.g., "X requests per minute")

@@ -18,7 +18,8 @@ const envSchema = z.object({
 
   // Scheduling preferences (with defaults)
   DAYS_AHEAD: z.coerce.number().int().positive().default(60),
-  AIRCRAFT_REGEX: z.string().default("172S|172N"),
+  AIRCRAFT_REGEX: z.string().default("65411|737BC"),
+  INSTRUCTOR_REGEX: z.string().default("Doug Libal"),
   TIMEZONE: z
     .string()
     .min(1)
@@ -44,6 +45,7 @@ export interface ConfigType {
   EMAIL: string;
   PASSWORD: string;
   AIRCRAFT_REGEX: RegExp;
+  INSTRUCTOR_REGEX: RegExp;
   DAYS_AHEAD: number;
   TIMEZONE: string;
   RESERVATION_TYPE_ID?: string;
@@ -55,6 +57,7 @@ export interface WorkerEnvInput {
   FSP_PASSWORD: string;
   DAYS_AHEAD: string;
   AIRCRAFT_REGEX: string;
+  INSTRUCTOR_REGEX?: string;
   WEEKDAY_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
@@ -96,6 +99,7 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
 
     // Scheduling preferences
     AIRCRAFT_REGEX: new RegExp(env.AIRCRAFT_REGEX, "i"),
+    INSTRUCTOR_REGEX: new RegExp(env.INSTRUCTOR_REGEX, "i"),
     DAYS_AHEAD: env.DAYS_AHEAD,
     TIMEZONE: env.TIMEZONE,
     RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
@@ -108,6 +112,7 @@ export function createWorkerConfig(env: WorkerEnvInput): ConfigType {
     FSP_PASSWORD: env.FSP_PASSWORD,
     DAYS_AHEAD: env.DAYS_AHEAD,
     AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
+    INSTRUCTOR_REGEX: env.INSTRUCTOR_REGEX ?? "Doug Libal",
     WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
     MAX_HOUR: env.MAX_HOUR ?? "19",
     TIMEZONE: env.TIMEZONE,

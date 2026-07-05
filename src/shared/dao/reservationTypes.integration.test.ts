@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ReservationTypeSchema,
   reservationTypeMissingFieldMetadata,
-  supportsScheduleMatchSearch,
+  supportsAvailabilitySearch,
 } from "./reservationTypes.js";
 
 describe("ReservationTypes Schema Validation - Real API Shapes", () => {
@@ -14,7 +14,7 @@ describe("ReservationTypes Schema Validation - Real API Shapes", () => {
       defaultLength: 120,
     });
 
-    expect(supportsScheduleMatchSearch(rentalFromApi)).toBe(true);
+    expect(supportsAvailabilitySearch(rentalFromApi)).toBe(true);
     expect(reservationTypeMissingFieldMetadata(rentalFromApi)).toBe(false);
   });
 
@@ -26,7 +26,7 @@ describe("ReservationTypes Schema Validation - Real API Shapes", () => {
       defaultLength: 60,
     });
 
-    expect(supportsScheduleMatchSearch(groundFromApi)).toBe(true);
+    expect(supportsAvailabilitySearch(groundFromApi)).toBe(true);
     expect(reservationTypeMissingFieldMetadata(groundFromApi)).toBe(false);
   });
 
@@ -37,7 +37,7 @@ describe("ReservationTypes Schema Validation - Real API Shapes", () => {
     });
 
     expect(reservationTypeMissingFieldMetadata(legacyCached)).toBe(true);
-    expect(supportsScheduleMatchSearch(legacyCached)).toBe(false);
+    expect(supportsAvailabilitySearch(legacyCached)).toBe(false);
   });
 
   it("parses dual instruction payloads with explicit enabled flags", () => {
@@ -52,6 +52,6 @@ describe("ReservationTypes Schema Validation - Real API Shapes", () => {
     });
 
     expect(reservationTypeMissingFieldMetadata(dualFromApi)).toBe(false);
-    expect(supportsScheduleMatchSearch(dualFromApi)).toBe(true);
+    expect(supportsAvailabilitySearch(dualFromApi)).toBe(true);
   });
 });

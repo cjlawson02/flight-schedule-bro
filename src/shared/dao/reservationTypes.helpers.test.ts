@@ -8,7 +8,7 @@ import {
   reservationTypeUsesAircraft,
   reservationTypeUsesInstructor,
   selectMonitoringReservationType,
-  supportsScheduleMatchSearch,
+  supportsAvailabilitySearch,
 } from "./reservationTypes.js";
 import {
   dualFlightTraining,
@@ -83,9 +83,9 @@ describe("reservation type helpers", () => {
   });
 
   it("supports schedule match when at least one resource is enabled", () => {
-    expect(supportsScheduleMatchSearch(dualFlightTraining)).toBe(true);
-    expect(supportsScheduleMatchSearch(groundTraining)).toBe(true);
-    expect(supportsScheduleMatchSearch(rental)).toBe(true);
+    expect(supportsAvailabilitySearch(dualFlightTraining)).toBe(true);
+    expect(supportsAvailabilitySearch(groundTraining)).toBe(true);
+    expect(supportsAvailabilitySearch(rental)).toBe(true);
   });
 
   it("infers enabled resources from requirement levels when booleans are omitted", () => {
@@ -100,8 +100,8 @@ describe("reservation type helpers", () => {
       instructorRequirement: 2,
     });
 
-    expect(supportsScheduleMatchSearch(rentalFromApi)).toBe(true);
-    expect(supportsScheduleMatchSearch(groundFromApi)).toBe(true);
+    expect(supportsAvailabilitySearch(rentalFromApi)).toBe(true);
+    expect(supportsAvailabilitySearch(groundFromApi)).toBe(true);
     expect(
       getAvailabilitySearchResources(rentalFromApi, ["inst-1"], ["ac-1"]),
     ).toEqual({

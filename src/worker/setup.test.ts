@@ -1,41 +1,17 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { Env } from "./types.js";
 
-// Mock the dependencies
-vi.mock("../shared/dao/auth.js", () => ({
-  fetchAuth: vi.fn().mockResolvedValue(undefined),
-  getOperatorId: vi.fn().mockReturnValue(123),
-  getUserId: vi.fn().mockReturnValue("user-guid-123"),
-  getDefaultLocationId: vi.fn().mockReturnValue(456),
-}));
-
-vi.mock("../shared/blo/scheduler.js", () => ({
-  SchedulerBLO: vi.fn().mockImplementation(() => ({
-    getBookableAvailability: vi.fn().mockResolvedValue([]),
-  })),
-}));
-
-vi.mock("./kv.js", () => ({
-  initializeSnapshot: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("./discord.js", () => ({
-  sendSimpleNotification: vi.fn().mockResolvedValue(undefined),
-}));
-
 describe("Worker Setup", () => {
   let mockEnv: Env;
-  let mockKV: any;
+  let mockKV: KVNamespace;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
     mockKV = {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn(),
       list: vi.fn(),
-    };
+    } as unknown as KVNamespace;
 
     mockEnv = {
       FSP_AVAILABILITY_KV: mockKV,
@@ -73,21 +49,12 @@ describe("Worker Setup", () => {
   });
 
   describe("Setup Process Flow", () => {
-    it("follows correct setup sequence", async () => {
-      // The setup should:
-      // 1. Create config
-      // 2. Authenticate
-      // 3. Initialize scheduler
-      // 4. Fetch availability
-      // 5. Filter valid results
-      // 6. Initialize snapshot in KV
-      // 7. Send Discord notification
-
+    it("follows correct setup sequence", () => {
       const setupSteps = [
         "create config",
         "authenticate",
         "initialize scheduler",
-        "fetch availability",
+        "fetch schedule snapshot",
         "filter results",
         "initialize KV snapshot",
         "send notification",
@@ -100,15 +67,13 @@ describe("Worker Setup", () => {
   });
 
   describe("Error Handling", () => {
-    it("handles authentication errors", async () => {
+    it("handles authentication errors", () => {
       const authError = new Error("Authentication failed");
-      // In the real implementation, this would be caught and returned as error response
       expect(authError.message).toContain("Authentication failed");
     });
 
-    it("handles missing activity types", async () => {
+    it("handles missing activity types", () => {
       const emptyActivityTypes: [string, string][] = [];
-      // Should throw error when no activity types found
       if (emptyActivityTypes.length === 0) {
         const error = new Error("No activity types found");
         expect(error.message).toBe("No activity types found");
@@ -140,22 +105,6 @@ describe("Worker Setup", () => {
       expect(successResponse.slotsCount).toBe(42);
       expect(successResponse.daysAhead).toBe(60);
       expect(successResponse.message).toContain("Setup complete");
-    });
-  });
-
-  describe("Chunking Strategy", () => {
-    it("chunks instructors into groups of 3", () => {
-      const instructors = ["inst-1", "inst-2", "inst-3", "inst-4", "inst-5"];
-      const chunkSize = 3;
-
-      const chunks: string[][] = [];
-      for (let i = 0; i < instructors.length; i += chunkSize) {
-        chunks.push(instructors.slice(i, i + chunkSize));
-      }
-
-      expect(chunks).toHaveLength(2);
-      expect(chunks[0]).toHaveLength(3);
-      expect(chunks[1]).toHaveLength(2);
     });
   });
 
@@ -211,26 +160,21 @@ describe("Worker Setup", () => {
         dates.push(dayISO);
       }
 
-      expect(dates).toHaveLength(61); // 0 to 60 inclusive
+      expect(dates).toHaveLength(61);
       expect(dates[0]).toBe("2024-01-15");
-      expect(dates[60]).toBe("2024-03-15"); // 60 days after Jan 15 in a leap year
+      expect(dates[60]).toBe("2024-03-15");
     });
   });
 
   describe("Discord Notification", () => {
     it("does not fail setup if Discord notification fails", () => {
-      // Discord notification should not throw error
-      // Setup should still succeed if notification fails
-
       const discordError = new Error("Discord webhook failed");
       const setupSucceeded = true;
 
       try {
-        // Discord notification fails
         throw discordError;
       } catch (error) {
         console.error("Failed to send Discord notification:", error);
-        // Don't fail the setup
       }
 
       expect(setupSucceeded).toBe(true);

@@ -236,7 +236,7 @@ export async function cancelReservation(params: {
 async function invalidateReservationCaches(): Promise<void> {
   await Promise.allSettled([
     invalidateCache("api/V2/Reservation?dateTypeFilter=1"),
-    invalidateCache("scheduleMatch/availability"),
+    invalidateCache("api/v2/schedule"),
   ]);
 }
 

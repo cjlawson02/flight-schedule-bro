@@ -1,8 +1,11 @@
 import dotenv from "dotenv";
 import { SchedulerBLO } from "../shared/blo/scheduler.js";
 import { loadCliConfig } from "../shared/util/config.js";
-import { clearInvalidInstructorIds } from "../shared/dao/availability.js";
-import { supportsScheduleMatchSearch } from "../shared/dao/reservationTypes.js";
+import {
+  reservationTypeUsesAircraft,
+  reservationTypeUsesInstructor,
+  supportsAvailabilitySearch,
+} from "../shared/dao/reservationTypes.js";
 import {
   reservationTypeUsesFlightDetails,
   validateActivityFlightDetails,
@@ -37,11 +40,54 @@ async function runBookWorkflow(
     return;
   }
 
-  if (!supportsScheduleMatchSearch(reservationType)) {
+  if (!supportsAvailabilitySearch(reservationType)) {
     console.log(
       `❌ "${reservationType.reservationTypeName}" is not supported for automated availability search.`,
     );
     return;
+  }
+
+  const durationMinutes = await cli.selectDurationMinutes(reservationType);
+  if (durationMinutes === null) {
+    return;
+  }
+
+  let aircraftIds: string[] | undefined;
+  if (reservationTypeUsesAircraft(reservationType)) {
+    const aircraft = Array.from(
+      scheduler.getAircraftMapEntries(),
+      ([aircraftId, tailNumber]) => ({
+        aircraftId,
+        tailNumber,
+      }),
+    );
+    const selectedTailNumbers = await cli.selectTailNumbers(
+      aircraft,
+      config.AIRCRAFT_REGEX,
+    );
+    if (selectedTailNumbers === null) {
+      return;
+    }
+    aircraftIds = selectedTailNumbers;
+  }
+
+  let instructorIds: string[] | undefined;
+  if (reservationTypeUsesInstructor(reservationType)) {
+    const instructors = Array.from(
+      scheduler.getInstructorMapEntries(),
+      ([instructorId, displayName]) => ({
+        instructorId,
+        displayName,
+      }),
+    );
+    const selectedInstructors = await cli.selectInstructors(
+      instructors,
+      config.INSTRUCTOR_REGEX,
+    );
+    if (selectedInstructors === null) {
+      return;
+    }
+    instructorIds = selectedInstructors;
   }
 
   let flightDetails;
@@ -67,6 +113,9 @@ async function runBookWorkflow(
       config,
       reservationType,
       operatorId,
+      durationMinutes,
+      aircraftIds,
+      instructorIds,
     });
 
     if (availableWithoutConflicts.length > 0) {
@@ -94,7 +143,6 @@ async function main() {
   const config = loadCliConfig();
 
   setCacheAdapter(cliCacheAdapter);
-  clearInvalidInstructorIds();
   await fetchAuth(config.EMAIL, config.PASSWORD);
 
   const operatorId = getOperatorId();
