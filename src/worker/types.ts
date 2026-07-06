@@ -127,7 +127,6 @@ export interface Env {
   WEEKDAY_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
-  NOTIFICATION_AIRCRAFT?: string; // Comma-separated aircraft tail numbers for Discord notifications
   RESERVATION_TYPE_ID?: string;
   /** Set to "true" on Workers Paid — KV ops count toward the unified subrequest limit. */
   WORKERS_PAID_PLAN?: string;

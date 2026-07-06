@@ -156,7 +156,6 @@ The worker does **not** use `DAYS_AHEAD`. Each cron run fetches schedule days se
 | `AIRCRAFT_REGEX`                | No              | see `wrangler.toml` | Aircraft tail numbers to monitor                                              |
 | `TIMEZONE`                      | No              | America/Los_Angeles | Operator IANA timezone                                                        |
 | `WEEKDAY_MIN_HOUR` / `MAX_HOUR` | No              | 15 / 19             | Valid slot hour window                                                        |
-| `NOTIFICATION_AIRCRAFT`         | No              | -                   | Comma-separated tail numbers; empty = all                                     |
 | `RESERVATION_TYPE_ID`           | No              | -                   | Optional monitoring reservation type UUID                                     |
 | `MAX_DAYS_AHEAD`                | No              | (none)              | Cap days searched (today + N) even if budget remains                          |
 | `WORKERS_PAID_PLAN`             | No              | false               | Set `"true"` on Workers Paid so KV counts toward the unified subrequest limit |
@@ -386,7 +385,6 @@ npx wrangler secret put DISCORD_WEBHOOK_URL
 The `[vars]` block in `wrangler.toml` contains safe defaults you can customize:
 
 - `AIRCRAFT_REGEX`, `TIMEZONE`, `WEEKDAY_MIN_HOUR`, `MAX_HOUR`
-- `NOTIFICATION_AIRCRAFT` — limit Discord alerts to specific tail numbers
 - `MAX_DAYS_AHEAD` — optional cap on days searched (useful on Workers Paid)
 - `WORKERS_PAID_PLAN` — set `"true"` if you upgrade to Workers Paid
 

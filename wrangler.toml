@@ -28,11 +28,10 @@ remote = true
 
 # Environment variables (non-sensitive)
 [vars]
-AIRCRAFT_REGEX = "172S|172N"
+AIRCRAFT_REGEX = "65411|737BC"
 TIMEZONE = "America/Los_Angeles"
 WEEKDAY_MIN_HOUR = "15"
 MAX_HOUR = "19"
-NOTIFICATION_AIRCRAFT = "N65411,N734UZ,N713RE"  # Comma-separated aircraft tail numbers for Discord notifications
 
 # Optional: override automated monitoring reservation type (UUID from FSP)
 # RESERVATION_TYPE_ID = "09c58400-bd2a-49a3-a35e-9ab0e81fcebc"

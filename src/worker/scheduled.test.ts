@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { filterSlotsForNotification, runScheduledTask } from "./scheduled.js";
+import { runScheduledTask } from "./scheduled.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
 import type { FspMetadata } from "../shared/blo/fspMetadata.js";
 import type { AuthSession } from "../shared/dao/auth.js";
@@ -59,21 +59,6 @@ function makeSlot(aircraftId: string): BookableAvailability {
     endDateTime,
   };
 }
-
-describe("filterSlotsForNotification", () => {
-  it("returns all slots when no aircraft filter is configured", () => {
-    const slots = [makeSlot("ac-1"), makeSlot("ac-2")];
-    expect(filterSlotsForNotification(slots, mockMetadata, [])).toEqual(slots);
-  });
-
-  it("filters slots to configured tail numbers", () => {
-    const slot1 = makeSlot("ac-1");
-    const slot2 = makeSlot("ac-2");
-    expect(
-      filterSlotsForNotification([slot1, slot2], mockMetadata, ["N172S"]),
-    ).toEqual([slot1]);
-  });
-});
 
 describe("runScheduledTask", () => {
   let mockEnv: Env;

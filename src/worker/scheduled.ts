@@ -24,8 +24,6 @@ import {
 import { setActiveAuthSession } from "../shared/dao/auth.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { getExistingReservations } from "../shared/dao/existingReservations.js";
-import type { BookableAvailability } from "../shared/dao/availability.js";
-import type { FspMetadata } from "../shared/blo/fspMetadata.js";
 import {
   getSnapshot,
   getSlotsFromSnapshot,
@@ -38,28 +36,6 @@ import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
 
 const log = createLogger("scheduled");
-
-export function filterSlotsForNotification(
-  newSlots: BookableAvailability[],
-  fspMetadata: FspMetadata,
-  notificationAircraftTailNumbers: string[],
-): BookableAvailability[] {
-  if (notificationAircraftTailNumbers.length === 0) {
-    return newSlots;
-  }
-
-  const notificationAircraftIds = new Set(
-    fspMetadata.aircraft
-      .filter((aircraft) =>
-        notificationAircraftTailNumbers.includes(aircraft.tailNumber),
-      )
-      .map((aircraft) => aircraft.aircraftId),
-  );
-
-  return newSlots.filter((slot) =>
-    notificationAircraftIds.has(slot.aircraftId),
-  );
-}
 
 export async function runScheduledTask(
   env: Env,
@@ -187,24 +163,10 @@ export async function runScheduledTask(
     );
     log.info("New slots within tracked window", { count: newSlots.length });
 
-    const notificationAircraftTailNumbers = env.NOTIFICATION_AIRCRAFT
-      ? env.NOTIFICATION_AIRCRAFT.split(",").map((value) => value.trim())
-      : [];
-    const slotsToNotify = filterSlotsForDiscordNotification(
-      filterSlotsForNotification(
-        newSlots,
-        fspMetadata,
-        notificationAircraftTailNumbers,
-      ),
-      now,
-    );
+    const slotsToNotify = filterSlotsForDiscordNotification(newSlots, now);
 
     log.info("Slots selected for notification", {
       count: slotsToNotify.length,
-      filter:
-        notificationAircraftTailNumbers.length > 0
-          ? notificationAircraftTailNumbers
-          : "all aircraft",
     });
 
     const updatedMetadata = {
@@ -245,7 +207,7 @@ export async function runScheduledTask(
         }
       }
     } else if (newSlots.length > 0) {
-      log.info("Skipping notification: no slots match filter", {
+      log.info("Skipping notification: no slots within Discord window", {
         newSlotCount: newSlots.length,
       });
     }
