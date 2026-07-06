@@ -1,6 +1,6 @@
 name = "flight-schedule-bro-worker"
 main = "src/worker/index.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-06-16"
 compatibility_flags = ["nodejs_compat"]
 
 # Observability configuration for better debugging
