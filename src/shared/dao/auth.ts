@@ -14,92 +14,57 @@ export interface AuthSession {
   defaultLocationId: number;
 }
 
-let currentSession: AuthSession | null = null;
+let activeAuthSession: AuthSession | null = null;
 
 /**
- * Zod schema for AccountAppContext response
+ * Bind the authenticated session for the current invocation.
+ * CLI and worker entry points must call this after `fetchAuth`.
  */
-const AccountAppContextSchema = z.object({
-  subscriptionKey: z.string(),
-  // Add other fields if needed, but we only care about subscriptionKey
-});
-
-/**
- * Zod schema for FspApp cookie data
- */
-const FspAppCookieSchema = z.object({
-  token: z.string(),
-  operatorId: z.number(),
-});
-
-/**
- * Zod schema for MyOperators list response (without operator ID)
- */
-const MyOperatorsListSchema = z.object({
-  companies: z.array(
-    z.object({
-      id: z.number(),
-    }),
-  ),
-});
-
-/**
- * Zod schema for MyOperators detail response (with operator ID)
- */
-const MyOperatorsDetailSchema = z.object({
-  userId: z.uuid(),
-  pilotId: z.uuid(),
-  operatorId: z.number(),
-  defaultLocationId: z.number(),
-});
-
-function getSetCookieHeaders(headers: Headers): string[] {
-  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
-    .getSetCookie;
-  return getSetCookie?.call(headers) ?? [];
+export function setActiveAuthSession(session: AuthSession | null): void {
+  activeAuthSession = session;
 }
 
-function requireSession(): AuthSession {
-  if (!currentSession) {
+function requireActiveAuthSession(): AuthSession {
+  if (!activeAuthSession) {
     throw new Error("Not authenticated. Please login first.");
   }
-  return currentSession;
+  return activeAuthSession;
 }
 
 export function resetAuthForTests(): void {
-  currentSession = null;
+  activeAuthSession = null;
 }
 
 export function getAuthSession(): AuthSession | null {
-  return currentSession;
+  return activeAuthSession;
 }
 
 export function getSessionCookies(): string | null {
-  return currentSession?.sessionCookies ?? null;
+  return activeAuthSession?.sessionCookies ?? null;
 }
 
 export function getOperatorId(): number {
-  return requireSession().operatorId;
+  return requireActiveAuthSession().operatorId;
 }
 
 export function getSubscriptionKey(): string {
-  return requireSession().subscriptionKey;
+  return requireActiveAuthSession().subscriptionKey;
 }
 
 export function getAuthToken(): string {
-  return requireSession().authToken;
+  return requireActiveAuthSession().authToken;
 }
 
 export function getUserId(): string {
-  return requireSession().userId;
+  return requireActiveAuthSession().userId;
 }
 
 export function getPilotId(): string {
-  return requireSession().pilotId;
+  return requireActiveAuthSession().pilotId;
 }
 
 export function getDefaultLocationId(): number {
-  return requireSession().defaultLocationId;
+  return requireActiveAuthSession().defaultLocationId;
 }
 
 export async function fetchAuth(
@@ -148,14 +113,55 @@ export async function fetchAuth(
     subscriptionKey,
   );
 
-  currentSession = {
+  return {
     sessionCookies,
     subscriptionKey,
     authToken,
     ...operatorDetails,
   };
+}
 
-  return currentSession;
+/**
+ * Zod schema for AccountAppContext response
+ */
+const AccountAppContextSchema = z.object({
+  subscriptionKey: z.string(),
+  // Add other fields if needed, but we only care about subscriptionKey
+});
+
+/**
+ * Zod schema for FspApp cookie data
+ */
+const FspAppCookieSchema = z.object({
+  token: z.string(),
+  operatorId: z.number(),
+});
+
+/**
+ * Zod schema for MyOperators list response (without operator ID)
+ */
+const MyOperatorsListSchema = z.object({
+  companies: z.array(
+    z.object({
+      id: z.number(),
+    }),
+  ),
+});
+
+/**
+ * Zod schema for MyOperators detail response (with operator ID)
+ */
+const MyOperatorsDetailSchema = z.object({
+  userId: z.uuid(),
+  pilotId: z.uuid(),
+  operatorId: z.number(),
+  defaultLocationId: z.number(),
+});
+
+function getSetCookieHeaders(headers: Headers): string[] {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie;
+  return getSetCookie?.call(headers) ?? [];
 }
 
 /**

@@ -13,6 +13,10 @@ import * as workerSearchModule from "../shared/blo/workerAvailabilitySearch.js";
 
 vi.mock("./kv.js");
 vi.mock("./discord.js");
+vi.mock("./runLock.js", () => ({
+  tryAcquireWorkerRunLock: vi.fn().mockResolvedValue(true),
+  releaseWorkerRunLock: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("../shared/dao/auth.js");
 vi.mock("../shared/dao/existingReservations.js");
 vi.mock("./metadata.js");
@@ -235,6 +239,30 @@ describe("runScheduledTask", () => {
     expect(discordModule.sendAvailabilityNotification).not.toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+
+  it("skips snapshot update when no complete days were fetched", async () => {
+    vi.mocked(
+      workerSearchModule.executeWorkerAvailabilitySearch,
+    ).mockResolvedValue({
+      validResults: [],
+      search: {
+        results: [],
+        trackedThroughDate: null,
+        scheduleSubrequests: 0,
+        daysFetched: 0,
+      },
+      reservationType: {
+        reservationTypeId: "11111111-1111-4111-8111-111111111111",
+        reservationTypeName: "Dual",
+      } as never,
+      today: new Date("2024-01-15T08:00:00.000Z"),
+    });
+
+    await runScheduledTask(mockEnv);
+
+    expect(kvModule.setSnapshot).not.toHaveBeenCalled();
+    expect(discordModule.sendAvailabilityNotification).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { DEFAULT_TIMEZONE } from "./flightTime.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("config");
 
 function isValidIanaTimeZone(value: string): boolean {
   try {
@@ -68,6 +71,7 @@ export interface WorkerEnvInput {
   TIMEZONE?: string;
   RESERVATION_TYPE_ID?: string;
   MAX_DAYS_AHEAD?: string;
+  DAYS_AHEAD?: string;
 }
 
 /**
@@ -113,6 +117,13 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
 }
 
 export function createWorkerConfig(env: WorkerEnvInput): WorkerConfigType {
+  if (env.DAYS_AHEAD !== undefined && env.DAYS_AHEAD.trim() !== "") {
+    log.warn(
+      "DAYS_AHEAD is ignored by the worker; set MAX_DAYS_AHEAD to cap calendar lookahead",
+      { daysAhead: env.DAYS_AHEAD },
+    );
+  }
+
   const config = createConfig({
     FSP_EMAIL: env.FSP_EMAIL,
     FSP_PASSWORD: env.FSP_PASSWORD,

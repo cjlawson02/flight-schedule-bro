@@ -97,4 +97,44 @@ describe("computeBookableAvailabilityFromSnapshot", () => {
       ),
     ).toBe(true);
   });
+
+  it("emits one slot per free instructor for the same aircraft time", () => {
+    const instructorA = "11111111-1111-4111-8111-111111111111";
+    const instructorB = "22222222-2222-4222-8222-222222222222";
+    const aircraftId = "33333333-3333-4333-8333-333333333333";
+
+    const results = computeBookableAvailabilityFromSnapshot({
+      snapshot: {
+        resources: [
+          { Id: aircraftId, Name: "N172", ResourceTypeId: 1 },
+          { Id: instructorA, Name: "Alice", ResourceTypeId: 2 },
+          { Id: instructorB, Name: "Bob", ResourceTypeId: 2 },
+        ],
+        events: [],
+        unavailability: [],
+        closings: [],
+      },
+      day: "2030-07-15",
+      timeZone: testConfig.TIMEZONE,
+      reservationType: dualFlightTraining,
+      aircraftIds: [aircraftId],
+      instructorIds: [instructorA, instructorB],
+      durationMinutes: 60,
+      instructorsMap: new Map([
+        [instructorA, "Alice"],
+        [instructorB, "Bob"],
+      ]),
+      aircraftMap: new Map([[aircraftId, "N172"]]),
+    });
+
+    const threePm = parseFspLocal("2030-07-15T15:00:00", testConfig.TIMEZONE);
+    const matching = results.filter(
+      (slot) => slot.startDateTime.getTime() === threePm.getTime(),
+    );
+
+    expect(matching).toHaveLength(2);
+    expect(new Set(matching.map((slot) => slot.instructorId))).toEqual(
+      new Set([instructorA, instructorB]),
+    );
+  });
 });

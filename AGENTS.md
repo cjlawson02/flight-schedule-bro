@@ -37,9 +37,6 @@ npm run worker:deploy
 
 # View logs
 npm run worker:tail
-
-# Test schedule search locally (uses .env, no KV/Discord)
-npm run worker:sanity
 ```
 
 ### Testing
@@ -142,13 +139,12 @@ src/
 - **Workers Paid (`WORKERS_PAID_PLAN=true`):** unified 10,000 subrequest limit; KV get/put also counts
 - Reserves 1 subrequest for Discord before schedule fetching
 - Optional `MAX_DAYS_AHEAD` in `wrangler.toml` caps calendar days searched even when budget remains
-- Local sanity check: `npm run worker:sanity` (uses `.env`, no KV/Discord)
 
 **API Wrapper with Rate Limiting** (`src/shared/dao/api_wrapper.ts`)
 
 - All FSP API calls go through `safeFetch()`
 - Multi-layered rate limit handling:
-  - Request queue: Max 50 concurrent requests
+  - Request queue: Max 20 concurrent requests
   - Staggered delays: 50ms between initial requests
   - Exponential backoff: 1s → 2s → 4s on retries
   - Caching: 30-minute TTL (configurable)

@@ -46,7 +46,8 @@ export function setCacheAdapter(adapter: CacheAdapter | null) {
  *    - Rate-limit responses wait out the API window and release concurrency slots while waiting
  *
  * 4. **Schedule snapshot pagination**
- *    - One paginated schedule fetch per search day via resolveMaxScheduleSearchBudget()
+ *    - Worker checks subrequest budget per page in `fetchScheduleDay()`
+ *    - Cron/setup reserve one subrequest for Discord before the schedule loop
  *
  * Why This Works:
  * - Most rate limits are time-based (e.g., "X requests per minute")
@@ -200,11 +201,12 @@ export async function safeFetch<T extends z.ZodType>(
       let lastError: Error | null = null;
       let fetchSucceeded = false;
 
+      recordActiveSubrequest();
+
       while (attemptCount < MAX_ATTEMPTS) {
         attemptCount++;
 
         try {
-          recordActiveSubrequest();
           const res = await fetch(url, {
             method,
             headers: {

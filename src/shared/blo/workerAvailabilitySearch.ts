@@ -9,6 +9,7 @@ import { startOfOperatorDay } from "../util/flightTime.js";
 import type { FspMetadata } from "./fspMetadata.js";
 import { SchedulerBLO } from "./scheduler.js";
 import {
+  estimateSchedulePagesPerDay,
   fetchScheduleDaysWithinBudget,
   filterValidAvailabilityBlocks,
   prepareScheduleSearch,
@@ -75,7 +76,14 @@ export async function executeWorkerAvailabilitySearch(options: {
   today?: Date;
   failFast?: boolean;
 }): Promise<WorkerAvailabilitySearchResult> {
-  const { config, fspMetadata, scheduler, auth, budget } = options;
+  const {
+    config,
+    fspMetadata,
+    scheduler,
+    auth,
+    budget,
+    failFast = false,
+  } = options;
   const today =
     options.today ?? startOfOperatorDay(new Date(), config.TIMEZONE);
   const { reservationType, allInstructorIds, aircraftIds } =
@@ -97,6 +105,11 @@ export async function executeWorkerAvailabilitySearch(options: {
 
   budget.reserve = 1;
 
+  const pagesPerDayEstimate = estimateSchedulePagesPerDay(
+    fspMetadata.instructors.length,
+    fspMetadata.aircraft.length,
+  );
+
   let search: WorkerScheduleSearchResult;
   try {
     search = await fetchScheduleDaysWithinBudget({
@@ -106,6 +119,8 @@ export async function executeWorkerAvailabilitySearch(options: {
       today,
       budget,
       maxDaysAhead: config.MAX_DAYS_AHEAD,
+      pagesPerDayEstimate,
+      failFast,
     });
   } finally {
     budget.reserve = 0;

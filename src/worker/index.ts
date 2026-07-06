@@ -1,10 +1,15 @@
 import { createWorkerConfig } from "../shared/util/config.js";
 import { getErrorMessage } from "../shared/util/errors.js";
-import { fetchAuth } from "../shared/dao/auth.js";
+import {
+  fetchAuth,
+  getOperatorId,
+  setActiveAuthSession,
+} from "../shared/dao/auth.js";
 import { runSetup } from "./setup.js";
 import { refreshMetadata } from "./metadata.js";
 import { getSnapshot } from "./kv.js";
 import { runScheduledTask } from "./scheduled.js";
+import { releaseWorkerRunLock, tryAcquireWorkerRunLock } from "./runLock.js";
 import { initializeWorker } from "./utils.js";
 import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
@@ -18,10 +23,10 @@ export default {
   async scheduled(
     event: ScheduledEvent,
     env: Env,
-    _ctx: ExecutionContext,
+    ctx: ExecutionContext,
   ): Promise<void> {
     try {
-      await runScheduledTask(env);
+      await runScheduledTask(env, ctx);
     } catch (error) {
       log.error("Error in scheduled task", {
         message: getErrorMessage(error),
@@ -48,16 +53,31 @@ export default {
 
     // Refresh metadata endpoint
     if (url.pathname === "/refresh-metadata") {
+      const runId = `refresh-metadata-${Date.now()}`;
+      const lockAcquired = await tryAcquireWorkerRunLock(
+        env.FSP_AVAILABILITY_KV,
+        runId,
+      );
+      if (!lockAcquired) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Another worker run is in progress. Try again shortly.",
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        );
+      }
+
       try {
         initializeWorker();
 
         log.info("Refreshing metadata");
         const config = createWorkerConfig(env);
 
-        const session = await fetchAuth(config.EMAIL, config.PASSWORD);
+        setActiveAuthSession(await fetchAuth(config.EMAIL, config.PASSWORD));
 
         const metadata = await refreshMetadata(
-          session.operatorId,
+          getOperatorId(),
           env.FSP_AVAILABILITY_KV,
         );
 
@@ -87,6 +107,9 @@ export default {
             headers: { "content-type": "application/json" },
           },
         );
+      } finally {
+        setActiveAuthSession(null);
+        await releaseWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
       }
     }
 

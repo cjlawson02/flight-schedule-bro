@@ -88,11 +88,12 @@ describe("config", () => {
     expect(config.MAX_HOUR).toBe(20);
   });
 
-  it("createWorkerConfig applies worker defaults", () => {
+  it("createWorkerConfig ignores legacy DAYS_AHEAD", () => {
     const config = createWorkerConfig({
       FSP_EMAIL: "worker@example.com",
       FSP_PASSWORD: "worker-password",
       AIRCRAFT_REGEX: "172S",
+      DAYS_AHEAD: "60",
     });
 
     expect(config.WEEKDAY_MIN_HOUR).toBe(15);

@@ -105,6 +105,7 @@ describe("executeWorkerAvailabilitySearch", () => {
       },
       budget,
       today: new Date("2024-07-15T12:00:00.000Z"),
+      failFast: true,
     });
 
     expect(
@@ -113,6 +114,7 @@ describe("executeWorkerAvailabilitySearch", () => {
       expect.objectContaining({
         scheduler,
         budget,
+        failFast: true,
         params: expect.objectContaining({
           locationId: 999,
         }),

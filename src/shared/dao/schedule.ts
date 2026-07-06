@@ -17,7 +17,8 @@ const log = createLogger("schedule");
 export const FSP_ALL_FILTER_SENTINEL = "00000000-0000-0000-0000-000000000001";
 
 export const SCHEDULE_PAGE_SIZE = 50;
-export const MAX_SCHEDULE_PAGES = 10;
+/** Safety cap when API pagination does not terminate. */
+export const MAX_SCHEDULE_PAGES = 200;
 
 /** 5 minutes — schedule changes frequently. */
 export const SCHEDULE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -232,11 +233,19 @@ export async function fetchScheduleDay(
 ): Promise<ScheduleDayFetchResult> {
   const end = scheduleExclusiveEndDate(params.start, params.timeZone);
   const merged = emptySnapshot();
-  let page = 1;
   let previousPageIndex: number | null = null;
   let pagesFetched = 0;
 
-  while (page <= MAX_SCHEDULE_PAGES) {
+  for (let page = 1; ; page++) {
+    if (page > MAX_SCHEDULE_PAGES) {
+      log.error("Schedule pagination exceeded safety page limit", {
+        start: params.start,
+        maxPages: MAX_SCHEDULE_PAGES,
+        pagesFetched,
+      });
+      return { snapshot: merged, complete: false, pagesFetched };
+    }
+
     if (params.budget && !canMakeSubrequest(params.budget)) {
       log.info("Schedule fetch stopped: subrequest budget exhausted", {
         start: params.start,
@@ -269,23 +278,12 @@ export async function fetchScheduleDay(
 
     mergeScheduleSnapshot(merged, response.results);
 
-    const reachedEnd =
-      response.pageIndex * response.pageSize >= response.total ||
-      response.results.resources.length === 0;
+    const reachedEnd = response.pageIndex * response.pageSize >= response.total;
 
     if (reachedEnd) {
       return { snapshot: merged, complete: true, pagesFetched };
     }
-
-    page++;
   }
-
-  log.warn("Reached MAX_SCHEDULE_PAGES; using partial schedule snapshot", {
-    start: params.start,
-    maxPages: MAX_SCHEDULE_PAGES,
-  });
-
-  return { snapshot: merged, complete: false, pagesFetched };
 }
 
 export function estimatePagesPerDay(resourceCount: number): number {

@@ -18,6 +18,7 @@ import {
   type TimeInterval,
 } from "./scheduleGaps.js";
 import {
+  addOperatorDays,
   formatOperatorDisplayDate,
   formatOperatorDisplayTime,
   parseOperatorDateString,
@@ -155,7 +156,7 @@ export function computeBookableAvailabilityFromSnapshot(
   } = params;
 
   const dayStart = parseOperatorDateString(day, timeZone);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const dayEnd = addOperatorDays(dayStart, 1, timeZone);
   const durationMs = durationMinutes * 60 * 1000;
   const stepMs = slotStepMs();
   const closingBusy = buildClosingBusy(snapshot, dayStart, dayEnd, timeZone);
@@ -192,28 +193,28 @@ export function computeBookableAvailabilityFromSnapshot(
       const aircraftSlots = slotsFromFree(aircraftFree, durationMs, stepMs);
 
       for (const slot of aircraftSlots) {
-        const matchingInstructor = instructorIds.find((instructorId) =>
-          isIntervalFree(
-            slot.start,
-            slot.end,
-            instructorFree.get(instructorId) ?? [],
-          ),
-        );
+        for (const instructorId of instructorIds) {
+          if (
+            !isIntervalFree(
+              slot.start,
+              slot.end,
+              instructorFree.get(instructorId) ?? [],
+            )
+          ) {
+            continue;
+          }
 
-        if (!matchingInstructor) {
-          continue;
+          results.push(
+            toBookableAvailability(
+              slot,
+              instructorId,
+              aircraftId,
+              timeZone,
+              instructorsMap,
+              aircraftMap,
+            ),
+          );
         }
-
-        results.push(
-          toBookableAvailability(
-            slot,
-            matchingInstructor,
-            aircraftId,
-            timeZone,
-            instructorsMap,
-            aircraftMap,
-          ),
-        );
       }
     }
 

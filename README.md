@@ -192,8 +192,6 @@ better-scheduler/
 │       ├── blo/          # Scheduling and availability logic
 │       ├── dao/          # Flight Schedule Pro API clients
 │       └── util/         # Config, dates, subrequest budget, etc.
-├── scripts/
-│   └── worker-sanity.ts  # Local worker search test (uses .env)
 ├── .env                  # CLI environment variables (not in git)
 ├── .env.example          # CLI environment template
 ├── .dev.vars.example     # Worker secrets template for wrangler dev
@@ -392,21 +390,13 @@ The `[vars]` block in `wrangler.toml` contains safe defaults you can customize:
 - `MAX_DAYS_AHEAD` — optional cap on days searched (useful on Workers Paid)
 - `WORKERS_PAID_PLAN` — set `"true"` if you upgrade to Workers Paid
 
-### 6. Test the search locally (optional)
-
-Run the worker schedule search against FSP using your `.env` credentials (no KV or Discord):
-
-```bash
-npm run worker:sanity
-```
-
-### 7. Deploy your worker
+### 6. Deploy your worker
 
 ```bash
 npm run worker:deploy
 ```
 
-### 8. Initialize the worker state
+### 7. Initialize the worker state
 
 After deploy, call the setup endpoint once to create the initial snapshot (or re-run after upgrading from an older snapshot format), then warm the metadata cache:
 
@@ -415,7 +405,7 @@ curl https://your-worker.workers.dev/setup
 curl https://your-worker.workers.dev/refresh-metadata
 ```
 
-### 9. Verify it is working
+### 8. Verify it is working
 
 Useful commands once the worker is deployed:
 

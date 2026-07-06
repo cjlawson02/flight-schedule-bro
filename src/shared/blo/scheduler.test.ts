@@ -287,6 +287,62 @@ describe("SchedulerBLO", () => {
     });
   });
 
+  describe("getBookableAvailabilityForDay", () => {
+    it("computes availability using real schedule gap logic", async () => {
+      const { computeBookableAvailabilityFromSnapshot } = await vi.importActual<
+        typeof import("./scheduleAvailability.js")
+      >("./scheduleAvailability.js");
+
+      vi.mocked(
+        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
+      ).mockImplementation(computeBookableAvailabilityFromSnapshot);
+
+      vi.mocked(scheduleDAO.fetchScheduleDay).mockResolvedValue({
+        snapshot: {
+          resources: [
+            {
+              Id: "ac-1",
+              Name: "N12345",
+              ResourceTypeId: 1,
+            },
+            {
+              Id: "inst-1",
+              Name: "John Doe",
+              ResourceTypeId: 2,
+            },
+          ],
+          events: [],
+          unavailability: [],
+          closings: [],
+        },
+        complete: true,
+        pagesFetched: 1,
+      });
+
+      const workerScheduler = new SchedulerBLO(mockOperatorId, LA);
+      workerScheduler.hydrateFromMetadata(
+        createMockMetadata({
+          instructors: [{ instructorId: "inst-1", displayName: "John Doe" }],
+          reservationTypes: [mockDualReservationType],
+          aircraft: [{ aircraftId: "ac-1", tailNumber: "N12345" }],
+        }),
+      );
+
+      const result = await workerScheduler.getBookableAvailabilityForDay({
+        locationId: 1,
+        activityTypeId: mockDualReservationType.reservationTypeId,
+        instructorIds: ["inst-1"],
+        aircraftIds: ["ac-1"],
+        startDate: "2030-07-15",
+        lengthOfReservationInMinutes: 120,
+      });
+
+      expect(result.complete).toBe(true);
+      expect(result.availability.length).toBeGreaterThan(0);
+      expect(result.availability[0]?.aircraftId).toBe("ac-1");
+    });
+  });
+
   describe("bookReservation", () => {
     beforeEach(async () => {
       vi.mocked(authDAO.getAuthSession).mockReturnValue(null);

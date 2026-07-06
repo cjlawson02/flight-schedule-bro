@@ -12,6 +12,8 @@ import {
   filterSlotsForDiscordNotification,
   filterSlotsNotInPast,
   findNewSlots,
+  maxIsoDate,
+  mergeRefreshedSnapshotSlots,
 } from "../shared/util/slots.js";
 import { resolveTrackedThroughDate } from "../shared/util/snapshotTracking.js";
 import {
@@ -19,6 +21,7 @@ import {
   parseWorkersPaidPlan,
   setActiveSubrequestBudget,
 } from "../shared/util/subrequestBudget.js";
+import { setActiveAuthSession } from "../shared/dao/auth.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { getExistingReservations } from "../shared/dao/existingReservations.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
@@ -30,6 +33,7 @@ import {
   cleanPastSlotsFromSnapshot,
 } from "./kv.js";
 import { sendAvailabilityNotification } from "./discord.js";
+import { releaseWorkerRunLock, tryAcquireWorkerRunLock } from "./runLock.js";
 import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
 
@@ -57,8 +61,20 @@ export function filterSlotsForNotification(
   );
 }
 
-export async function runScheduledTask(env: Env): Promise<void> {
+export async function runScheduledTask(
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<void> {
   log.info("Scheduled task started", { timestamp: new Date().toISOString() });
+
+  const runId = `scheduled-${Date.now()}`;
+  const lockAcquired = await tryAcquireWorkerRunLock(
+    env.FSP_AVAILABILITY_KV,
+    runId,
+  );
+  if (!lockAcquired) {
+    return;
+  }
 
   const paidMode = parseWorkersPaidPlan(env.WORKERS_PAID_PLAN);
   const budget = createWorkerSubrequestBudget({ paidMode });
@@ -109,6 +125,7 @@ export async function runScheduledTask(env: Env): Promise<void> {
     const fspMetadata = await loadWorkerMetadata(
       session,
       env.FSP_AVAILABILITY_KV,
+      { allowApiRefresh: false },
     );
     log.info("FSP metadata loaded", {
       instructors: fspMetadata.instructors.length,
@@ -143,8 +160,27 @@ export async function runScheduledTask(env: Env): Promise<void> {
       subrequestsUsed: budget.used,
     });
 
-    const newSlots = findNewSlots(
+    if (search.daysFetched === 0 || search.trackedThroughDate === null) {
+      log.warn("Skipping snapshot update: no complete schedule days fetched", {
+        daysFetched: search.daysFetched,
+        subrequestsUsed: budget.used,
+      });
+      return;
+    }
+
+    const mergedSlots = mergeRefreshedSnapshotSlots(
       bookableSlots,
+      previousSlots,
+      search.trackedThroughDate,
+      config.TIMEZONE,
+    );
+    const mergedTrackedThroughDate = maxIsoDate(
+      previousTrackedThroughDate,
+      search.trackedThroughDate,
+    );
+
+    const newSlots = findNewSlots(
+      mergedSlots,
       previousSlots,
       previousTrackedThroughDate,
       config.TIMEZONE,
@@ -174,26 +210,39 @@ export async function runScheduledTask(env: Env): Promise<void> {
     const updatedMetadata = {
       lastSearchDate: formatOperatorIsoDate(today, config.TIMEZONE),
       lastUpdate: new Date().toISOString(),
-      trackedThroughDate: search.trackedThroughDate,
+      trackedThroughDate: mergedTrackedThroughDate,
     };
 
-    await setSnapshot(env, bookableSlots, updatedMetadata);
+    await setSnapshot(env, mergedSlots, updatedMetadata);
 
     if (slotsToNotify.length > 0) {
       log.info("Sending Discord notification");
-      try {
-        await sendAvailabilityNotification(
+      const notify = () =>
+        sendAvailabilityNotification(
           env,
           slotsToNotify,
           fspMetadata,
           existingReservations,
           config.TIMEZONE,
         );
+
+      try {
+        await notify();
       } catch (error) {
         log.error("Failed to send Discord notification", {
           message: getErrorMessage(error),
           error,
         });
+        if (ctx) {
+          ctx.waitUntil(
+            notify().catch((retryError: unknown) => {
+              log.error("Discord notification retry failed", {
+                message: getErrorMessage(retryError),
+                error: retryError,
+              });
+            }),
+          );
+        }
       }
     } else if (newSlots.length > 0) {
       log.info("Skipping notification: no slots match filter", {
@@ -208,5 +257,7 @@ export async function runScheduledTask(env: Env): Promise<void> {
     });
   } finally {
     setActiveSubrequestBudget(null);
+    setActiveAuthSession(null);
+    await releaseWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
   }
 }

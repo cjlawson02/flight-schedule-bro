@@ -1,5 +1,4 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { resolveMaxScheduleSearchBudget } from "../shared/blo/availabilitySearch.js";
 import type { Env } from "./types.js";
 
 describe("Worker Setup", () => {
@@ -141,26 +140,6 @@ describe("Worker Setup", () => {
 
       expect(finalIds).toHaveLength(2);
       expect(finalIds).toEqual(allAircraftIds);
-    });
-  });
-
-  describe("Date Range Calculation", () => {
-    it("derives max lookahead from the subrequest budget for CLI searches", () => {
-      const budget = resolveMaxScheduleSearchBudget(1);
-      const today = new Date("2024-01-15T12:00:00.000Z");
-      const dates: string[] = [];
-
-      for (let offset = 0; offset <= budget.daysAhead; offset++) {
-        const day = new Date(today);
-        day.setUTCHours(0, 0, 0, 0);
-        day.setUTCDate(day.getUTCDate() + offset);
-        const dayISO = day.toISOString().split("T")[0];
-        dates.push(dayISO);
-      }
-
-      expect(dates).toHaveLength(40);
-      expect(dates[0]).toBe("2024-01-15");
-      expect(dates[39]).toBe("2024-02-23");
     });
   });
 

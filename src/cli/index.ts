@@ -11,7 +11,11 @@ import {
   validateActivityFlightDetails,
 } from "../shared/dao/reservationFlightDetails.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
-import { fetchAuth, getOperatorId } from "../shared/dao/auth.js";
+import {
+  fetchAuth,
+  getOperatorId,
+  setActiveAuthSession,
+} from "../shared/dao/auth.js";
 import { setCacheAdapter } from "../shared/dao/api_wrapper.js";
 import { cliCacheAdapter } from "./cache.js";
 import { configureLogger, createLogger } from "../shared/util/logger.js";
@@ -143,7 +147,7 @@ async function main() {
   const config = loadCliConfig();
 
   setCacheAdapter(cliCacheAdapter);
-  await fetchAuth(config.EMAIL, config.PASSWORD);
+  setActiveAuthSession(await fetchAuth(config.EMAIL, config.PASSWORD));
 
   const operatorId = getOperatorId();
   const scheduler = new SchedulerBLO(operatorId, config.TIMEZONE);

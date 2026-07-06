@@ -10,106 +10,11 @@ import { isValidBlock } from "../util/dates.js";
 import { addOperatorDays, formatOperatorIsoDate } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
 import {
-  CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
   type SubrequestBudget,
   subrequestsRemaining,
 } from "../util/subrequestBudget.js";
 
 const log = createLogger("availability-search");
-
-export { CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT };
-
-/** Conservative non-availability subrequests per worker run (auth, reservations, KV, Discord). */
-export const WORKER_AVAILABILITY_OVERHEAD = 10;
-
-export interface ScheduleSearchBudget {
-  daysAhead: number;
-  totalFetches: number;
-  capped: boolean;
-  pagesPerDay: number;
-}
-
-/** Maximize lookahead days within the Cloudflare subrequest budget. */
-export function resolveMaxScheduleSearchBudget(
-  pagesPerDay: number,
-  options: {
-    subrequestLimit?: number;
-    overhead?: number;
-  } = {},
-): ScheduleSearchBudget {
-  const budget = resolveScheduleSearchBudget(
-    Number.MAX_SAFE_INTEGER,
-    pagesPerDay,
-    options,
-  );
-  return { ...budget, capped: false };
-}
-
-export function resolveScheduleSearchBudget(
-  daysAhead: number,
-  pagesPerDay: number,
-  options: {
-    subrequestLimit?: number;
-    overhead?: number;
-  } = {},
-): ScheduleSearchBudget {
-  const subrequestLimit =
-    options.subrequestLimit ?? CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT;
-  const overhead = options.overhead ?? WORKER_AVAILABILITY_OVERHEAD;
-  const maxAvailabilityFetches = subrequestLimit - overhead;
-
-  if (pagesPerDay === 0) {
-    return {
-      daysAhead: 0,
-      totalFetches: 0,
-      capped: false,
-      pagesPerDay,
-    };
-  }
-
-  if (pagesPerDay > maxAvailabilityFetches) {
-    throw new Error(
-      `Schedule pages per day (${pagesPerDay}) exceeds Cloudflare subrequest budget (${maxAvailabilityFetches} availability fetches).`,
-    );
-  }
-
-  const maxDayCount = Math.floor(maxAvailabilityFetches / pagesPerDay);
-  const effectiveDaysAhead = Math.min(daysAhead, Math.max(0, maxDayCount - 1));
-  const totalFetches = (effectiveDaysAhead + 1) * pagesPerDay;
-
-  return {
-    daysAhead: effectiveDaysAhead,
-    totalFetches,
-    capped: effectiveDaysAhead < daysAhead,
-    pagesPerDay,
-  };
-}
-
-export function logScheduleSearchBudget(
-  budget: ScheduleSearchBudget,
-  configuredDaysAhead: number,
-): void {
-  if (budget.capped) {
-    log.warn("Reducing DAYS_AHEAD to stay under Cloudflare subrequest limit", {
-      configuredDaysAhead,
-      effectiveDaysAhead: budget.daysAhead,
-      pagesPerDay: budget.pagesPerDay,
-      availabilityFetches: budget.totalFetches,
-      subrequestLimit: CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
-    });
-  } else {
-    logMaxScheduleSearchBudget(budget);
-  }
-}
-
-export function logMaxScheduleSearchBudget(budget: ScheduleSearchBudget): void {
-  log.info("Schedule search budget", {
-    daysAhead: budget.daysAhead,
-    pagesPerDay: budget.pagesPerDay,
-    availabilityFetches: budget.totalFetches,
-    subrequestLimit: CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
-  });
-}
 
 export interface AvailabilitySearchParams {
   locationId: number;
@@ -156,7 +61,8 @@ export function estimateSchedulePagesPerDay(
 
 export interface WorkerScheduleSearchResult {
   results: BookableAvailability[];
-  trackedThroughDate: string;
+  /** Set only after at least one fully fetched day; null when daysFetched is 0. */
+  trackedThroughDate: string | null;
   scheduleSubrequests: number;
   daysFetched: number;
 }
@@ -168,13 +74,26 @@ export async function fetchScheduleDaysWithinBudget(options: {
   today: Date;
   budget: SubrequestBudget;
   maxDaysAhead?: number;
+  /** Minimum subrequests required to start another day (typically pages per day). */
+  pagesPerDayEstimate?: number;
+  /** When true, throw if any day fetch does not complete. */
+  failFast?: boolean;
 }): Promise<WorkerScheduleSearchResult> {
-  const { scheduler, params, prepared, today, budget, maxDaysAhead } = options;
+  const {
+    scheduler,
+    params,
+    prepared,
+    today,
+    budget,
+    maxDaysAhead,
+    pagesPerDayEstimate = 1,
+    failFast = false,
+  } = options;
   const durationMinutes =
     params.durationMinutes ?? params.reservationType.defaultLength;
   const results: BookableAvailability[] = [];
   const scheduleStartUsed = budget.used;
-  let trackedThroughDate = formatOperatorIsoDate(today, params.timeZone);
+  let trackedThroughDate: string | null = null;
   let daysFetched = 0;
 
   for (let offset = 0; ; offset++) {
@@ -182,7 +101,7 @@ export async function fetchScheduleDaysWithinBudget(options: {
       break;
     }
 
-    if (!canFetchAnotherScheduleDay(budget)) {
+    if (!canFetchAnotherScheduleDay(budget, pagesPerDayEstimate)) {
       break;
     }
 
@@ -200,6 +119,11 @@ export async function fetchScheduleDaysWithinBudget(options: {
       });
 
     if (!complete) {
+      if (failFast) {
+        throw new Error(
+          `Schedule day ${dayISO} did not complete (pagination or budget exhausted).`,
+        );
+      }
       break;
     }
 
@@ -226,8 +150,11 @@ export async function fetchScheduleDaysWithinBudget(options: {
   };
 }
 
-function canFetchAnotherScheduleDay(budget: SubrequestBudget): boolean {
-  return subrequestsRemaining(budget) > 0;
+function canFetchAnotherScheduleDay(
+  budget: SubrequestBudget,
+  pagesPerDay: number,
+): boolean {
+  return subrequestsRemaining(budget) >= pagesPerDay;
 }
 
 export function buildScheduleFetchTasks(

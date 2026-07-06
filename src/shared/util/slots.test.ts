@@ -10,6 +10,8 @@ import {
   isSlotStartInPast,
   isSlotStartTooSoonForBooking,
   isSlotStartTooSoonForDiscordNotification,
+  maxIsoDate,
+  mergeRefreshedSnapshotSlots,
 } from "./slots.js";
 
 const LA = "America/Los_Angeles";
@@ -144,5 +146,41 @@ describe("findNewSlots", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("1/20/2024");
+  });
+});
+
+describe("maxIsoDate", () => {
+  it("returns the later ISO calendar date", () => {
+    expect(maxIsoDate("2024-01-15", "2024-02-01")).toBe("2024-02-01");
+    expect(maxIsoDate("2024-02-01", "2024-01-15")).toBe("2024-02-01");
+  });
+});
+
+describe("mergeRefreshedSnapshotSlots", () => {
+  it("retains prior slots beyond the refreshed tracked-through date", () => {
+    const refreshed = [
+      makeSlot({
+        startDateTime: new Date("2024-01-20T17:00:00.000Z"),
+        date: "1/20/2024",
+      }),
+    ];
+    const retained = [
+      makeSlot({
+        startDateTime: new Date("2024-01-28T17:00:00.000Z"),
+        date: "1/28/2024",
+        aircraftId: "323e4567-e89b-12d3-a456-426614174000",
+      }),
+    ];
+    const previous = [...refreshed, ...retained];
+
+    const merged = mergeRefreshedSnapshotSlots(
+      refreshed,
+      previous,
+      "2024-01-25",
+      LA,
+    );
+
+    expect(merged).toHaveLength(2);
+    expect(merged.map((slot) => slot.date)).toEqual(["1/20/2024", "1/28/2024"]);
   });
 });

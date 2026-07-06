@@ -5,6 +5,10 @@ import {
   resetRequestQueueForTests,
   safeFetch,
 } from "./api_wrapper.js";
+import {
+  createSubrequestBudget,
+  setActiveSubrequestBudget,
+} from "../util/subrequestBudget.js";
 
 vi.mock("./auth.js", () => ({
   getAuthToken: () => "token",
@@ -45,6 +49,7 @@ describe("safeFetch", () => {
 
   afterEach(() => {
     resetRequestQueueForTests();
+    setActiveSubrequestBudget(null);
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
@@ -159,5 +164,40 @@ describe("safeFetch", () => {
         0,
       ),
     ).rejects.toThrow(/Failed to parse response body/);
+  });
+
+  it("counts one subrequest per safeFetch call across retries", async () => {
+    const budget = createSubrequestBudget(50, 0);
+    setActiveSubrequestBudget(budget);
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({
+            statusCode: 429,
+            message: "Rate limit is exceeded. Try again in 0 seconds.",
+          }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({ ok: true }),
+        }),
+      );
+
+    await safeFetch(
+      "https://example.com/test",
+      "POST",
+      { foo: "bar" },
+      ResponseSchema,
+      0,
+    );
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(budget.used).toBe(1);
   });
 });

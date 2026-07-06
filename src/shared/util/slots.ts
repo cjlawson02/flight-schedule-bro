@@ -69,6 +69,31 @@ function createSlotKey(slot: BookableAvailability): string {
   return `${slot.date}|${slot.startTime}|${slot.endTime}|${slot.aircraftId}|${slot.instructorId}`;
 }
 
+/** Later ISO calendar date (YYYY-MM-DD). */
+export function maxIsoDate(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
+/**
+ * Combine freshly searched slots with prior snapshot slots beyond the refreshed window.
+ * Used when a budget-limited run re-fetches only the near-term days.
+ */
+export function mergeRefreshedSnapshotSlots(
+  refreshedSlots: BookableAvailability[],
+  previousSlots: BookableAvailability[],
+  refreshedThroughDateIso: string,
+  timeZone: string,
+): BookableAvailability[] {
+  const refreshedThroughEnd = endOfOperatorDay(
+    parseOperatorDateString(refreshedThroughDateIso, timeZone),
+    timeZone,
+  );
+  const retained = previousSlots.filter(
+    (slot) => slot.startDateTime.getTime() > refreshedThroughEnd.getTime(),
+  );
+  return [...refreshedSlots, ...retained];
+}
+
 /**
  * Find new slots that aren't in the existing snapshot.
  * Implements the rolling window algorithm to exclude newly added future days.

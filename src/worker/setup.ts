@@ -10,8 +10,10 @@ import {
   parseWorkersPaidPlan,
   setActiveSubrequestBudget,
 } from "../shared/util/subrequestBudget.js";
+import { setActiveAuthSession } from "../shared/dao/auth.js";
 import { initializeSnapshot } from "./kv.js";
 import { sendSimpleNotification } from "./discord.js";
+import { releaseWorkerRunLock, tryAcquireWorkerRunLock } from "./runLock.js";
 import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
 
@@ -25,6 +27,25 @@ const log = createLogger("setup");
  * @returns Response with status message
  */
 export async function runSetup(env: Env): Promise<Response> {
+  const runId = `setup-${Date.now()}`;
+  const lockAcquired = await tryAcquireWorkerRunLock(
+    env.FSP_AVAILABILITY_KV,
+    runId,
+  );
+  if (!lockAcquired) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error:
+          "❌ Setup failed: another worker run is in progress. Try again shortly.",
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   const paidMode = parseWorkersPaidPlan(env.WORKERS_PAID_PLAN);
   const budget = createWorkerSubrequestBudget({ paidMode });
   setActiveSubrequestBudget(budget);
@@ -68,6 +89,12 @@ export async function runSetup(env: Env): Promise<Response> {
       name: reservationType.reservationTypeName,
       activityTypeId: reservationType.reservationTypeId,
     });
+
+    if (search.daysFetched === 0 || search.trackedThroughDate === null) {
+      throw new Error(
+        "Setup could not fetch any complete schedule days within the subrequest budget. Retry later or set WORKERS_PAID_PLAN=true.",
+      );
+    }
 
     await initializeSnapshot(
       env,
@@ -119,5 +146,7 @@ export async function runSetup(env: Env): Promise<Response> {
     );
   } finally {
     setActiveSubrequestBudget(null);
+    setActiveAuthSession(null);
+    await releaseWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
   }
 }

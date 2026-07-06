@@ -98,6 +98,7 @@ describe("workerPipeline", () => {
         auth: {
           locationId: mockSession.defaultLocationId,
         },
+        failFast: true,
       }),
     );
   });

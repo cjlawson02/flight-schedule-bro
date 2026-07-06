@@ -9,7 +9,11 @@ import {
   type WorkerConfigType,
 } from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
-import { fetchAuth, type AuthSession } from "../shared/dao/auth.js";
+import {
+  fetchAuth,
+  setActiveAuthSession,
+  type AuthSession,
+} from "../shared/dao/auth.js";
 import { getOrFetchMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
 import type { SubrequestBudget } from "../shared/util/subrequestBudget.js";
@@ -25,6 +29,7 @@ export async function bootstrapWorker(env: Env): Promise<WorkerBootstrap> {
 
   const config = createWorkerConfig(env);
   const session = await fetchAuth(config.EMAIL, config.PASSWORD);
+  setActiveAuthSession(session);
 
   return { config, session };
 }
@@ -32,8 +37,9 @@ export async function bootstrapWorker(env: Env): Promise<WorkerBootstrap> {
 export async function loadWorkerMetadata(
   session: AuthSession,
   kv: KVNamespace,
+  options: { allowApiRefresh?: boolean } = {},
 ): Promise<FspMetadata> {
-  return getOrFetchMetadata(session.operatorId, kv);
+  return getOrFetchMetadata(session.operatorId, kv, options);
 }
 
 export function createHydratedScheduler(

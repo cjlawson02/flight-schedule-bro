@@ -86,12 +86,22 @@ export async function refreshMetadata(
 export async function getOrFetchMetadata(
   operatorId: number,
   kv: KVNamespace,
+  options: { allowApiRefresh?: boolean } = {},
 ): Promise<FspMetadata> {
+  const allowApiRefresh = options.allowApiRefresh ?? true;
+
   // Try to get from KV first
   const metadata = await getMetadataFromKV(kv);
 
   if (metadata) {
     if (metadataNeedsRefresh(metadata)) {
+      if (!allowApiRefresh) {
+        log.warn(
+          "Cached metadata is missing reservation type fields; using stale cache (run /refresh-metadata)",
+        );
+        return metadata;
+      }
+
       log.info(
         "Cached metadata is missing reservation type fields, refreshing",
       );
@@ -102,6 +112,12 @@ export async function getOrFetchMetadata(
       lastUpdated: metadata.lastUpdated,
     });
     return metadata;
+  }
+
+  if (!allowApiRefresh) {
+    throw new Error(
+      "No metadata in KV. Run /refresh-metadata before scheduled monitoring.",
+    );
   }
 
   log.info("No metadata in KV, fetching from API");
