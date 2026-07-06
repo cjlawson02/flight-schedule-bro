@@ -33,7 +33,7 @@
     "**/*.{json,md,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260702.1",
+    "@cloudflare/workers-types": "^5.0.0",
     "@eslint/js": "^10.0.1",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^25.9.4",
