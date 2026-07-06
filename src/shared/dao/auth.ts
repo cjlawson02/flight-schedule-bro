@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createLogger } from "../util/logger.js";
+import { recordActiveSubrequest } from "../util/subrequestBudget.js";
 
 const log = createLogger("auth");
 
@@ -105,6 +106,7 @@ export async function fetchAuth(
   email: string,
   password: string,
 ): Promise<AuthSession> {
+  recordActiveSubrequest();
   const login = await fetch("https://app.flightschedulepro.com/Account/Login", {
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -193,6 +195,7 @@ function extractTokenFromCookie(sessionCookies: string): string | null {
  */
 async function fetchSubscriptionKey(sessionCookies: string): Promise<string> {
   try {
+    recordActiveSubrequest();
     const response = await fetch(
       "https://app.flightschedulepro.com/AccountAppContext",
       {
@@ -248,6 +251,7 @@ async function fetchOperatorDetails(
     };
 
     // Step 1: Get list of companies to find active operator ID
+    recordActiveSubrequest();
     const listResponse = await fetch(
       "https://api-external.flightschedulepro.com/api/V1/myoperators",
       {
@@ -273,6 +277,7 @@ async function fetchOperatorDetails(
     const company = listResult.data.companies[0];
 
     // Step 2: Get detailed operator info using the operator ID
+    recordActiveSubrequest();
     const detailResponse = await fetch(
       `https://api-external.flightschedulepro.com/api/V1/myoperators/${company.id}`,
       {

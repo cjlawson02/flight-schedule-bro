@@ -124,7 +124,7 @@ describe("findNewSlots", () => {
       }),
     ];
 
-    const result = findNewSlots(current, previous, "2024-01-15", 10, LA);
+    const result = findNewSlots(current, previous, "2024-01-25", LA);
 
     expect(result).toHaveLength(1);
     expect(result[0].aircraftId).toBe("323e4567-e89b-12d3-a456-426614174000");
@@ -140,7 +140,7 @@ describe("findNewSlots", () => {
       }),
     ];
 
-    const result = findNewSlots(current, [], "2024-01-15", 10, LA);
+    const result = findNewSlots(current, [], "2024-01-25", LA);
 
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("1/20/2024");

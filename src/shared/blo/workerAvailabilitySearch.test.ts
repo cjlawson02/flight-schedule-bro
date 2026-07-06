@@ -6,6 +6,7 @@ import {
 import { dualFlightTraining } from "../dao/reservationTypes.fixtures.js";
 import { SchedulerBLO } from "./scheduler.js";
 import * as availabilitySearchModule from "./availabilitySearch.js";
+import { createSubrequestBudget } from "../util/subrequestBudget.js";
 
 describe("buildWorkerSearchResources", () => {
   it("selects monitoring reservation type and preferred aircraft", () => {
@@ -17,7 +18,6 @@ describe("buildWorkerSearchResources", () => {
         PASSWORD: "password",
         AIRCRAFT_REGEX: /172S/i,
         INSTRUCTOR_REGEX: /Doug Libal/i,
-        DAYS_AHEAD: 14,
         TIMEZONE: "America/Los_Angeles",
       },
       {
@@ -46,7 +46,6 @@ describe("buildWorkerSearchResources", () => {
           PASSWORD: "password",
           AIRCRAFT_REGEX: /172S/i,
           INSTRUCTOR_REGEX: /Doug Libal/i,
-          DAYS_AHEAD: 14,
           TIMEZONE: "America/Los_Angeles",
         },
         {
@@ -61,15 +60,16 @@ describe("buildWorkerSearchResources", () => {
 });
 
 describe("executeWorkerAvailabilitySearch", () => {
-  it("uses explicit auth context instead of global getters", async () => {
+  it("uses explicit auth context and subrequest budget", async () => {
     vi.spyOn(
       availabilitySearchModule,
-      "buildScheduleFetchTasks",
-    ).mockReturnValue([]);
-    vi.spyOn(
-      availabilitySearchModule,
-      "fetchAllAvailability",
-    ).mockResolvedValue([]);
+      "fetchScheduleDaysWithinBudget",
+    ).mockResolvedValue({
+      results: [],
+      trackedThroughDate: "2024-07-15",
+      scheduleSubrequests: 3,
+      daysFetched: 2,
+    });
     vi.spyOn(
       availabilitySearchModule,
       "filterValidAvailabilityBlocks",
@@ -81,6 +81,7 @@ describe("executeWorkerAvailabilitySearch", () => {
     );
 
     const scheduler = new SchedulerBLO(123, "America/Los_Angeles");
+    const budget = createSubrequestBudget();
 
     await executeWorkerAvailabilitySearch({
       config: {
@@ -90,7 +91,6 @@ describe("executeWorkerAvailabilitySearch", () => {
         PASSWORD: "password",
         AIRCRAFT_REGEX: /172S/i,
         INSTRUCTOR_REGEX: /Doug Libal/i,
-        DAYS_AHEAD: 14,
         TIMEZONE: "America/Los_Angeles",
       },
       fspMetadata: {
@@ -103,14 +103,16 @@ describe("executeWorkerAvailabilitySearch", () => {
       auth: {
         locationId: 999,
       },
+      budget,
       today: new Date("2024-07-15T12:00:00.000Z"),
     });
 
     expect(
-      availabilitySearchModule.buildScheduleFetchTasks,
+      availabilitySearchModule.fetchScheduleDaysWithinBudget,
     ).toHaveBeenCalledWith(
-      scheduler,
       expect.objectContaining({
+        scheduler,
+        budget,
         params: expect.objectContaining({
           locationId: 999,
         }),

@@ -66,17 +66,14 @@ An automated flight training scheduler for Flight Schedule Pro that intelligentl
    FSP_EMAIL=your-email@example.com
    FSP_PASSWORD=your-password-here
 
-   # Scheduling Configuration
-   DAYS_AHEAD=60                    # How many days ahead to search
-   AIRCRAFT_REGEX=172S|172N         # Aircraft models to search (regex pattern)
+   # Scheduling Configuration (CLI only — worker uses wrangler.toml)
+   DAYS_AHEAD=60
+   AIRCRAFT_REGEX=N65411|N737BC
 
    # Timing Preferences (OPTIONAL - defaults shown)
-   WEEKDAY_MIN_HOUR=15             # Earliest hour on weekdays (3 PM)
-   MAX_HOUR=19             # Latest hour on weekdays (7 PM)
-   WEEKEND_MIN_HOUR=8              # Earliest hour on weekends (8 AM)
-   WEEKEND_MAX_HOUR=19             # Latest hour on weekends (7 PM)
-   MIN_BLOCK_HOURS=2               # Minimum flight duration in hours
-   MAX_BLOCK_HOURS=3               # Maximum flight duration in hours
+   TIMEZONE=America/Los_Angeles
+   WEEKDAY_MIN_HOUR=15
+   MAX_HOUR=19
    ```
 
 4. **Build the project:**
@@ -133,19 +130,38 @@ Logged in!
 
 ### Environment Variables
 
-| Variable           | Required | Default | Description                             |
-| ------------------ | -------- | ------- | --------------------------------------- |
-| `FSP_EMAIL`        | ✅ Yes   | -       | Your Flight Schedule Pro email          |
-| `FSP_PASSWORD`     | ✅ Yes   | -       | Your Flight Schedule Pro password       |
-| `DAYS_AHEAD`       | ✅ Yes   | -       | Days ahead to search (e.g., 60)         |
-| `ACTIVITY_TYPE`    | ✅ Yes   | -       | Activity type ID or name (e.g., "dual") |
-| `AIRCRAFT_REGEX`   | ✅ Yes   | -       | Regex pattern for aircraft callsigns    |
-| `WEEKDAY_MIN_HOUR` | No       | 15      | Earliest booking hour on weekdays (24h) |
-| `MAX_HOUR`         | No       | 19      | Latest booking hour on weekdays (24h)   |
-| `WEEKEND_MIN_HOUR` | No       | 8       | Earliest booking hour on weekends (24h) |
-| `WEEKEND_MAX_HOUR` | No       | 19      | Latest booking hour on weekends (24h)   |
-| `MIN_BLOCK_HOURS`  | No       | 2       | Minimum flight duration (hours)         |
-| `MAX_BLOCK_HOURS`  | No       | 3       | Maximum flight duration (hours)         |
+#### CLI (`.env`)
+
+| Variable              | Required | Default              | Description                                               |
+| --------------------- | -------- | -------------------- | --------------------------------------------------------- |
+| `FSP_EMAIL`           | ✅ Yes   | -                    | Your Flight Schedule Pro email                            |
+| `FSP_PASSWORD`        | ✅ Yes   | -                    | Your Flight Schedule Pro password                         |
+| `DAYS_AHEAD`          | No       | 60                   | Days ahead to search (today + N)                          |
+| `AIRCRAFT_REGEX`      | No       | (see `.env.example`) | Regex pattern for aircraft tail numbers                   |
+| `INSTRUCTOR_REGEX`    | No       | Doug Libal           | Default instructor pick pattern (CLI)                     |
+| `TIMEZONE`            | No       | America/Los_Angeles  | Operator IANA timezone                                    |
+| `WEEKDAY_MIN_HOUR`    | No       | 15                   | Earliest booking hour on weekdays (24h)                   |
+| `MAX_HOUR`            | No       | 19                   | Latest booking hour (24h)                                 |
+| `RESERVATION_TYPE_ID` | No       | -                    | Optional UUID to override monitoring/CLI reservation type |
+
+#### Worker (`wrangler.toml` `[vars]` + secrets)
+
+The worker does **not** use `DAYS_AHEAD`. Each cron run fetches schedule days sequentially until the Cloudflare subrequest budget is exhausted.
+
+| Variable                        | Required        | Default             | Description                                                                   |
+| ------------------------------- | --------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `FSP_EMAIL`                     | ✅ Yes (secret) | -                   | Flight Schedule Pro email                                                     |
+| `FSP_PASSWORD`                  | ✅ Yes (secret) | -                   | Flight Schedule Pro password                                                  |
+| `DISCORD_WEBHOOK_URL`           | ✅ Yes (secret) | -                   | Discord webhook for notifications                                             |
+| `AIRCRAFT_REGEX`                | No              | see `wrangler.toml` | Aircraft tail numbers to monitor                                              |
+| `TIMEZONE`                      | No              | America/Los_Angeles | Operator IANA timezone                                                        |
+| `WEEKDAY_MIN_HOUR` / `MAX_HOUR` | No              | 15 / 19             | Valid slot hour window                                                        |
+| `NOTIFICATION_AIRCRAFT`         | No              | -                   | Comma-separated tail numbers; empty = all                                     |
+| `RESERVATION_TYPE_ID`           | No              | -                   | Optional monitoring reservation type UUID                                     |
+| `MAX_DAYS_AHEAD`                | No              | (none)              | Cap days searched (today + N) even if budget remains                          |
+| `WORKERS_PAID_PLAN`             | No              | false               | Set `"true"` on Workers Paid so KV counts toward the unified subrequest limit |
+
+On **Workers Free**, expect ~40+ days of lookahead when schedule pages/day ≈ 1 (50 external subrequests minus auth/reservations/Discord overhead).
 
 ### Aircraft Regex Examples
 
@@ -168,32 +184,22 @@ AIRCRAFT_REGEX=172.*
 ### Project Structure
 
 ```
-flight-schedule-bro/
+better-scheduler/
 ├── src/
-│   ├── blo/              # Business Logic Objects
-│   │   ├── calendar.ts   # Calendar integration logic
-│   │   └── scheduler.ts  # Scheduling business logic
-│   ├── dao/              # Data Access Objects
-│   │   ├── aircraft.ts   # Aircraft data access
-│   │   ├── api_wrapper.ts # API wrapper with caching/retry
-│   │   ├── auth.ts       # Authentication
-│   │   ├── availability.ts # Availability search
-│   │   ├── calendar.ts   # Calendar API access
-│   │   ├── existingReservations.ts # Existing reservation checks
-│   │   ├── instructors.ts # Instructor data access
-│   │   ├── reservations.ts # Reservation booking
-│   │   └── reservationTypes.ts # Reservation type data
-│   ├── util/             # Utility modules
-│   │   ├── cache.ts      # File-based caching system
-│   │   ├── config.ts     # Configuration management
-│   │   ├── dates.ts      # Date/time utilities
-│   │   └── interactive.ts # CLI user interface
-│   └── index.ts          # Main entry point
-├── .env                  # Environment variables (not in git)
-├── .env.example          # Environment template
-├── package.json          # Dependencies
-├── tsconfig.json         # TypeScript config
-└── vitest.config.ts      # Test configuration
+│   ├── cli/              # CLI entry point and file cache
+│   ├── worker/           # Cloudflare Worker (cron, KV, Discord)
+│   └── shared/
+│       ├── blo/          # Scheduling and availability logic
+│       ├── dao/          # Flight Schedule Pro API clients
+│       └── util/         # Config, dates, subrequest budget, etc.
+├── scripts/
+│   └── worker-sanity.ts  # Local worker search test (uses .env)
+├── .env                  # CLI environment variables (not in git)
+├── .env.example          # CLI environment template
+├── .dev.vars.example     # Worker secrets template for wrangler dev
+├── wrangler.toml         # Worker config, cron, KV, [vars]
+├── package.json
+└── vitest.config.ts
 ```
 
 ### Running Tests
@@ -233,16 +239,16 @@ npm run exec
 ### 2. Availability Search
 
 - Fetches aircraft, instructors, and reservation types
-- Searches availability for each day in the configured range
-- Uses chunked requests (3 instructors at a time) to avoid rate limits
-- Caches results for 30 minutes to reduce API load
+- Uses the FSP **Schedule v2 grid** (`POST /api/v2/schedule`) per day and computes bookable gaps from the snapshot
+- **CLI:** parallel day fetches up to `DAYS_AHEAD`; optional duration 60/90/120 minutes
+- **Worker:** sequential day fetches until the subrequest budget (or `MAX_DAYS_AHEAD`) is reached
+- Caches FSP responses (CLI: 30-minute file cache; schedule pages: 5-minute TTL)
 
 ### 3. Smart Filtering
 
-- **Time-based filtering**: Only shows slots within your preferred hours
-- **Duration filtering**: Only shows slots matching your min/max duration
+- **Time-based filtering**: Only shows slots within your preferred hour window (`WEEKDAY_MIN_HOUR`–`MAX_HOUR`)
 - **Conflict prevention**: Filters out any days where you already have a reservation
-- **Weekday/Weekend logic**: Applies different rules for weekdays vs weekends
+- **Aircraft/instructor matching**: Regex filters and interactive selection narrow results
 
 ### 4. Booking Process
 
@@ -282,9 +288,10 @@ npm run exec
 
 **Problem:** Too many requests or slow performance
 
-- The app automatically chunks requests (3 instructors at a time)
-- Results are cached for 30 minutes
-- If issues persist, reduce `DAYS_AHEAD` to search fewer days
+- FSP calls go through a queued `safeFetch()` with exponential backoff on 429/5xx
+- CLI caches responses for 30 minutes; schedule page cache TTL is 5 minutes
+- If the CLI search is slow, reduce `DAYS_AHEAD`
+- Worker lookahead is automatic on Free plan; use `MAX_DAYS_AHEAD` to cap it
 
 ### Calendar Integration Not Working
 
@@ -378,30 +385,37 @@ npx wrangler secret put DISCORD_WEBHOOK_URL
 
 ### 5. Review non-secret worker config
 
-The `[vars]` block in `wrangler.toml` contains safe defaults you can customize for your own setup:
+The `[vars]` block in `wrangler.toml` contains safe defaults you can customize:
 
-- `DAYS_AHEAD`
-- `AIRCRAFT_REGEX`
-- `WEEKDAY_MIN_HOUR`
-- `MAX_HOUR`
-- `NOTIFICATION_AIRCRAFT`
+- `AIRCRAFT_REGEX`, `TIMEZONE`, `WEEKDAY_MIN_HOUR`, `MAX_HOUR`
+- `NOTIFICATION_AIRCRAFT` — limit Discord alerts to specific tail numbers
+- `MAX_DAYS_AHEAD` — optional cap on days searched (useful on Workers Paid)
+- `WORKERS_PAID_PLAN` — set `"true"` if you upgrade to Workers Paid
 
-### 6. Deploy your worker
+### 6. Test the search locally (optional)
+
+Run the worker schedule search against FSP using your `.env` credentials (no KV or Discord):
+
+```bash
+npm run worker:sanity
+```
+
+### 7. Deploy your worker
 
 ```bash
 npm run worker:deploy
 ```
 
-### 7. Initialize the worker state
+### 8. Initialize the worker state
 
-After deploy, call the setup endpoint once to create the initial snapshot, then warm the metadata cache:
+After deploy, call the setup endpoint once to create the initial snapshot (or re-run after upgrading from an older snapshot format), then warm the metadata cache:
 
 ```bash
 curl https://your-worker.workers.dev/setup
 curl https://your-worker.workers.dev/refresh-metadata
 ```
 
-### 8. Verify it is working
+### 9. Verify it is working
 
 Useful commands once the worker is deployed:
 
@@ -410,7 +424,7 @@ npm run worker:tail
 npm run worker:dev
 ```
 
-The cron schedule in `wrangler.toml` runs every 30 minutes. Each run compares the latest availability against the previous snapshot and sends a Discord notification only for newly opened slots.
+The cron schedule in `wrangler.toml` runs every 30 minutes. Each run fetches as many schedule days as the subrequest budget allows, compares against the previous KV snapshot, and sends a Discord notification only for newly opened slots within the previously tracked window (`trackedThroughDate`).
 
 ## Contributing
 

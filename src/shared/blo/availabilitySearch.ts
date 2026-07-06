@@ -9,11 +9,15 @@ import { type ConfigType } from "../util/config.js";
 import { isValidBlock } from "../util/dates.js";
 import { addOperatorDays, formatOperatorIsoDate } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
+import {
+  CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
+  type SubrequestBudget,
+  subrequestsRemaining,
+} from "../util/subrequestBudget.js";
 
 const log = createLogger("availability-search");
 
-/** Cloudflare Workers scheduled invocations are limited to 50 subrequests. */
-export const CLOUDFLARE_SUBREQUEST_LIMIT = 50;
+export { CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT };
 
 /** Conservative non-availability subrequests per worker run (auth, reservations, KV, Discord). */
 export const WORKER_AVAILABILITY_OVERHEAD = 10;
@@ -25,6 +29,22 @@ export interface ScheduleSearchBudget {
   pagesPerDay: number;
 }
 
+/** Maximize lookahead days within the Cloudflare subrequest budget. */
+export function resolveMaxScheduleSearchBudget(
+  pagesPerDay: number,
+  options: {
+    subrequestLimit?: number;
+    overhead?: number;
+  } = {},
+): ScheduleSearchBudget {
+  const budget = resolveScheduleSearchBudget(
+    Number.MAX_SAFE_INTEGER,
+    pagesPerDay,
+    options,
+  );
+  return { ...budget, capped: false };
+}
+
 export function resolveScheduleSearchBudget(
   daysAhead: number,
   pagesPerDay: number,
@@ -34,7 +54,7 @@ export function resolveScheduleSearchBudget(
   } = {},
 ): ScheduleSearchBudget {
   const subrequestLimit =
-    options.subrequestLimit ?? CLOUDFLARE_SUBREQUEST_LIMIT;
+    options.subrequestLimit ?? CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT;
   const overhead = options.overhead ?? WORKER_AVAILABILITY_OVERHEAD;
   const maxAvailabilityFetches = subrequestLimit - overhead;
 
@@ -75,15 +95,20 @@ export function logScheduleSearchBudget(
       effectiveDaysAhead: budget.daysAhead,
       pagesPerDay: budget.pagesPerDay,
       availabilityFetches: budget.totalFetches,
-      subrequestLimit: CLOUDFLARE_SUBREQUEST_LIMIT,
+      subrequestLimit: CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
     });
   } else {
-    log.info("Schedule search budget", {
-      daysAhead: budget.daysAhead,
-      pagesPerDay: budget.pagesPerDay,
-      availabilityFetches: budget.totalFetches,
-    });
+    logMaxScheduleSearchBudget(budget);
   }
+}
+
+export function logMaxScheduleSearchBudget(budget: ScheduleSearchBudget): void {
+  log.info("Schedule search budget", {
+    daysAhead: budget.daysAhead,
+    pagesPerDay: budget.pagesPerDay,
+    availabilityFetches: budget.totalFetches,
+    subrequestLimit: CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
+  });
 }
 
 export interface AvailabilitySearchParams {
@@ -127,6 +152,82 @@ export function estimateSchedulePagesPerDay(
   aircraftCount: number,
 ): number {
   return estimatePagesPerDay(instructorCount + aircraftCount);
+}
+
+export interface WorkerScheduleSearchResult {
+  results: BookableAvailability[];
+  trackedThroughDate: string;
+  scheduleSubrequests: number;
+  daysFetched: number;
+}
+
+export async function fetchScheduleDaysWithinBudget(options: {
+  scheduler: SchedulerBLO;
+  params: AvailabilitySearchParams;
+  prepared: PreparedScheduleSearch;
+  today: Date;
+  budget: SubrequestBudget;
+  maxDaysAhead?: number;
+}): Promise<WorkerScheduleSearchResult> {
+  const { scheduler, params, prepared, today, budget, maxDaysAhead } = options;
+  const durationMinutes =
+    params.durationMinutes ?? params.reservationType.defaultLength;
+  const results: BookableAvailability[] = [];
+  const scheduleStartUsed = budget.used;
+  let trackedThroughDate = formatOperatorIsoDate(today, params.timeZone);
+  let daysFetched = 0;
+
+  for (let offset = 0; ; offset++) {
+    if (maxDaysAhead !== undefined && offset > maxDaysAhead) {
+      break;
+    }
+
+    if (!canFetchAnotherScheduleDay(budget)) {
+      break;
+    }
+
+    const day = addOperatorDays(today, offset, params.timeZone);
+    const dayISO = formatOperatorIsoDate(day, params.timeZone);
+    const { availability, complete } =
+      await scheduler.getBookableAvailabilityForDay({
+        locationId: params.locationId,
+        activityTypeId: params.activityTypeId,
+        instructorIds: prepared.searchResources.instructors,
+        aircraftIds: prepared.searchResources.aircraftIds,
+        startDate: dayISO,
+        lengthOfReservationInMinutes: durationMinutes,
+        budget,
+      });
+
+    if (!complete) {
+      break;
+    }
+
+    results.push(...availability);
+    trackedThroughDate = dayISO;
+    daysFetched++;
+  }
+
+  const scheduleSubrequests = budget.used - scheduleStartUsed;
+  log.info("Schedule search completed", {
+    daysFetched,
+    trackedThroughDate,
+    scheduleSubrequests,
+    maxDaysAhead,
+    subrequestsRemaining: subrequestsRemaining(budget),
+    subrequestLimit: budget.limit,
+  });
+
+  return {
+    results,
+    trackedThroughDate,
+    scheduleSubrequests,
+    daysFetched,
+  };
+}
+
+function canFetchAnotherScheduleDay(budget: SubrequestBudget): boolean {
+  return subrequestsRemaining(budget) > 0;
 }
 
 export function buildScheduleFetchTasks(
@@ -189,7 +290,7 @@ export async function fetchAllAvailability(
 
 export function filterValidAvailabilityBlocks(
   results: BookableAvailability[],
-  config: ConfigType,
+  config: Pick<ConfigType, "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "MAX_HOUR">,
   expectedDurationMinutes: number,
 ): BookableAvailability[] {
   return results.filter((result) =>

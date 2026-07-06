@@ -1,9 +1,5 @@
 import type { BookableAvailability } from "../dao/availability.js";
-import {
-  addOperatorDays,
-  endOfOperatorDay,
-  parseOperatorDateString,
-} from "./flightTime.js";
+import { endOfOperatorDay, parseOperatorDateString } from "./flightTime.js";
 
 /** Minimum hours before slot start before a Discord notification is sent. */
 export const DISCORD_NOTIFICATION_MIN_LEAD_HOURS = 24;
@@ -80,14 +76,12 @@ function createSlotKey(slot: BookableAvailability): string {
 export function findNewSlots(
   currentSlots: BookableAvailability[],
   previousSlots: BookableAvailability[],
-  lastSearchDateIso: string,
-  daysAhead: number,
+  previousTrackedThroughDateIso: string,
   timeZone: string,
 ): BookableAvailability[] {
   const previousSlotKeys = new Set(previousSlots.map(createSlotKey));
-  const lastSearchDate = parseOperatorDateString(lastSearchDateIso, timeZone);
   const maxTrackedDateOnly = endOfOperatorDay(
-    addOperatorDays(lastSearchDate, daysAhead, timeZone),
+    parseOperatorDateString(previousTrackedThroughDateIso, timeZone),
     timeZone,
   );
 

@@ -6,6 +6,10 @@ import {
   parseOperatorDateString,
 } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
+import {
+  canMakeSubrequest,
+  type SubrequestBudget,
+} from "../util/subrequestBudget.js";
 
 const log = createLogger("schedule");
 
@@ -98,6 +102,13 @@ export interface FetchScheduleDayParams {
   aircraftIds: string[];
   instructorIds: string[];
   reservationTypeIds: string[];
+  budget?: SubrequestBudget;
+}
+
+export interface ScheduleDayFetchResult {
+  snapshot: ScheduleDaySnapshot;
+  complete: boolean;
+  pagesFetched: number;
 }
 
 function emptySnapshot(): ScheduleDaySnapshot {
@@ -218,13 +229,22 @@ export async function fetchSchedulePage(
 
 export async function fetchScheduleDay(
   params: FetchScheduleDayParams,
-): Promise<ScheduleDaySnapshot> {
+): Promise<ScheduleDayFetchResult> {
   const end = scheduleExclusiveEndDate(params.start, params.timeZone);
   const merged = emptySnapshot();
   let page = 1;
   let previousPageIndex: number | null = null;
+  let pagesFetched = 0;
 
   while (page <= MAX_SCHEDULE_PAGES) {
+    if (params.budget && !canMakeSubrequest(params.budget)) {
+      log.info("Schedule fetch stopped: subrequest budget exhausted", {
+        start: params.start,
+        pagesFetched,
+      });
+      return { snapshot: merged, complete: false, pagesFetched };
+    }
+
     const response = await fetchSchedulePage({
       operatorId: params.operatorId,
       locationId: params.locationId,
@@ -235,6 +255,7 @@ export async function fetchScheduleDay(
       reservationTypeIds: params.reservationTypeIds,
       page,
     });
+    pagesFetched++;
 
     if (previousPageIndex !== null && response.pageIndex <= previousPageIndex) {
       log.warn("Schedule pagination did not advance; using partial snapshot", {
@@ -242,7 +263,7 @@ export async function fetchScheduleDay(
         pageIndex: response.pageIndex,
         previousPageIndex,
       });
-      break;
+      return { snapshot: merged, complete: false, pagesFetched };
     }
     previousPageIndex = response.pageIndex;
 
@@ -253,20 +274,18 @@ export async function fetchScheduleDay(
       response.results.resources.length === 0;
 
     if (reachedEnd) {
-      break;
+      return { snapshot: merged, complete: true, pagesFetched };
     }
 
     page++;
   }
 
-  if (page > MAX_SCHEDULE_PAGES) {
-    log.warn("Reached MAX_SCHEDULE_PAGES; using partial schedule snapshot", {
-      start: params.start,
-      maxPages: MAX_SCHEDULE_PAGES,
-    });
-  }
+  log.warn("Reached MAX_SCHEDULE_PAGES; using partial schedule snapshot", {
+    start: params.start,
+    maxPages: MAX_SCHEDULE_PAGES,
+  });
 
-  return merged;
+  return { snapshot: merged, complete: false, pagesFetched };
 }
 
 export function estimatePagesPerDay(resourceCount: number): number {

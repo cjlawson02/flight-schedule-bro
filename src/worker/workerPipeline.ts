@@ -4,15 +4,19 @@ import {
   type WorkerAvailabilitySearchResult,
 } from "../shared/blo/workerAvailabilitySearch.js";
 import type { FspMetadata } from "../shared/blo/fspMetadata.js";
-import { createWorkerConfig, type ConfigType } from "../shared/util/config.js";
+import {
+  createWorkerConfig,
+  type WorkerConfigType,
+} from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
 import { fetchAuth, type AuthSession } from "../shared/dao/auth.js";
 import { getOrFetchMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
+import type { SubrequestBudget } from "../shared/util/subrequestBudget.js";
 import type { Env } from "./types.js";
 
 export interface WorkerBootstrap {
-  config: ConfigType;
+  config: WorkerConfigType;
   session: AuthSession;
 }
 
@@ -43,10 +47,11 @@ export function createHydratedScheduler(
 }
 
 export async function runWorkerAvailabilitySearchFlow(options: {
-  config: ConfigType;
+  config: WorkerConfigType;
   session: AuthSession;
   fspMetadata: FspMetadata;
   scheduler: SchedulerBLO;
+  budget: SubrequestBudget;
   today?: Date;
   failFast?: boolean;
 }): Promise<WorkerAvailabilitySearchResult> {
@@ -60,6 +65,7 @@ export async function runWorkerAvailabilitySearchFlow(options: {
     auth: {
       locationId: options.session.defaultLocationId,
     },
+    budget: options.budget,
     today,
     failFast: options.failFast,
   });

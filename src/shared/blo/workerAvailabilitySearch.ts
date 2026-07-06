@@ -4,21 +4,18 @@ import {
   selectMonitoringReservationType,
   type ReservationType,
 } from "../dao/reservationTypes.js";
-import { type ConfigType } from "../util/config.js";
+import { type WorkerConfigType } from "../util/config.js";
 import { startOfOperatorDay } from "../util/flightTime.js";
 import type { FspMetadata } from "./fspMetadata.js";
 import { SchedulerBLO } from "./scheduler.js";
 import {
-  buildScheduleFetchTasks,
-  estimateSchedulePagesPerDay,
-  fetchAllAvailability,
+  fetchScheduleDaysWithinBudget,
   filterValidAvailabilityBlocks,
-  logScheduleSearchBudget,
   prepareScheduleSearch,
-  resolveScheduleSearchBudget,
-  type ScheduleSearchBudget,
+  type WorkerScheduleSearchResult,
 } from "./availabilitySearch.js";
 import { selectPreferredAircraftIds } from "../dao/aircraft.js";
+import type { SubrequestBudget } from "../util/subrequestBudget.js";
 
 export interface WorkerAuthContext {
   locationId: number;
@@ -26,13 +23,13 @@ export interface WorkerAuthContext {
 
 export interface WorkerAvailabilitySearchResult {
   validResults: BookableAvailability[];
-  budget: ScheduleSearchBudget;
+  search: WorkerScheduleSearchResult;
   reservationType: ReservationType;
   today: Date;
 }
 
 export function buildWorkerSearchResources(
-  config: ConfigType,
+  config: WorkerConfigType,
   fspMetadata: FspMetadata,
 ): {
   reservationType: ReservationType;
@@ -70,15 +67,15 @@ export function buildWorkerSearchResources(
 }
 
 export async function executeWorkerAvailabilitySearch(options: {
-  config: ConfigType;
+  config: WorkerConfigType;
   fspMetadata: FspMetadata;
   scheduler: SchedulerBLO;
   auth: WorkerAuthContext;
+  budget: SubrequestBudget;
   today?: Date;
   failFast?: boolean;
-  onTaskComplete?: () => void;
 }): Promise<WorkerAvailabilitySearchResult> {
-  const { config, fspMetadata, scheduler, auth } = options;
+  const { config, fspMetadata, scheduler, auth, budget } = options;
   const today =
     options.today ?? startOfOperatorDay(new Date(), config.TIMEZONE);
   const { reservationType, allInstructorIds, aircraftIds } =
@@ -98,45 +95,27 @@ export async function executeWorkerAvailabilitySearch(options: {
     throw new Error("No instructors or aircraft available for search.");
   }
 
-  const pagesPerDay = estimateSchedulePagesPerDay(
-    prepared.searchResources.instructors.length,
-    prepared.searchResources.aircraftIds.length,
-  );
+  budget.reserve = 1;
 
-  const budget = resolveScheduleSearchBudget(config.DAYS_AHEAD, pagesPerDay);
-  logScheduleSearchBudget(budget, config.DAYS_AHEAD);
-
-  const bookablePromises = buildScheduleFetchTasks(scheduler, {
-    params: searchParams,
-    prepared,
-    today,
-    daysAhead: budget.daysAhead,
-  });
-
-  let tasks = bookablePromises;
-  if (options.onTaskComplete) {
-    tasks = bookablePromises.map((promise) =>
-      promise
-        .then((result) => {
-          options.onTaskComplete?.();
-          return result;
-        })
-        .catch((error: unknown) => {
-          options.onTaskComplete?.();
-          throw error;
-        }),
-    );
+  let search: WorkerScheduleSearchResult;
+  try {
+    search = await fetchScheduleDaysWithinBudget({
+      scheduler,
+      params: searchParams,
+      prepared,
+      today,
+      budget,
+      maxDaysAhead: config.MAX_DAYS_AHEAD,
+    });
+  } finally {
+    budget.reserve = 0;
   }
 
-  const allBookableResults = await fetchAllAvailability(tasks, {
-    failFast: options.failFast,
-  });
-
   const validResults = filterValidAvailabilityBlocks(
-    allBookableResults,
+    search.results,
     config,
     reservationType.defaultLength,
   );
 
-  return { validResults, budget, reservationType, today };
+  return { validResults, search, reservationType, today };
 }

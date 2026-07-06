@@ -37,6 +37,9 @@ npm run worker:deploy
 
 # View logs
 npm run worker:tail
+
+# Test schedule search locally (uses .env, no KV/Discord)
+npm run worker:sanity
 ```
 
 ### Testing
@@ -91,6 +94,7 @@ src/
 │   │   ├── scheduler.ts           # Core scheduling logic
 │   │   ├── scheduleGaps.ts        # Interval/gap computation from schedule grid
 │   │   ├── scheduleAvailability.ts # Schedule snapshot → BookableAvailability
+│   │   ├── workerAvailabilitySearch.ts # Worker cron search orchestration
 │   │   └── calendar.ts            # Calendar integration (CLI only)
 │   ├── dao/          # Data Access Objects (Flight Schedule Pro API)
 │   │   ├── api_wrapper.ts  # Fetch wrapper with rate limiting & caching
@@ -105,6 +109,8 @@ src/
 │   └── util/         # Utilities
 │       ├── config.ts       # Environment variable validation
 │       ├── dates.ts        # Date/time utilities & validation
+│       ├── subrequestBudget.ts # Cloudflare subrequest tracking (worker)
+│       ├── snapshotTracking.ts # Rolling-window trackedThroughDate helpers
 │       ├── interactive.ts  # CLI prompts (CLI only)
 │       └── progressBar.ts  # Progress display (CLI only)
 ```
@@ -124,9 +130,19 @@ src/
 - Uses `POST /api/v2/schedule` per day (CLI, worker, and activity-type upgrades)
 - Paginates resources (50 per page) and merges events, unavailability, and closings
 - Gap computation intersects aircraft and instructor free windows at 30-minute steps
-- Worker subrequest budget: `(daysAhead + 1) × pagesPerDay` (typically ~39 days max)
+- CLI: parallel day fetches capped by `DAYS_AHEAD` in `.env`
+- Worker: sequential day fetches in `fetchScheduleDaysWithinBudget()` until the subrequest budget is exhausted (or `MAX_DAYS_AHEAD` is reached)
 - CLI supports duration selection: 60, 90, or 120 minutes (defaults to reservation type `defaultLength`)
-- 5-minute cache TTL per schedule page
+- 5-minute cache TTL per schedule page (CLI file cache only; worker is stateless)
+
+**Worker Subrequest Budget** (`src/shared/util/subrequestBudget.ts`, `src/shared/blo/workerAvailabilitySearch.ts`)
+
+- Tracks outgoing `fetch()` calls during each cron run (auth, FSP API, Discord)
+- **Workers Free (default):** 50 external subrequests per invocation; KV uses a separate 1,000-op internal quota and is not counted
+- **Workers Paid (`WORKERS_PAID_PLAN=true`):** unified 10,000 subrequest limit; KV get/put also counts
+- Reserves 1 subrequest for Discord before schedule fetching
+- Optional `MAX_DAYS_AHEAD` in `wrangler.toml` caps calendar days searched even when budget remains
+- Local sanity check: `npm run worker:sanity` (uses `.env`, no KV/Discord)
 
 **API Wrapper with Rate Limiting** (`src/shared/dao/api_wrapper.ts`)
 
@@ -139,18 +155,18 @@ src/
 - Automatically retries on 429 (rate limit) and 5xx errors
 - Uses Zod for runtime type validation
 
-**Worker Rolling Window Algorithm** (`src/worker/index.ts`)
+**Worker Rolling Window Algorithm** (`src/worker/scheduled.ts`, `src/shared/util/slots.ts`)
 
-- `findNewSlots()` prevents false notifications when date range advances
-- Compares current snapshot to previous snapshot
+- `findNewSlots()` prevents false notifications when the searched date range advances
+- Compares current snapshot to previous snapshot using `metadata.trackedThroughDate`
 - Only notifies about slots within the previously tracked window
 - Cleans up past slots automatically before each run
 
 **Environment Validation** (`src/shared/util/config.ts`)
 
 - Uses Zod schemas for runtime validation
-- CLI loads from `.env` via dotenv
-- Worker receives from Cloudflare environment
+- CLI loads from `.env` via dotenv (`DAYS_AHEAD`, etc.)
+- Worker receives from Cloudflare `Env` / `wrangler.toml` (no `DAYS_AHEAD`; lookahead is budget-driven)
 - Throws descriptive errors for missing/invalid config
 
 ## Testing Notes
@@ -162,11 +178,12 @@ src/
 
 ## Important API Constraints
 
-1. **Schedule Pagination**: Resource pages are capped at 50; worker budget uses `pagesPerDay` estimate
-2. **Rate Limiting**: FSP API has rate limits - use caching and exponential backoff
-3. **Cloudflare Worker Limits**:
-   - 50 subrequest limit (stay under with `DAYS_AHEAD` config and `pagesPerDay` estimate)
-   - KV operations count toward limits
+1. **Schedule Pagination**: Resource pages are capped at 50 per day-query
+2. **Rate Limiting**: FSP API has rate limits — use caching and exponential backoff
+3. **Cloudflare Worker Limits** (see [Workers limits](https://developers.cloudflare.com/workers/platform/limits/#subrequests)):
+   - **Free:** 50 external subrequests per cron invocation; KV/D1/R2 use a separate 1,000-op internal quota
+   - **Paid:** unified subrequest pool (default 10,000); set `WORKERS_PAID_PLAN=true` so KV is tracked
+   - Worker fills the external/unified budget sequentially — no manual day-count tuning required on Free
 4. **Time Zones**: All times are local timezone; schedule grid uses `YYYY-MM-DD HH:mm:ss`
 
 **KV Snapshot Structure**:
@@ -174,14 +191,12 @@ src/
 ```typescript
 {
   metadata: {
-    lastSearchDate: "2024-11-15",  // Rolling window anchor
+    lastSearchDate: "2024-11-15",       // Rolling window anchor (today at search time)
     lastUpdate: "2024-11-15T10:30:00Z",
-    daysAhead: 14
+    trackedThroughDate: "2024-12-27"    // Last calendar day fully fetched
+    // legacy snapshots may still have daysAhead instead of trackedThroughDate
   },
-  slots: {
-    "slot-key-1": { ...BookableAvailability },
-    "slot-key-2": { ...BookableAvailability }
-  }
+  slots: [ /* BookableAvailabilityKV[] */ ]
 }
 ```
 
@@ -199,7 +214,8 @@ src/
 
 ## Configuration Files
 
-- `.env` - CLI environment variables (not in git)
-- `wrangler.toml` - Worker configuration and KV bindings
+- `.env` - CLI environment variables (not in git); includes `DAYS_AHEAD`
+- `wrangler.toml` - Worker `[vars]` (`AIRCRAFT_REGEX`, `MAX_DAYS_AHEAD`, `WORKERS_PAID_PLAN`, etc.) and KV bindings
+- `.dev.vars` - Worker secrets for local `wrangler dev` (see `.dev.vars.example`)
 - `vitest.config.ts` - Test configuration
 - `tsconfig.json` - TypeScript configuration (extends @tsconfig/node24)

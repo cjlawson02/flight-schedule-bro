@@ -206,7 +206,11 @@ describe("SchedulerBLO", () => {
         }),
       );
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
-      vi.mocked(scheduleDAO.fetchScheduleDay).mockResolvedValue(emptySnapshot);
+      vi.mocked(scheduleDAO.fetchScheduleDay).mockResolvedValue({
+        snapshot: emptySnapshot,
+        complete: true,
+        pagesFetched: 1,
+      });
       await scheduler.initialize();
     });
 

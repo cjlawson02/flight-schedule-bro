@@ -15,11 +15,25 @@ import {
 /**
  * Metadata schema for tracking snapshot state
  */
-export const MetadataSchema = z.object({
-  lastSearchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  lastUpdate: z.iso.datetime(),
-  daysAhead: z.number().int().positive(),
-});
+export const MetadataSchema = z
+  .object({
+    lastSearchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    lastUpdate: z.iso.datetime(),
+    trackedThroughDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    /** @deprecated Legacy snapshots only — prefer trackedThroughDate. */
+    daysAhead: z.number().int().positive().optional(),
+  })
+  .refine(
+    (metadata) =>
+      metadata.trackedThroughDate !== undefined ||
+      (metadata as { daysAhead?: number }).daysAhead !== undefined,
+    {
+      message: "Metadata requires trackedThroughDate or legacy daysAhead",
+    },
+  );
 
 export { FspMetadataSchema, type FspMetadata };
 
@@ -109,13 +123,16 @@ export interface Env {
   DISCORD_WEBHOOK_URL: string;
 
   // Configuration variables
-  DAYS_AHEAD: string;
   AIRCRAFT_REGEX: string;
   WEEKDAY_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
   NOTIFICATION_AIRCRAFT?: string; // Comma-separated aircraft tail numbers for Discord notifications
   RESERVATION_TYPE_ID?: string;
+  /** Set to "true" on Workers Paid — KV ops count toward the unified subrequest limit. */
+  WORKERS_PAID_PLAN?: string;
+  /** Optional cap on days searched (today + N). */
+  MAX_DAYS_AHEAD?: string;
 }
 
 /**

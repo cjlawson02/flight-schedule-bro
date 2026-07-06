@@ -50,8 +50,7 @@ describe("Worker Index - Helper Functions", () => {
       const newSlots = findNewSlots(
         currentSlots,
         previousSlots,
-        "2024-01-15",
-        60,
+        "2024-03-15",
         LA,
       );
 
@@ -77,7 +76,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].date).toBe("1/20/2024");
@@ -92,7 +91,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(slots, slots, "2024-01-15", 60, LA);
+      const newSlots = findNewSlots(slots, slots, "2024-03-15", LA);
 
       expect(newSlots).toHaveLength(0);
     });
@@ -122,8 +121,7 @@ describe("Worker Index - Helper Functions", () => {
       const newSlots = findNewSlots(
         currentSlots,
         previousSlots,
-        "2024-01-15",
-        60,
+        "2024-03-15",
         LA,
       );
 
@@ -162,7 +160,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(2);
       expect(newSlots.every((slot) => slot.date === "1/25/2024")).toBe(true);
@@ -192,7 +190,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
@@ -211,7 +209,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
@@ -230,7 +228,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(1);
     });
@@ -257,7 +255,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(currentSlots, [], "2024-01-15", 10, LA);
+      const newSlots = findNewSlots(currentSlots, [], "2024-01-25", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-123");
@@ -281,7 +279,6 @@ describe("Worker HTTP Endpoints", () => {
       FSP_EMAIL: "test@example.com",
       FSP_PASSWORD: "password",
       DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-      DAYS_AHEAD: "60",
       AIRCRAFT_REGEX: "172S",
     };
   });
@@ -320,7 +317,7 @@ describe("Worker HTTP Endpoints", () => {
       const metadata = {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:00:00.000Z",
-        daysAhead: 60,
+        trackedThroughDate: "2024-03-15",
       };
 
       const expectedResponse = {

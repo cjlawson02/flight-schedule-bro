@@ -5,6 +5,11 @@ import {
   runWorkerAvailabilitySearchFlow,
 } from "./workerPipeline.js";
 import { getErrorMessage } from "../shared/util/errors.js";
+import {
+  createWorkerSubrequestBudget,
+  parseWorkersPaidPlan,
+  setActiveSubrequestBudget,
+} from "../shared/util/subrequestBudget.js";
 import { initializeSnapshot } from "./kv.js";
 import { sendSimpleNotification } from "./discord.js";
 import { createLogger } from "../shared/util/logger.js";
@@ -20,6 +25,10 @@ const log = createLogger("setup");
  * @returns Response with status message
  */
 export async function runSetup(env: Env): Promise<Response> {
+  const paidMode = parseWorkersPaidPlan(env.WORKERS_PAID_PLAN);
+  const budget = createWorkerSubrequestBudget({ paidMode });
+  setActiveSubrequestBudget(budget);
+
   try {
     log.info("Starting setup");
 
@@ -35,6 +44,7 @@ export async function runSetup(env: Env): Promise<Response> {
       instructors: fspMetadata.instructors.length,
       reservationTypes: fspMetadata.reservationTypes.length,
       aircraft: fspMetadata.aircraft.length,
+      subrequestsUsed: budget.used,
     });
 
     const scheduler = createHydratedScheduler(
@@ -43,12 +53,13 @@ export async function runSetup(env: Env): Promise<Response> {
       config.TIMEZONE,
     );
 
-    const { validResults, budget, reservationType } =
+    const { validResults, search, reservationType } =
       await runWorkerAvailabilitySearchFlow({
         config,
         session,
         fspMetadata,
         scheduler,
+        budget,
         failFast: true,
       });
 
@@ -58,22 +69,21 @@ export async function runSetup(env: Env): Promise<Response> {
       activityTypeId: reservationType.reservationTypeId,
     });
 
-    // Initialize snapshot in KV
     await initializeSnapshot(
       env,
       validResults,
-      budget.daysAhead,
+      search.trackedThroughDate,
       config.TIMEZONE,
     );
 
-    const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots for the next ${budget.daysAhead} days.`;
+    const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots through ${search.trackedThroughDate}.`;
     log.info("Setup complete", {
       slotsCount: validResults.length,
-      configuredDaysAhead: config.DAYS_AHEAD,
-      effectiveDaysAhead: budget.daysAhead,
+      trackedThroughDate: search.trackedThroughDate,
+      daysFetched: search.daysFetched,
+      subrequestsUsed: budget.used,
     });
 
-    // Send notification to Discord
     try {
       await sendSimpleNotification(env, successMessage);
     } catch (error) {
@@ -85,7 +95,8 @@ export async function runSetup(env: Env): Promise<Response> {
         success: true,
         message: successMessage,
         slotsCount: validResults.length,
-        daysAhead: budget.daysAhead,
+        trackedThroughDate: search.trackedThroughDate,
+        daysFetched: search.daysFetched,
       }),
       {
         status: 200,
@@ -106,5 +117,7 @@ export async function runSetup(env: Env): Promise<Response> {
         headers: { "Content-Type": "application/json" },
       },
     );
+  } finally {
+    setActiveSubrequestBudget(null);
   }
 }

@@ -1,5 +1,6 @@
 import z from "zod";
 import { getSubscriptionKey, getAuthToken } from "./auth.js";
+import { recordActiveSubrequest } from "../util/subrequestBudget.js";
 import { createLogger } from "../util/logger.js";
 
 const log = createLogger("api-wrapper");
@@ -45,7 +46,7 @@ export function setCacheAdapter(adapter: CacheAdapter | null) {
  *    - Rate-limit responses wait out the API window and release concurrency slots while waiting
  *
  * 4. **Schedule snapshot pagination**
- *    - One paginated schedule fetch per search day via resolveScheduleSearchBudget()
+ *    - One paginated schedule fetch per search day via resolveMaxScheduleSearchBudget()
  *
  * Why This Works:
  * - Most rate limits are time-based (e.g., "X requests per minute")
@@ -203,6 +204,7 @@ export async function safeFetch<T extends z.ZodType>(
         attemptCount++;
 
         try {
+          recordActiveSubrequest();
           const res = await fetch(url, {
             method,
             headers: {

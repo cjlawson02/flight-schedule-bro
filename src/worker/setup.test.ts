@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { resolveMaxScheduleSearchBudget } from "../shared/blo/availabilitySearch.js";
 import type { Env } from "./types.js";
 
 describe("Worker Setup", () => {
@@ -18,7 +19,6 @@ describe("Worker Setup", () => {
       FSP_EMAIL: "test@example.com",
       FSP_PASSWORD: "password",
       DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-      DAYS_AHEAD: "60",
       AIRCRAFT_REGEX: "172S|172N",
       WEEKDAY_MIN_HOUR: "15",
       MAX_HOUR: "19",
@@ -29,7 +29,6 @@ describe("Worker Setup", () => {
     it("validates required environment variables", () => {
       expect(mockEnv.FSP_EMAIL).toBeDefined();
       expect(mockEnv.FSP_PASSWORD).toBeDefined();
-      expect(mockEnv.DAYS_AHEAD).toBeDefined();
       expect(mockEnv.AIRCRAFT_REGEX).toBeDefined();
     });
 
@@ -39,7 +38,6 @@ describe("Worker Setup", () => {
         FSP_EMAIL: "test@example.com",
         FSP_PASSWORD: "password",
         DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-        DAYS_AHEAD: "60",
         AIRCRAFT_REGEX: "172S",
       };
 
@@ -96,14 +94,15 @@ describe("Worker Setup", () => {
       const successResponse = {
         success: true,
         message:
-          "✅ Setup complete! Initialized with 42 available time slots for the next 60 days.",
+          "✅ Setup complete! Initialized with 42 available time slots through 2024-03-15.",
         slotsCount: 42,
-        daysAhead: 60,
+        trackedThroughDate: "2024-03-15",
+        daysFetched: 39,
       };
 
       expect(successResponse.success).toBe(true);
       expect(successResponse.slotsCount).toBe(42);
-      expect(successResponse.daysAhead).toBe(60);
+      expect(successResponse.trackedThroughDate).toBe("2024-03-15");
       expect(successResponse.message).toContain("Setup complete");
     });
   });
@@ -146,13 +145,12 @@ describe("Worker Setup", () => {
   });
 
   describe("Date Range Calculation", () => {
-    it("calculates correct date range for DAYS_AHEAD", () => {
+    it("derives max lookahead from the subrequest budget for CLI searches", () => {
+      const budget = resolveMaxScheduleSearchBudget(1);
       const today = new Date("2024-01-15T12:00:00.000Z");
-
-      const daysAhead = 60;
       const dates: string[] = [];
 
-      for (let offset = 0; offset <= daysAhead; offset++) {
+      for (let offset = 0; offset <= budget.daysAhead; offset++) {
         const day = new Date(today);
         day.setUTCHours(0, 0, 0, 0);
         day.setUTCDate(day.getUTCDate() + offset);
@@ -160,9 +158,9 @@ describe("Worker Setup", () => {
         dates.push(dayISO);
       }
 
-      expect(dates).toHaveLength(61);
+      expect(dates).toHaveLength(40);
       expect(dates[0]).toBe("2024-01-15");
-      expect(dates[60]).toBe("2024-03-15");
+      expect(dates[39]).toBe("2024-02-23");
     });
   });
 

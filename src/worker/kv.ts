@@ -13,6 +13,7 @@ import {
   formatOperatorIsoDate,
   startOfOperatorDay,
 } from "../shared/util/flightTime.js";
+import { recordActiveKvSubrequest } from "../shared/util/subrequestBudget.js";
 import { createLogger } from "../shared/util/logger.js";
 
 const log = createLogger("kv");
@@ -51,6 +52,7 @@ function deserializeAvailability(
  * @returns Snapshot object or null if not found
  */
 export async function getSnapshot(env: Env): Promise<Snapshot | null> {
+  recordActiveKvSubrequest();
   const raw = await env.FSP_AVAILABILITY_KV.get(SNAPSHOT_KEY, "text");
 
   if (!raw) {
@@ -104,6 +106,11 @@ export async function setSnapshot(
     );
   }
 
+  await putSnapshot(env, snapshot);
+}
+
+async function putSnapshot(env: Env, snapshot: Snapshot): Promise<void> {
+  recordActiveKvSubrequest();
   await env.FSP_AVAILABILITY_KV.put(SNAPSHOT_KEY, JSON.stringify(snapshot));
 }
 
@@ -153,12 +160,12 @@ export function cleanPastSlotsFromSnapshot(
  * Initialize or reset the snapshot (used during setup)
  * @param env - Worker environment with KV binding
  * @param slots - Initial availability slots
- * @param daysAhead - Number of days ahead being tracked
+ * @param trackedThroughDate - Last calendar day fully searched
  */
 export async function initializeSnapshot(
   env: Env,
   slots: BookableAvailability[],
-  daysAhead: number,
+  trackedThroughDate: string,
   timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   const now = new Date();
@@ -170,7 +177,7 @@ export async function initializeSnapshot(
   const metadata: Metadata = {
     lastSearchDate: todayISO,
     lastUpdate: now.toISOString(),
-    daysAhead,
+    trackedThroughDate,
   };
 
   await setSnapshot(env, slots, metadata);

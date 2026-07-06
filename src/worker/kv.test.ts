@@ -31,7 +31,6 @@ const createMockEnv = (kvMock: any): Env => {
     FSP_EMAIL: "test@example.com",
     FSP_PASSWORD: "password",
     DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-    DAYS_AHEAD: "60",
     AIRCRAFT_REGEX: "172S",
   };
 };
@@ -57,7 +56,7 @@ describe("Worker KV Operations", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 
@@ -102,7 +101,7 @@ describe("Worker KV Operations", () => {
       const metadata: Metadata = {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:00:00.000Z",
-        daysAhead: 60,
+        trackedThroughDate: "2024-03-15",
       };
 
       await setSnapshot(env, slots, metadata);
@@ -129,7 +128,7 @@ describe("Worker KV Operations", () => {
       const metadata: Metadata = {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:00:00.000Z",
-        daysAhead: 60,
+        trackedThroughDate: "2024-03-15",
       };
 
       await expect(setSnapshot(env, invalidSlots, metadata)).rejects.toThrow(
@@ -152,12 +151,12 @@ describe("Worker KV Operations", () => {
         },
       ];
 
-      await initializeSnapshot(env, slots, 60);
+      await initializeSnapshot(env, slots, "2024-03-15");
 
       const result = await getSnapshot(env);
       expect(result).not.toBeNull();
       expect(result!.slots).toHaveLength(1);
-      expect(result!.metadata.daysAhead).toBe(60);
+      expect(result!.metadata.trackedThroughDate).toBe("2024-03-15");
       expect(result!.metadata.lastSearchDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
@@ -186,7 +185,7 @@ describe("Worker KV Operations", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 
@@ -237,7 +236,7 @@ describe("Worker KV Operations", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 
@@ -280,7 +279,7 @@ describe("Worker KV Operations", () => {
         metadata: {
           lastSearchDate: "2024-01-20",
           lastUpdate: "2024-01-20T12:00:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 
@@ -311,7 +310,7 @@ describe("Worker KV Operations", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:00:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 

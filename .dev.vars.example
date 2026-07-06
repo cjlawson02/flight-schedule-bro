@@ -1,7 +1,9 @@
 # Copy this file to .dev.vars for local Worker development
-# These variables are used when running: npm run worker:dev
+# These secrets are used when running: npm run worker:dev
+#
+# Non-secret worker config (AIRCRAFT_REGEX, MAX_DAYS_AHEAD, etc.)
+# lives in wrangler.toml [vars].
 
 FSP_EMAIL=your-email@example.com
 FSP_PASSWORD=your-password-here
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-webhook-id/your-webhook-token
-

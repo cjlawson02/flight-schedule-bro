@@ -28,7 +28,6 @@ remote = true
 
 # Environment variables (non-sensitive)
 [vars]
-DAYS_AHEAD = "12"  # Worker auto-caps via resolveAvailabilityDaysAhead() when chunk count is high
 AIRCRAFT_REGEX = "172S|172N"
 TIMEZONE = "America/Los_Angeles"
 WEEKDAY_MIN_HOUR = "15"
@@ -37,6 +36,12 @@ NOTIFICATION_AIRCRAFT = "N65411,N734UZ,N713RE"  # Comma-separated aircraft tail 
 
 # Optional: override automated monitoring reservation type (UUID from FSP)
 # RESERVATION_TYPE_ID = "09c58400-bd2a-49a3-a35e-9ab0e81fcebc"
+
+# Optional: cap days searched even when subrequest budget allows more (today + N)
+# MAX_DAYS_AHEAD = "60"
+
+# Optional: set to "true" on Workers Paid (KV counts toward unified subrequest limit)
+# WORKERS_PAID_PLAN = "false"
 
 # Secrets (set these via wrangler CLI):
 # wrangler secret put FSP_EMAIL

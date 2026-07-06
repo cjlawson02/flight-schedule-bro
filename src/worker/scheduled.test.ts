@@ -82,7 +82,6 @@ describe("runScheduledTask", () => {
       FSP_EMAIL: "test@example.com",
       FSP_PASSWORD: "password",
       DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-      DAYS_AHEAD: "14",
       AIRCRAFT_REGEX: "172S",
       TIMEZONE: "America/Los_Angeles",
     };
@@ -92,7 +91,7 @@ describe("runScheduledTask", () => {
       metadata: {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:00:00.000Z",
-        daysAhead: 14,
+        trackedThroughDate: "2024-01-29",
       },
     });
     vi.mocked(kvModule.cleanPastSlotsFromSnapshot).mockImplementation(
@@ -111,11 +110,11 @@ describe("runScheduledTask", () => {
       workerSearchModule.executeWorkerAvailabilitySearch,
     ).mockResolvedValue({
       validResults: [makeSlot("ac-1")],
-      budget: {
-        daysAhead: 14,
-        totalFetches: 1,
-        capped: false,
-        pagesPerDay: 1,
+      search: {
+        results: [makeSlot("ac-1")],
+        trackedThroughDate: "2024-01-29",
+        scheduleSubrequests: 1,
+        daysFetched: 14,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",
@@ -144,11 +143,11 @@ describe("runScheduledTask", () => {
       workerSearchModule.executeWorkerAvailabilitySearch,
     ).mockResolvedValue({
       validResults: [notifyableSlot],
-      budget: {
-        daysAhead: 14,
-        totalFetches: 1,
-        capped: false,
-        pagesPerDay: 1,
+      search: {
+        results: [notifyableSlot],
+        trackedThroughDate: "2024-02-03",
+        scheduleSubrequests: 1,
+        daysFetched: 14,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",
@@ -218,11 +217,11 @@ describe("runScheduledTask", () => {
       workerSearchModule.executeWorkerAvailabilitySearch,
     ).mockResolvedValue({
       validResults: [soonSlot],
-      budget: {
-        daysAhead: 14,
-        totalFetches: 1,
-        capped: false,
-        pagesPerDay: 1,
+      search: {
+        results: [soonSlot],
+        trackedThroughDate: "2024-02-03",
+        scheduleSubrequests: 1,
+        daysFetched: 14,
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",

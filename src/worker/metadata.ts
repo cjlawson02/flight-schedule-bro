@@ -5,6 +5,7 @@ import {
   type FspMetadata,
 } from "../shared/blo/fspMetadata.js";
 import { createLogger } from "../shared/util/logger.js";
+import { recordActiveKvSubrequest } from "../shared/util/subrequestBudget.js";
 
 const log = createLogger("metadata");
 
@@ -21,6 +22,7 @@ export async function getMetadataFromKV(
   kv: KVNamespace,
 ): Promise<FspMetadata | null> {
   try {
+    recordActiveKvSubrequest();
     const data = await kv.get(METADATA_KEY, "json");
     if (!data) {
       return null;
@@ -49,6 +51,7 @@ export async function setMetadataInKV(
   try {
     // Validate before storing
     const validated = FspMetadataSchema.parse(metadata);
+    recordActiveKvSubrequest();
     await kv.put(METADATA_KEY, JSON.stringify(validated));
     log.info("Metadata stored in KV");
   } catch (error) {

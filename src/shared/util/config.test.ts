@@ -92,13 +92,24 @@ describe("config", () => {
     const config = createWorkerConfig({
       FSP_EMAIL: "worker@example.com",
       FSP_PASSWORD: "worker-password",
-      DAYS_AHEAD: "90",
       AIRCRAFT_REGEX: "172S",
     });
 
     expect(config.WEEKDAY_MIN_HOUR).toBe(15);
     expect(config.MAX_HOUR).toBe(19);
-    expect(config.DAYS_AHEAD).toBe(90);
+    expect(config).not.toHaveProperty("DAYS_AHEAD");
+    expect(config.MAX_DAYS_AHEAD).toBeUndefined();
+  });
+
+  it("createWorkerConfig parses MAX_DAYS_AHEAD", () => {
+    const config = createWorkerConfig({
+      FSP_EMAIL: "worker@example.com",
+      FSP_PASSWORD: "worker-password",
+      AIRCRAFT_REGEX: "172S",
+      MAX_DAYS_AHEAD: "60",
+    });
+
+    expect(config.MAX_DAYS_AHEAD).toBe(60);
   });
 
   it("rejects invalid IANA timezone values", () => {

@@ -2,13 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildScheduleFetchTasks,
   fetchAllAvailability,
+  fetchScheduleDaysWithinBudget,
   filterValidAvailabilityBlocks,
   prepareScheduleSearch,
+  resolveMaxScheduleSearchBudget,
   resolveScheduleSearchBudget,
-  CLOUDFLARE_SUBREQUEST_LIMIT,
+  CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT,
   WORKER_AVAILABILITY_OVERHEAD,
 } from "./availabilitySearch.js";
 import { SchedulerBLO } from "./scheduler.js";
+import {
+  createSubrequestBudget,
+  subrequestsRemaining,
+} from "../util/subrequestBudget.js";
 import {
   dualFlightTraining,
   groundTraining,
@@ -40,7 +46,7 @@ describe("resolveScheduleSearchBudget", () => {
       const budget = resolveScheduleSearchBudget(60, pagesPerDay);
       expect(
         budget.totalFetches + WORKER_AVAILABILITY_OVERHEAD,
-      ).toBeLessThanOrEqual(CLOUDFLARE_SUBREQUEST_LIMIT);
+      ).toBeLessThanOrEqual(CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT);
     }
   });
 
@@ -48,6 +54,110 @@ describe("resolveScheduleSearchBudget", () => {
     expect(() => resolveScheduleSearchBudget(12, 41)).toThrow(
       /subrequest budget/i,
     );
+  });
+});
+
+describe("resolveMaxScheduleSearchBudget", () => {
+  it("uses the full Cloudflare availability budget", () => {
+    expect(resolveMaxScheduleSearchBudget(1)).toEqual({
+      daysAhead: 39,
+      totalFetches: 40,
+      capped: false,
+      pagesPerDay: 1,
+    });
+  });
+
+  it("stays under the Cloudflare subrequest budget", () => {
+    for (const pagesPerDay of [1, 2, 3, 4, 5]) {
+      const budget = resolveMaxScheduleSearchBudget(pagesPerDay);
+      expect(
+        budget.totalFetches + WORKER_AVAILABILITY_OVERHEAD,
+      ).toBeLessThanOrEqual(CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT);
+    }
+  });
+});
+
+describe("fetchScheduleDaysWithinBudget", () => {
+  it("fetches days sequentially until the subrequest budget is exhausted", async () => {
+    const budget = createSubrequestBudget(5, 0);
+    budget.used = 2;
+
+    const getBookableAvailabilityForDay = vi
+      .fn()
+      .mockResolvedValueOnce({
+        availability: [{ date: "2024-07-15" }],
+        complete: true,
+      })
+      .mockResolvedValueOnce({
+        availability: [{ date: "2024-07-16" }],
+        complete: true,
+      })
+      .mockResolvedValueOnce({
+        availability: [],
+        complete: false,
+      });
+
+    const scheduler = {
+      getBookableAvailabilityForDay,
+    } as Pick<SchedulerBLO, "getBookableAvailabilityForDay"> as SchedulerBLO;
+
+    const result = await fetchScheduleDaysWithinBudget({
+      scheduler,
+      params: {
+        locationId: 1,
+        timeZone: "America/Los_Angeles",
+        activityTypeId: "type-1",
+        reservationType: dualFlightTraining,
+        allInstructorIds: ["inst-1"],
+        aircraftIds: ["ac-1"],
+      },
+      prepared: {
+        searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
+      },
+      today: new Date("2024-07-15T12:00:00.000Z"),
+      budget,
+    });
+
+    expect(getBookableAvailabilityForDay).toHaveBeenCalledTimes(3);
+    expect(result.daysFetched).toBe(2);
+    expect(result.trackedThroughDate).toBe("2024-07-16");
+    expect(result.results).toHaveLength(2);
+    expect(subrequestsRemaining(budget)).toBe(3);
+  });
+
+  it("stops after maxDaysAhead even when budget remains", async () => {
+    const budget = createSubrequestBudget(50, 0);
+
+    const getBookableAvailabilityForDay = vi.fn().mockResolvedValue({
+      availability: [{ date: "2024-07-15" }],
+      complete: true,
+    });
+
+    const scheduler = {
+      getBookableAvailabilityForDay,
+    } as Pick<SchedulerBLO, "getBookableAvailabilityForDay"> as SchedulerBLO;
+
+    const result = await fetchScheduleDaysWithinBudget({
+      scheduler,
+      params: {
+        locationId: 1,
+        timeZone: "America/Los_Angeles",
+        activityTypeId: "type-1",
+        reservationType: dualFlightTraining,
+        allInstructorIds: ["inst-1"],
+        aircraftIds: ["ac-1"],
+      },
+      prepared: {
+        searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
+      },
+      today: new Date("2024-07-15T12:00:00.000Z"),
+      budget,
+      maxDaysAhead: 2,
+    });
+
+    expect(getBookableAvailabilityForDay).toHaveBeenCalledTimes(3);
+    expect(result.daysFetched).toBe(3);
+    expect(result.trackedThroughDate).toBe("2024-07-17");
   });
 });
 

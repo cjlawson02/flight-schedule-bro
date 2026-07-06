@@ -18,6 +18,7 @@ import {
 } from "../shared/util/flightTime.js";
 import { formatInTimeZone } from "date-fns-tz";
 import { createLogger } from "../shared/util/logger.js";
+import { recordActiveSubrequest } from "../shared/util/subrequestBudget.js";
 import { filterSlotsForDiscordNotification } from "../shared/util/slots.js";
 
 const log = createLogger("discord");
@@ -289,6 +290,7 @@ export async function sendAvailabilityNotification(
   }
 
   try {
+    recordActiveSubrequest();
     const response = await fetch(env.DISCORD_WEBHOOK_URL, {
       method: "POST",
       headers: {
@@ -334,6 +336,7 @@ export async function sendSimpleNotification(
   try {
     DiscordPayloadSchema.parse(payload);
 
+    recordActiveSubrequest();
     const response = await fetch(env.DISCORD_WEBHOOK_URL, {
       method: "POST",
       headers: {

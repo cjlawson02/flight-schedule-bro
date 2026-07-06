@@ -23,6 +23,7 @@ import {
   BOOKING_MIN_LEAD_HOURS,
   isSlotStartTooSoonForBooking,
 } from "../util/slots.js";
+import type { SubrequestBudget } from "../util/subrequestBudget.js";
 
 const log = createLogger("scheduler");
 
@@ -120,7 +121,21 @@ export class SchedulerBLO {
     instructorIds: string[];
     startDate: string;
     lengthOfReservationInMinutes?: number;
+    budget?: SubrequestBudget;
   }): Promise<BookableAvailability[]> {
+    const result = await this.getBookableAvailabilityForDay(params);
+    return result.availability;
+  }
+
+  async getBookableAvailabilityForDay(params: {
+    locationId: number;
+    activityTypeId: string;
+    aircraftIds: string[];
+    instructorIds: string[];
+    startDate: string;
+    lengthOfReservationInMinutes?: number;
+    budget?: SubrequestBudget;
+  }): Promise<{ availability: BookableAvailability[]; complete: boolean }> {
     const reservationType = this.reservationTypesMap.get(params.activityTypeId);
     const durationMinutes =
       params.lengthOfReservationInMinutes ??
@@ -132,7 +147,7 @@ export class SchedulerBLO {
       params.instructorIds,
     );
 
-    const snapshot = await fetchScheduleDay({
+    const { snapshot, complete } = await fetchScheduleDay({
       operatorId: this.operatorId,
       locationId: params.locationId,
       start: params.startDate,
@@ -140,23 +155,27 @@ export class SchedulerBLO {
       aircraftIds: filters.aircraftIds,
       instructorIds: filters.instructorIds,
       reservationTypeIds: filters.reservationTypeIds,
+      budget: params.budget,
     });
 
-    if (!reservationType) {
-      return [];
+    if (!reservationType || !complete) {
+      return { availability: [], complete: false };
     }
 
-    return computeBookableAvailabilityFromSnapshot({
-      snapshot,
-      day: params.startDate,
-      timeZone: this.timeZone,
-      reservationType,
-      aircraftIds: params.aircraftIds,
-      instructorIds: params.instructorIds,
-      durationMinutes,
-      instructorsMap: this.instructorsMap,
-      aircraftMap: this.aircraftMap,
-    });
+    return {
+      availability: computeBookableAvailabilityFromSnapshot({
+        snapshot,
+        day: params.startDate,
+        timeZone: this.timeZone,
+        reservationType,
+        aircraftIds: params.aircraftIds,
+        instructorIds: params.instructorIds,
+        durationMinutes,
+        instructorsMap: this.instructorsMap,
+        aircraftMap: this.aircraftMap,
+      }),
+      complete: true,
+    };
   }
 
   /**

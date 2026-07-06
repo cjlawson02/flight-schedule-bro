@@ -16,7 +16,6 @@ const createMockEnv = (): Env => ({
   FSP_EMAIL: "test@example.com",
   FSP_PASSWORD: "password",
   DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/123/test",
-  DAYS_AHEAD: "60",
   AIRCRAFT_REGEX: "172S",
 });
 

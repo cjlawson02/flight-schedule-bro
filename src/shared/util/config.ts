@@ -51,17 +51,23 @@ export interface ConfigType {
   RESERVATION_TYPE_ID?: string;
 }
 
+/** Worker runtime config (lookahead is derived from the subrequest budget). */
+export type WorkerConfigType = Omit<ConfigType, "DAYS_AHEAD"> & {
+  /** Optional cap on calendar days searched (today + N days). */
+  MAX_DAYS_AHEAD?: number;
+};
+
 /** Worker env bindings used to build runtime config. */
 export interface WorkerEnvInput {
   FSP_EMAIL: string;
   FSP_PASSWORD: string;
-  DAYS_AHEAD: string;
   AIRCRAFT_REGEX: string;
   INSTRUCTOR_REGEX?: string;
   WEEKDAY_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
   RESERVATION_TYPE_ID?: string;
+  MAX_DAYS_AHEAD?: string;
 }
 
 /**
@@ -106,11 +112,10 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
   };
 }
 
-export function createWorkerConfig(env: WorkerEnvInput): ConfigType {
-  return createConfig({
+export function createWorkerConfig(env: WorkerEnvInput): WorkerConfigType {
+  const config = createConfig({
     FSP_EMAIL: env.FSP_EMAIL,
     FSP_PASSWORD: env.FSP_PASSWORD,
-    DAYS_AHEAD: env.DAYS_AHEAD,
     AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
     INSTRUCTOR_REGEX: env.INSTRUCTOR_REGEX ?? "Doug Libal",
     WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
@@ -118,6 +123,29 @@ export function createWorkerConfig(env: WorkerEnvInput): ConfigType {
     TIMEZONE: env.TIMEZONE,
     RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,
   });
+
+  const { DAYS_AHEAD: _daysAhead, ...workerConfig } = config;
+  const maxDaysAhead = parseOptionalPositiveInt(env.MAX_DAYS_AHEAD);
+
+  return {
+    ...workerConfig,
+    ...(maxDaysAhead !== undefined ? { MAX_DAYS_AHEAD: maxDaysAhead } : {}),
+  };
+}
+
+function parseOptionalPositiveInt(value?: string): number | undefined {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      `MAX_DAYS_AHEAD must be a positive integer, got "${value}"`,
+    );
+  }
+
+  return parsed;
 }
 
 /**

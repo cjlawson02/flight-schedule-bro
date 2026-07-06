@@ -10,6 +10,7 @@ import { SchedulerBLO } from "../shared/blo/scheduler.js";
 import { dualFlightTraining } from "../shared/dao/reservationTypes.fixtures.js";
 import type { Env } from "./types.js";
 import type { AuthSession } from "../shared/dao/auth.js";
+import { createSubrequestBudget } from "../shared/util/subrequestBudget.js";
 
 vi.mock("../shared/dao/auth.js");
 vi.mock("../shared/blo/workerAvailabilitySearch.js");
@@ -41,7 +42,6 @@ describe("workerPipeline", () => {
     FSP_EMAIL: "test@example.com",
     FSP_PASSWORD: "password",
     DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
-    DAYS_AHEAD: "14",
     AIRCRAFT_REGEX: "172S",
     TIMEZONE: "America/Los_Angeles",
   };
@@ -56,11 +56,11 @@ describe("workerPipeline", () => {
       workerSearchModule.executeWorkerAvailabilitySearch,
     ).mockResolvedValue({
       validResults: [],
-      budget: {
-        daysAhead: 14,
-        totalFetches: 1,
-        capped: false,
-        pagesPerDay: 1,
+      search: {
+        results: [],
+        trackedThroughDate: "2024-01-29",
+        scheduleSubrequests: 1,
+        daysFetched: 14,
       },
       reservationType: dualFlightTraining,
       today: new Date("2024-01-15T08:00:00.000Z"),
@@ -87,6 +87,7 @@ describe("workerPipeline", () => {
       session,
       fspMetadata: mockMetadata,
       scheduler,
+      budget: createSubrequestBudget(),
       failFast: true,
     });
 

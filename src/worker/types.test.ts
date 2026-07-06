@@ -66,6 +66,17 @@ describe("Worker Types - Zod Schemas", () => {
       const valid = {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:30:00.000Z",
+        trackedThroughDate: "2024-03-15",
+      };
+
+      const result = MetadataSchema.safeParse(valid);
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts legacy daysAhead metadata", () => {
+      const valid = {
+        lastSearchDate: "2024-01-15",
+        lastUpdate: "2024-01-15T12:30:00.000Z",
         daysAhead: 60,
       };
 
@@ -84,11 +95,10 @@ describe("Worker Types - Zod Schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("rejects negative daysAhead", () => {
+    it("rejects metadata without a tracking horizon", () => {
       const invalid = {
         lastSearchDate: "2024-01-15",
         lastUpdate: "2024-01-15T12:30:00.000Z",
-        daysAhead: -10,
       };
 
       const result = MetadataSchema.safeParse(invalid);
@@ -115,7 +125,7 @@ describe("Worker Types - Zod Schemas", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:30:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 
@@ -129,7 +139,7 @@ describe("Worker Types - Zod Schemas", () => {
         metadata: {
           lastSearchDate: "2024-01-15",
           lastUpdate: "2024-01-15T12:30:00.000Z",
-          daysAhead: 60,
+          trackedThroughDate: "2024-03-15",
         },
       };
 

@@ -16,7 +16,7 @@ import {
 export function isValidBlock(
   start: Date,
   end: Date,
-  config: ConfigType,
+  config: Pick<ConfigType, "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "MAX_HOUR">,
   expectedDurationMinutes: number,
 ): boolean {
   const timeZone = config.TIMEZONE;
