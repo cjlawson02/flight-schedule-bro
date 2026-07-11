@@ -159,9 +159,7 @@ const MyOperatorsDetailSchema = z.object({
 });
 
 function getSetCookieHeaders(headers: Headers): string[] {
-  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
-    .getSetCookie;
-  return getSetCookie?.call(headers) ?? [];
+  return headers.getSetCookie();
 }
 
 /**
