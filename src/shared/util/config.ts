@@ -32,8 +32,9 @@ const envSchema = z.object({
     })
     .default(DEFAULT_TIMEZONE),
 
-  // Weekday hours (with defaults)
+  // Booking hour window (with defaults)
   WEEKDAY_MIN_HOUR: z.coerce.number().int().min(0).max(23).default(15),
+  WEEKEND_MIN_HOUR: z.coerce.number().int().min(0).max(23).default(8),
   MAX_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 
   // Optional reservation type override for automated monitoring
@@ -44,6 +45,7 @@ const envSchema = z.object({
 
 export interface ConfigType {
   WEEKDAY_MIN_HOUR: number;
+  WEEKEND_MIN_HOUR: number;
   MAX_HOUR: number;
   EMAIL: string;
   PASSWORD: string;
@@ -67,6 +69,7 @@ export interface WorkerEnvInput {
   AIRCRAFT_REGEX: string;
   INSTRUCTOR_REGEX?: string;
   WEEKDAY_MIN_HOUR?: string;
+  WEEKEND_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
   RESERVATION_TYPE_ID?: string;
@@ -99,8 +102,9 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
   }
 
   return {
-    // Weekday hours
+    // Booking hour window
     WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR,
+    WEEKEND_MIN_HOUR: env.WEEKEND_MIN_HOUR,
     MAX_HOUR: env.MAX_HOUR,
 
     // Authentication
@@ -130,6 +134,7 @@ export function createWorkerConfig(env: WorkerEnvInput): WorkerConfigType {
     AIRCRAFT_REGEX: env.AIRCRAFT_REGEX,
     INSTRUCTOR_REGEX: env.INSTRUCTOR_REGEX ?? "Doug Libal",
     WEEKDAY_MIN_HOUR: env.WEEKDAY_MIN_HOUR ?? "15",
+    WEEKEND_MIN_HOUR: env.WEEKEND_MIN_HOUR ?? "8",
     MAX_HOUR: env.MAX_HOUR ?? "19",
     TIMEZONE: env.TIMEZONE,
     RESERVATION_TYPE_ID: env.RESERVATION_TYPE_ID,

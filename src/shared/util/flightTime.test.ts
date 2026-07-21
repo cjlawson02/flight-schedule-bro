@@ -54,6 +54,7 @@ describe("flightTime", () => {
 describe("isValidBlock with operator timezone", () => {
   const testConfig = {
     WEEKDAY_MIN_HOUR: 15,
+    WEEKEND_MIN_HOUR: 8,
     MAX_HOUR: 19,
     EMAIL: "test@example.com",
     PASSWORD: "password",

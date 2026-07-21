@@ -125,6 +125,7 @@ export interface Env {
   // Configuration variables
   AIRCRAFT_REGEX: string;
   WEEKDAY_MIN_HOUR?: string;
+  WEEKEND_MIN_HOUR?: string;
   MAX_HOUR?: string;
   TIMEZONE?: string;
   RESERVATION_TYPE_ID?: string;

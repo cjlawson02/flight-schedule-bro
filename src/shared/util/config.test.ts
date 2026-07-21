@@ -79,12 +79,14 @@ describe("config", () => {
     process.env.FSP_EMAIL = "test@example.com";
     process.env.FSP_PASSWORD = "password123";
     process.env.WEEKDAY_MIN_HOUR = "14";
+    process.env.WEEKEND_MIN_HOUR = "7";
     process.env.MAX_HOUR = "20";
 
     const { loadCliConfig } = await import("./config.js");
     const config = loadCliConfig();
 
     expect(config.WEEKDAY_MIN_HOUR).toBe(14);
+    expect(config.WEEKEND_MIN_HOUR).toBe(7);
     expect(config.MAX_HOUR).toBe(20);
   });
 
@@ -97,6 +99,7 @@ describe("config", () => {
     });
 
     expect(config.WEEKDAY_MIN_HOUR).toBe(15);
+    expect(config.WEEKEND_MIN_HOUR).toBe(8);
     expect(config.MAX_HOUR).toBe(19);
     expect(config).not.toHaveProperty("DAYS_AHEAD");
     expect(config.MAX_DAYS_AHEAD).toBeUndefined();

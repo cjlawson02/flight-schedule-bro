@@ -13,6 +13,7 @@ describe("buildWorkerSearchResources", () => {
     const result = buildWorkerSearchResources(
       {
         WEEKDAY_MIN_HOUR: 15,
+        WEEKEND_MIN_HOUR: 8,
         MAX_HOUR: 19,
         EMAIL: "test@example.com",
         PASSWORD: "password",
@@ -41,6 +42,7 @@ describe("buildWorkerSearchResources", () => {
       buildWorkerSearchResources(
         {
           WEEKDAY_MIN_HOUR: 15,
+          WEEKEND_MIN_HOUR: 8,
           MAX_HOUR: 19,
           EMAIL: "test@example.com",
           PASSWORD: "password",
@@ -86,6 +88,7 @@ describe("executeWorkerAvailabilitySearch", () => {
     await executeWorkerAvailabilitySearch({
       config: {
         WEEKDAY_MIN_HOUR: 15,
+        WEEKEND_MIN_HOUR: 8,
         MAX_HOUR: 19,
         EMAIL: "test@example.com",
         PASSWORD: "password",

@@ -7,6 +7,7 @@ const LA = "America/Los_Angeles";
 describe("isValidBlock", () => {
   const testConfig = {
     WEEKDAY_MIN_HOUR: 15,
+    WEEKEND_MIN_HOUR: 8,
     MAX_HOUR: 19,
     EMAIL: "test@example.com",
     PASSWORD: "password123",
@@ -72,6 +73,18 @@ describe("isValidBlock", () => {
   });
 
   describe("weekend validation (summer)", () => {
+    it("returns false if weekend block starts before WEEKEND_MIN_HOUR", () => {
+      const start = localStart("2024-07-13T06:00:00"); // Saturday 6 AM
+      const end = localStart("2024-07-13T08:00:00");
+      expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
+    });
+
+    it("returns true for weekend slot starting at WEEKEND_MIN_HOUR", () => {
+      const start = localStart("2024-07-13T08:00:00"); // Saturday 8 AM
+      const end = localStart("2024-07-13T10:00:00");
+      expect(isValidBlock(start, end, testConfig, 120)).toBe(true);
+    });
+
     it("returns true for weekend slot starting at 10 AM in July", () => {
       const start = localStart("2024-07-13T10:00:00"); // Saturday, July
       const end = localStart("2024-07-13T12:00:00");
@@ -121,6 +134,25 @@ describe("isValidBlock", () => {
     it("rejects slots that go beyond MAX_HOUR", () => {
       const start = localStart("2024-07-15T17:30:00"); // 5:30 PM
       const end = localStart("2024-07-15T19:30:00"); // 7:30 PM - beyond max
+      expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
+    });
+
+    it("rejects overnight weekday slots that wrap past midnight", () => {
+      // Aircraft-only rental gaps can free overnight; end hour must not wrap to 0.
+      const start = localStart("2024-07-15T22:00:00"); // Monday 10 PM
+      const end = localStart("2024-07-16T00:00:00"); // Tuesday midnight
+      expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
+    });
+
+    it("rejects overnight weekend slots that wrap past midnight", () => {
+      const start = localStart("2024-07-13T22:00:00"); // Saturday 10 PM
+      const end = localStart("2024-07-14T00:00:00"); // Sunday midnight
+      expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
+    });
+
+    it("rejects late-evening weekday slots ending before midnight but after MAX_HOUR", () => {
+      const start = localStart("2024-07-15T21:00:00"); // Monday 9 PM
+      const end = localStart("2024-07-15T23:00:00"); // 11 PM
       expect(isValidBlock(start, end, testConfig, 120)).toBe(false);
     });
   });

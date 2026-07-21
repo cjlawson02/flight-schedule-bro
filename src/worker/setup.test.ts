@@ -20,6 +20,7 @@ describe("Worker Setup", () => {
       DISCORD_WEBHOOK_URL: "https://discord.com/webhook",
       AIRCRAFT_REGEX: "172S|172N",
       WEEKDAY_MIN_HOUR: "15",
+      WEEKEND_MIN_HOUR: "8",
       MAX_HOUR: "19",
     };
   });
@@ -41,6 +42,7 @@ describe("Worker Setup", () => {
       };
 
       expect(envWithoutOptional.WEEKDAY_MIN_HOUR).toBeUndefined();
+      expect(envWithoutOptional.WEEKEND_MIN_HOUR).toBeUndefined();
       expect(envWithoutOptional.MAX_HOUR).toBeUndefined();
     });
   });

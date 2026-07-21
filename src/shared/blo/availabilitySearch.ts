@@ -217,7 +217,10 @@ export async function fetchAllAvailability(
 
 export function filterValidAvailabilityBlocks(
   results: BookableAvailability[],
-  config: Pick<ConfigType, "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "MAX_HOUR">,
+  config: Pick<
+    ConfigType,
+    "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "WEEKEND_MIN_HOUR" | "MAX_HOUR"
+  >,
   expectedDurationMinutes: number,
 ): BookableAvailability[] {
   return results.filter((result) =>

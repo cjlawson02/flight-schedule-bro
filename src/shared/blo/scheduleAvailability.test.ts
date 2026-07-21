@@ -10,6 +10,7 @@ import { parseFspLocal } from "../util/flightTime.js";
 
 const testConfig = {
   WEEKDAY_MIN_HOUR: 15,
+  WEEKEND_MIN_HOUR: 8,
   MAX_HOUR: 19,
   EMAIL: "test@example.com",
   PASSWORD: "password",
