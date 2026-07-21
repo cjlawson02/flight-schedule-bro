@@ -70,14 +70,12 @@ export function configureLogger(config: LoggerConfig = {}): Logger<ILogObj> {
     type: merged.type,
     minLevel: merged.minLevel,
     name: "flight-schedule-bro",
-    hideLogPositionForProduction: merged.runtime === "worker",
-    maskValuesOfKeys: [
-      "password",
-      "token",
-      "authorization",
-      "cookie",
-      "FSP_PASSWORD",
-    ],
+    stack: {
+      capture: merged.runtime === "worker" ? "off" : "auto",
+    },
+    mask: {
+      keys: ["password", "token", "authorization", "cookie", "FSP_PASSWORD"],
+    },
   });
 
   return rootLogger;
