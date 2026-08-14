@@ -32,7 +32,9 @@ export type CliMainAction = "book" | "manage-existing-activity" | "exit";
 export type ManageActivityAction = "change-activity-type" | "cancel" | "back";
 
 /** Common reservation lengths offered in the CLI duration prompt (minutes). */
-export const CLI_DURATION_OPTIONS_MINUTES = [180, 150, 120, 90, 60, 45, 30];
+export const CLI_DURATION_OPTIONS_MINUTES = [
+  210, 180, 150, 120, 90, 60, 45, 30,
+];
 
 export function formatDurationChoice(minutes: number): string {
   const wholeHours = Math.floor(minutes / 60);

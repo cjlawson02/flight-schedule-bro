@@ -619,6 +619,7 @@ describe("duration choices", () => {
     expect(formatDurationChoice(60)).toBe("1 hour");
     expect(formatDurationChoice(120)).toBe("2 hours");
     expect(formatDurationChoice(90)).toBe("1.5 hours");
+    expect(formatDurationChoice(210)).toBe("3.5 hours");
     expect(formatDurationChoice(45)).toBe("45 minutes");
   });
 
@@ -626,16 +627,16 @@ describe("duration choices", () => {
     const choices = buildDurationChoices(120);
 
     expect(choices.map((choice) => choice.value)).toEqual([
-      180, 150, 120, 90, 60, 45, 30,
+      210, 180, 150, 120, 90, 60, 45, 30,
     ]);
-    expect(choices[2].name).toBe("2 hours");
+    expect(choices[3].name).toBe("2 hours");
   });
 
   it("adds non-standard defaults without duplicating options", () => {
     const choices = buildDurationChoices(75);
 
     expect(choices.map((choice) => choice.value)).toEqual([
-      180, 150, 120, 90, 75, 60, 45, 30,
+      210, 180, 150, 120, 90, 75, 60, 45, 30,
     ]);
     expect(choices.find((choice) => choice.value === 75)?.name).toBe(
       "75 minutes",
