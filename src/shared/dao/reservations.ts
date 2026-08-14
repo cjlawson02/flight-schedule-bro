@@ -19,9 +19,9 @@ export interface ReservationBookingParams {
 }
 
 const UserReservationRequestSchema = z.object({
-  aircraftId: z.uuid(),
+  aircraftId: z.uuid().optional(),
   end: z.string(),
-  instructorId: z.uuid(),
+  instructorId: z.uuid().optional(),
   locationId: z.number(),
   operatorId: z.number(),
   pilotId: z.uuid(),
@@ -82,9 +82,7 @@ export function buildUserReservationRequest(params: {
   const aircraft = getFieldState(params.reservationType, "aircraft");
   const instructor = getFieldState(params.reservationType, "instructor");
 
-  return {
-    aircraftId: resolveResourceId(aircraft.enabled, params.aircraftId),
-    instructorId: resolveResourceId(instructor.enabled, params.instructorId),
+  const request: UserReservationRequest = {
     end: params.end,
     start: params.start,
     locationId: params.locationId,
@@ -92,6 +90,20 @@ export function buildUserReservationRequest(params: {
     pilotId: params.pilotId,
     reservationTypeId: params.reservationType.reservationTypeId,
   };
+
+  const aircraftId = resolveResourceId(aircraft.enabled, params.aircraftId);
+  const instructorId = resolveResourceId(
+    instructor.enabled,
+    params.instructorId,
+  );
+  if (aircraftId) {
+    request.aircraftId = aircraftId;
+  }
+  if (instructorId) {
+    request.instructorId = instructorId;
+  }
+
+  return request;
 }
 
 export function buildFullReservationRequest(

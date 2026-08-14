@@ -106,9 +106,10 @@ describe("nilToOptionalResourceId", () => {
 });
 
 describe("resolveResourceId", () => {
-  it("uses nil UUID for disabled resources on create payloads", () => {
-    expect(resolveResourceId(false, "ac-1")).toBe(FSP_NIL_RESOURCE_ID);
-    expect(resolveResourceId(true, undefined)).toBe(FSP_NIL_RESOURCE_ID);
+  it("omits disabled and nil resources on create payloads", () => {
+    expect(resolveResourceId(false, "ac-1")).toBeUndefined();
+    expect(resolveResourceId(true, undefined)).toBeUndefined();
+    expect(resolveResourceId(true, FSP_NIL_RESOURCE_ID)).toBeUndefined();
     expect(resolveResourceId(true, "ac-1")).toBe("ac-1");
   });
 });

@@ -36,14 +36,15 @@ export function nilToOptionalResourceId(
   return id;
 }
 
+/** Create payloads omit disabled resources; FSP rejects the nil UUID as invalid. */
 export function resolveResourceId(
   enabled: boolean,
   resourceId: string | undefined,
-): string {
+): string | undefined {
   if (!enabled) {
-    return FSP_NIL_RESOURCE_ID;
+    return undefined;
   }
-  return resourceId ?? FSP_NIL_RESOURCE_ID;
+  return nilToOptionalResourceId(resourceId);
 }
 
 /** PUT/DELETE mutations use null (not the nil UUID) for disabled resources. */
