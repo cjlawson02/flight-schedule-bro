@@ -49,7 +49,7 @@
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.65.0",
     "vitest": "^5.0.0",
-    "wrangler": "^4.112.0",
+    "wrangler": "^4.143.1",
     "zod": "^4.4.3"
   },
   "dependencies": {
