@@ -11,8 +11,7 @@ describe("fspErrors", () => {
   const maintenanceErrors = [
     {
       code: 0,
-      message:
-        "The time based maintenance reminder (100Hr Inspection) is expired.",
+      message: "The time based maintenance reminder (100Hr Inspection) is expired.",
       overridable: true,
       category: 11,
       groupLabel: "Aircraft: N737BC Cessna 172N",
@@ -34,8 +33,7 @@ describe("fspErrors", () => {
 
     expect(parseFspValidationErrors(error)).toEqual([
       {
-        message:
-          "The time based maintenance reminder (100Hr Inspection) is expired.",
+        message: "The time based maintenance reminder (100Hr Inspection) is expired.",
         overridable: true,
         groupLabel: "Aircraft: N737BC Cessna 172N",
       },
@@ -49,9 +47,7 @@ describe("fspErrors", () => {
   });
 
   it("detects when all parsed errors are overridable", () => {
-    const errors = parseFspValidationErrors(
-      new FspHttpError(400, { errors: maintenanceErrors }),
-    );
+    const errors = parseFspValidationErrors(new FspHttpError(400, { errors: maintenanceErrors }));
 
     expect(areAllErrorsOverridable(errors)).toBe(true);
   });

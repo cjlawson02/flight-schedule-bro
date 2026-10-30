@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  mergeScheduleSnapshot,
-  SchedulePageResponseSchema,
-} from "./schedule.js";
+import { mergeScheduleSnapshot, SchedulePageResponseSchema } from "./schedule.js";
 import jul6Fixture from "./fixtures/schedule-day-2026-07-06.json" with { type: "json" };
 
 describe("SchedulePageResponseSchema", () => {

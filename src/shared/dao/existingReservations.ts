@@ -30,20 +30,14 @@ export function getReservationStart(
   reservation: ExistingReservation,
   timeZone: string = DEFAULT_TIMEZONE,
 ): Date {
-  return parseFspDateTime(
-    { local: reservation.start, utc: reservation.startUtc },
-    timeZone,
-  );
+  return parseFspDateTime({ local: reservation.start, utc: reservation.startUtc }, timeZone);
 }
 
 export function getReservationEnd(
   reservation: ExistingReservation,
   timeZone: string = DEFAULT_TIMEZONE,
 ): Date {
-  return parseFspDateTime(
-    { local: reservation.end, utc: reservation.endUtc },
-    timeZone,
-  );
+  return parseFspDateTime({ local: reservation.end, utc: reservation.endUtc }, timeZone);
 }
 
 export function getUpcomingReservations(

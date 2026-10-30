@@ -3,9 +3,13 @@ import { initializeWorker } from "./utils.js";
 import * as apiWrapper from "../shared/dao/api_wrapper.js";
 
 // Mock the api_wrapper module
-vi.mock("../shared/dao/api_wrapper.js", () => ({
-  setCacheAdapter: vi.fn(),
-}));
+vi.mock("../shared/dao/api_wrapper.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/dao/api_wrapper.js")>();
+  return {
+    ...actual,
+    setCacheAdapter: vi.fn<typeof actual.setCacheAdapter>(),
+  };
+});
 
 describe("Worker Utils", () => {
   beforeEach(() => {

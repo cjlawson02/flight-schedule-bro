@@ -8,15 +8,8 @@ import {
   updateReservation,
   validateUpdateResourcesForType,
 } from "./reservationManagement.js";
-import {
-  dualFlightTraining,
-  groundTraining,
-  rental,
-} from "./reservationTypes.fixtures.js";
-import {
-  FLIGHT_RULES_VFR,
-  FLIGHT_TYPE_LOCAL,
-} from "./reservationFlightDetails.js";
+import { dualFlightTraining, groundTraining, rental } from "./reservationTypes.fixtures.js";
+import { FLIGHT_RULES_VFR, FLIGHT_TYPE_LOCAL } from "./reservationFlightDetails.js";
 import * as apiWrapper from "./api_wrapper.js";
 import { parseFspLocal } from "../util/flightTime.js";
 
@@ -24,8 +17,17 @@ vi.mock("./api_wrapper.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api_wrapper.js")>();
   return {
     ...actual,
-    safeFetch: vi.fn(),
-    invalidateCache: vi.fn(),
+    safeFetch:
+      vi.fn<
+        (
+          url: string,
+          method: "GET" | "POST" | "PUT" | "DELETE",
+          params: Record<string, unknown> | null,
+          parser: import("zod").ZodType,
+          cacheTtlMs: number,
+        ) => Promise<unknown>
+      >(),
+    invalidateCache: vi.fn<(pattern?: string) => Promise<void>>(),
   };
 });
 
@@ -267,9 +269,7 @@ describe("validateUpdateResourcesForType", () => {
       },
     };
 
-    expect(
-      validateUpdateResourcesForType(detail, dualFlightTraining),
-    ).toBeNull();
+    expect(validateUpdateResourcesForType(detail, dualFlightTraining)).toBeNull();
   });
 });
 
@@ -302,9 +302,7 @@ describe("updateReservation", () => {
       expect.any(Object),
       0,
     );
-    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
-      "api/V2/Reservation?dateTypeFilter=1",
-    );
+    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/V2/Reservation?dateTypeFilter=1");
     expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/v2/schedule");
   });
 
@@ -351,9 +349,7 @@ describe("cancelReservation", () => {
       expect.any(Object),
       0,
     );
-    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith(
-      "api/V2/Reservation?dateTypeFilter=1",
-    );
+    expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/V2/Reservation?dateTypeFilter=1");
     expect(apiWrapper.invalidateCache).toHaveBeenCalledWith("api/v2/schedule");
   });
 

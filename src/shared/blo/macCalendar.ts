@@ -23,10 +23,7 @@ export async function addReservationToCalendar(
 
   try {
     const iCalContent = await fetchICalContent(operatorId, reservationId);
-    const normalizedContent = tagICalWithTimeZone(
-      iCalContent.replace(/\r\n/g, "\n"),
-      timeZone,
-    );
+    const normalizedContent = tagICalWithTimeZone(iCalContent.replace(/\r\n/g, "\n"), timeZone);
     tempFilePath = join(tmpdir(), `flight-reservation-${reservationId}.ics`);
     await writeFile(tempFilePath, normalizedContent, "ascii");
     await execAsync(`open -a Calendar "${tempFilePath}"`);
@@ -40,9 +37,7 @@ export async function addReservationToCalendar(
       await unlink(tempFilePath).catch(() => undefined);
     }
 
-    const err = new Error(
-      `Failed to add reservation to calendar: ${getErrorMessage(error)}`,
-    );
+    const err = new Error(`Failed to add reservation to calendar: ${getErrorMessage(error)}`);
     (err as Error & { code: string }).code = "CALENDAR_ADD_FAILED";
     throw err;
   }

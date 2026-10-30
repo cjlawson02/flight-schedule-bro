@@ -67,10 +67,7 @@ export function getDefaultLocationId(): number {
   return requireActiveAuthSession().defaultLocationId;
 }
 
-export async function fetchAuth(
-  email: string,
-  password: string,
-): Promise<AuthSession> {
+export async function fetchAuth(email: string, password: string): Promise<AuthSession> {
   recordActiveSubrequest();
   const login = await fetch("https://app.flightschedulepro.com/Account/Login", {
     headers: {
@@ -85,9 +82,7 @@ export async function fetchAuth(
   let sessionCookies: string | null = null;
 
   if (setCookieHeaders.length > 0) {
-    sessionCookies = setCookieHeaders
-      .map((cookie: string) => cookie.split(";")[0])
-      .join("; ");
+    sessionCookies = setCookieHeaders.map((cookie: string) => cookie.split(";")[0]).join("; ");
   } else {
     const singleCookie = login.headers.get("set-cookie");
     if (singleCookie) {
@@ -107,11 +102,7 @@ export async function fetchAuth(
 
   // Fetch the subscription key and operator ID from APIs
   const subscriptionKey = await fetchSubscriptionKey(sessionCookies);
-  const operatorDetails = await fetchOperatorDetails(
-    authToken,
-    sessionCookies,
-    subscriptionKey,
-  );
+  const operatorDetails = await fetchOperatorDetails(authToken, sessionCookies, subscriptionKey);
 
   return {
     sessionCookies,
@@ -200,17 +191,14 @@ function extractTokenFromCookie(sessionCookies: string): string | null {
 async function fetchSubscriptionKey(sessionCookies: string): Promise<string> {
   try {
     recordActiveSubrequest();
-    const response = await fetch(
-      "https://app.flightschedulepro.com/AccountAppContext",
-      {
-        headers: {
-          accept: "*/*",
-          "cache-control": "no-cache, no-store, must-revalidate",
-          cookie: sessionCookies,
-        },
-        method: "GET",
+    const response = await fetch("https://app.flightschedulepro.com/AccountAppContext", {
+      headers: {
+        accept: "*/*",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        cookie: sessionCookies,
       },
-    );
+      method: "GET",
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

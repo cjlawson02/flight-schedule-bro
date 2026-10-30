@@ -1,8 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  getReservationTypes,
-  ReservationTypeSchema,
-} from "./reservationTypes.js";
+import { getReservationTypes, ReservationTypeSchema } from "./reservationTypes.js";
 import { createReservationTypeFixture } from "./reservationTypes.fixtures.js";
 import * as apiWrapper from "./api_wrapper.js";
 
@@ -78,9 +75,7 @@ describe("getReservationTypes", () => {
     await getReservationTypes(99999);
 
     const url = vi.mocked(apiWrapper.safeFetch).mock.calls[0][0];
-    expect(url).toContain(
-      "api-external.flightschedulepro.com/api/ReservationTypes",
-    );
+    expect(url).toContain("api-external.flightschedulepro.com/api/ReservationTypes");
     expect(url).toContain("operatorId=99999");
   });
 
@@ -100,9 +95,7 @@ describe("getReservationTypes", () => {
       }),
     ];
 
-    vi.mocked(apiWrapper.safeFetch)
-      .mockResolvedValueOnce(legacy)
-      .mockResolvedValueOnce(fresh);
+    vi.mocked(apiWrapper.safeFetch).mockResolvedValueOnce(legacy).mockResolvedValueOnce(fresh);
     vi.mocked(apiWrapper.invalidateCache).mockResolvedValue(undefined);
 
     const result = await getReservationTypes(12345);

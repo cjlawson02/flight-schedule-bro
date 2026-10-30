@@ -33,17 +33,12 @@ function isFieldRequired(requirement: number): boolean {
   return requirement >= 2;
 }
 
-function isFieldEnabled(
-  explicitEnabled: boolean,
-  requirement: number,
-): boolean {
+function isFieldEnabled(explicitEnabled: boolean, requirement: number): boolean {
   return explicitEnabled || requirement > 0;
 }
 
 /** True when cached data only contains id/name without field metadata. */
-export function reservationTypeMissingFieldMetadata(
-  type: ReservationType,
-): boolean {
+export function reservationTypeMissingFieldMetadata(type: ReservationType): boolean {
   const hasEnabledFlag =
     type.aircraftEnabled ||
     type.instructorEnabled ||
@@ -115,22 +110,16 @@ export function reservationTypeUsesInstructor(type: ReservationType): boolean {
   return getFieldState(type, "instructor").enabled;
 }
 
-export function reservationTypeRequiresAircraft(
-  type: ReservationType,
-): boolean {
+export function reservationTypeRequiresAircraft(type: ReservationType): boolean {
   return getFieldState(type, "aircraft").required;
 }
 
-export function reservationTypeRequiresInstructor(
-  type: ReservationType,
-): boolean {
+export function reservationTypeRequiresInstructor(type: ReservationType): boolean {
   return getFieldState(type, "instructor").required;
 }
 
 export function supportsAvailabilitySearch(type: ReservationType): boolean {
-  return (
-    reservationTypeUsesAircraft(type) || reservationTypeUsesInstructor(type)
-  );
+  return reservationTypeUsesAircraft(type) || reservationTypeUsesInstructor(type);
 }
 
 export function getAvailabilitySearchResources(
@@ -149,9 +138,7 @@ export function pickReservationType(
   preferredTypeId?: string,
 ): ReservationType | undefined {
   if (preferredTypeId) {
-    const preferred = types.find(
-      (type) => type.reservationTypeId === preferredTypeId,
-    );
+    const preferred = types.find((type) => type.reservationTypeId === preferredTypeId);
     if (preferred) {
       return preferred;
     }
@@ -159,9 +146,7 @@ export function pickReservationType(
 
   return (
     types.find(
-      (type) =>
-        reservationTypeRequiresAircraft(type) &&
-        reservationTypeRequiresInstructor(type),
+      (type) => reservationTypeRequiresAircraft(type) && reservationTypeRequiresInstructor(type),
     ) ??
     types.find((type) => supportsAvailabilitySearch(type)) ??
     types[0]
@@ -174,9 +159,7 @@ export function selectMonitoringReservationType(
   preferredTypeId?: string,
 ): ReservationType | undefined {
   if (preferredTypeId) {
-    const preferred = types.find(
-      (type) => type.reservationTypeId === preferredTypeId,
-    );
+    const preferred = types.find((type) => type.reservationTypeId === preferredTypeId);
     if (preferred) {
       return preferred;
     }
@@ -186,26 +169,31 @@ export function selectMonitoringReservationType(
     });
   }
 
+  // Prefer solo/rental (aircraft, no instructor) over dual for cron monitoring.
+  const rentalLike = types.find(
+    (type) =>
+      reservationTypeRequiresAircraft(type) &&
+      !reservationTypeRequiresInstructor(type) &&
+      supportsAvailabilitySearch(type),
+  );
+  if (rentalLike) {
+    return rentalLike;
+  }
+
   const picked = pickReservationType(types);
   if (!picked) {
     return undefined;
   }
 
-  if (
-    reservationTypeRequiresAircraft(picked) &&
-    reservationTypeRequiresInstructor(picked)
-  ) {
+  if (reservationTypeRequiresAircraft(picked) && reservationTypeRequiresInstructor(picked)) {
     return picked;
   }
 
   if (supportsAvailabilitySearch(picked)) {
-    log.warn(
-      "Using first availability-search reservation type as monitoring fallback",
-      {
-        reservationTypeName: picked.reservationTypeName,
-        reservationTypeId: picked.reservationTypeId,
-      },
-    );
+    log.warn("Using first availability-search reservation type as monitoring fallback", {
+      reservationTypeName: picked.reservationTypeName,
+      reservationTypeId: picked.reservationTypeId,
+    });
     return picked;
   }
 
@@ -220,24 +208,12 @@ export async function getReservationTypes(operatorId: number) {
   const url = `https://api-external.flightschedulepro.com/api/ReservationTypes?includeInactive=false&includeInstructorTimeOff=false&includeMaintenance=false&includeMeeting=false&operatorId=${operatorId}`;
   const cacheTtlMs = 10 * 24 * 60 * 60 * 1000;
 
-  let types = await safeFetch(
-    url,
-    "GET",
-    null,
-    ReservationTypeListSchema,
-    cacheTtlMs,
-  );
+  let types = await safeFetch(url, "GET", null, ReservationTypeListSchema, cacheTtlMs);
 
   if (types.some(reservationTypeMissingFieldMetadata)) {
     log.info("Refreshing reservation types with incomplete cached metadata");
     await invalidateCache("ReservationTypes");
-    types = await safeFetch(
-      url,
-      "GET",
-      null,
-      ReservationTypeListSchema,
-      cacheTtlMs,
-    );
+    types = await safeFetch(url, "GET", null, ReservationTypeListSchema, cacheTtlMs);
   }
 
   return types;

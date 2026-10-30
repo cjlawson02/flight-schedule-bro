@@ -4,16 +4,9 @@ import {
   type WorkerAvailabilitySearchResult,
 } from "../shared/blo/workerAvailabilitySearch.js";
 import type { FspMetadata } from "../shared/blo/fspMetadata.js";
-import {
-  createWorkerConfig,
-  type WorkerConfigType,
-} from "../shared/util/config.js";
+import { createWorkerConfig, type WorkerConfigType } from "../shared/util/config.js";
 import { startOfOperatorDay } from "../shared/util/flightTime.js";
-import {
-  fetchAuth,
-  setActiveAuthSession,
-  type AuthSession,
-} from "../shared/dao/auth.js";
+import { fetchAuth, setActiveAuthSession, type AuthSession } from "../shared/dao/auth.js";
 import { getOrFetchMetadata } from "./metadata.js";
 import { initializeWorker } from "./utils.js";
 import type { SubrequestBudget } from "../shared/util/subrequestBudget.js";
@@ -61,8 +54,7 @@ export async function runWorkerAvailabilitySearchFlow(options: {
   today?: Date;
   failFast?: boolean;
 }): Promise<WorkerAvailabilitySearchResult> {
-  const today =
-    options.today ?? startOfOperatorDay(new Date(), options.config.TIMEZONE);
+  const today = options.today ?? startOfOperatorDay(new Date(), options.config.TIMEZONE);
 
   return executeWorkerAvailabilitySearch({
     config: options.config,

@@ -6,27 +6,28 @@ import * as availabilitySearchModule from "../shared/blo/availabilitySearch.js";
 import * as authModule from "../shared/dao/auth.js";
 import { parseFspLocal } from "../shared/util/flightTime.js";
 
-vi.mock("../shared/dao/auth.js", () => ({
-  getUserId: vi.fn(),
-  getDefaultLocationId: vi.fn(),
-}));
-vi.mock("../shared/dao/existingReservations.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../shared/dao/existingReservations.js")
-    >();
+vi.mock("../shared/dao/auth.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/dao/auth.js")>();
   return {
     ...actual,
-    getExistingReservations: vi.fn(),
-    hasReservationOnSameDay: vi.fn(),
+    getUserId: vi.fn<typeof actual.getUserId>(),
+    getDefaultLocationId: vi.fn<typeof actual.getDefaultLocationId>(),
+  };
+});
+vi.mock("../shared/dao/existingReservations.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/dao/existingReservations.js")>();
+  return {
+    ...actual,
+    getExistingReservations: vi.fn<typeof actual.getExistingReservations>(),
+    hasReservationOnSameDay: vi.fn<typeof actual.hasReservationOnSameDay>(),
   };
 });
 vi.mock("../shared/blo/availabilitySearch.js");
 vi.mock("../shared/util/progressBar.js", () => ({
   createProgressBar: () => ({
-    start: vi.fn(),
-    update: vi.fn(),
-    stop: vi.fn(),
+    start: vi.fn<() => void>(),
+    update: vi.fn<() => void>(),
+    stop: vi.fn<() => void>(),
   }),
 }));
 
@@ -48,28 +49,21 @@ describe("runCliAvailabilitySearch", () => {
 
     vi.mocked(authModule.getUserId).mockReturnValue("user-guid");
     vi.mocked(authModule.getDefaultLocationId).mockReturnValue(456);
-    vi.mocked(
-      existingReservationsModule.getExistingReservations,
-    ).mockResolvedValue([]);
+    vi.mocked(existingReservationsModule.getExistingReservations).mockResolvedValue([]);
     vi.mocked(availabilitySearchModule.prepareScheduleSearch).mockReturnValue({
       searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
     });
-    vi.mocked(availabilitySearchModule.buildScheduleFetchTasks).mockReturnValue(
-      [Promise.resolve([])],
-    );
-    vi.mocked(availabilitySearchModule.fetchAllAvailability).mockResolvedValue(
-      [],
-    );
-    vi.mocked(
-      availabilitySearchModule.filterValidAvailabilityBlocks,
-    ).mockReturnValue([]);
+    vi.mocked(availabilitySearchModule.buildScheduleFetchTasks).mockReturnValue([
+      Promise.resolve([]),
+    ]);
+    vi.mocked(availabilitySearchModule.fetchAllAvailability).mockResolvedValue([]);
+    vi.mocked(availabilitySearchModule.filterValidAvailabilityBlocks).mockReturnValue([]);
   });
 
   it("passes configured timezone to existing reservation lookup", async () => {
     const scheduler = {
       getInstructorIds: () => ["inst-1"],
-      getAircraftMapEntries: () =>
-        [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
+      getAircraftMapEntries: () => [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
     };
 
     await runCliAvailabilitySearch({
@@ -80,19 +74,19 @@ describe("runCliAvailabilitySearch", () => {
       durationMinutes: 120,
     });
 
-    expect(
-      existingReservationsModule.getExistingReservations,
-    ).toHaveBeenCalledWith(123, "America/Chicago");
+    expect(existingReservationsModule.getExistingReservations).toHaveBeenCalledWith(
+      123,
+      "America/Chicago",
+    );
   });
 
   it("uses explicitly selected aircraft ids when provided", async () => {
     const scheduler = {
       getInstructorIds: () => ["inst-1"],
       getAircraftMapEntries: () =>
-        [
-          ["ac-1", "N172S"] as [string, string],
-          ["ac-2", "N734UZ"] as [string, string],
-        ][Symbol.iterator](),
+        [["ac-1", "N172S"] as [string, string], ["ac-2", "N734UZ"] as [string, string]][
+          Symbol.iterator
+        ](),
     };
 
     await runCliAvailabilitySearch({
@@ -114,8 +108,7 @@ describe("runCliAvailabilitySearch", () => {
   it("uses explicitly selected instructor ids when provided", async () => {
     const scheduler = {
       getInstructorIds: () => ["inst-1", "inst-2"],
-      getAircraftMapEntries: () =>
-        [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
+      getAircraftMapEntries: () => [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
     };
 
     await runCliAvailabilitySearch({
@@ -145,29 +138,22 @@ describe("runCliAvailabilitySearch", () => {
       endDateTime: parseFspLocal("2024-07-15T17:00:00", testConfig.TIMEZONE),
     };
 
-    vi.mocked(availabilitySearchModule.fetchAllAvailability).mockResolvedValue([
+    vi.mocked(availabilitySearchModule.fetchAllAvailability).mockResolvedValue([slotOnConflictDay]);
+    vi.mocked(availabilitySearchModule.filterValidAvailabilityBlocks).mockReturnValue([
       slotOnConflictDay,
     ]);
-    vi.mocked(
-      availabilitySearchModule.filterValidAvailabilityBlocks,
-    ).mockReturnValue([slotOnConflictDay]);
-    vi.mocked(
-      existingReservationsModule.getExistingReservations,
-    ).mockResolvedValue([
+    vi.mocked(existingReservationsModule.getExistingReservations).mockResolvedValue([
       {
         reservationId: "33333333-3333-4333-8333-333333333333",
         start: "2024-07-15T10:00:00",
         end: "2024-07-15T12:00:00",
       },
     ]);
-    vi.mocked(
-      existingReservationsModule.hasReservationOnSameDay,
-    ).mockReturnValue(true);
+    vi.mocked(existingReservationsModule.hasReservationOnSameDay).mockReturnValue(true);
 
     const scheduler = {
       getInstructorIds: () => ["inst-1"],
-      getAircraftMapEntries: () =>
-        [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
+      getAircraftMapEntries: () => [["ac-1", "N172S"] as [string, string]][Symbol.iterator](),
     };
 
     const results = await runCliAvailabilitySearch({

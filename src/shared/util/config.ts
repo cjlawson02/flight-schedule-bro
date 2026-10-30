@@ -27,8 +27,7 @@ const envSchema = z.object({
     .string()
     .min(1)
     .refine((value) => isValidIanaTimeZone(value), {
-      message:
-        "TIMEZONE must be a valid IANA timezone (e.g. America/Los_Angeles)",
+      message: "TIMEZONE must be a valid IANA timezone (e.g. America/Los_Angeles)",
     })
     .default(DEFAULT_TIMEZONE),
 
@@ -38,9 +37,7 @@ const envSchema = z.object({
   MAX_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 
   // Optional reservation type override for automated monitoring
-  RESERVATION_TYPE_ID: z
-    .uuid("RESERVATION_TYPE_ID must be a valid UUID")
-    .optional(),
+  RESERVATION_TYPE_ID: z.uuid("RESERVATION_TYPE_ID must be a valid UUID").optional(),
 });
 
 export interface ConfigType {
@@ -60,6 +57,15 @@ export interface ConfigType {
 export type WorkerConfigType = Omit<ConfigType, "DAYS_AHEAD"> & {
   /** Optional cap on calendar days searched (today + N days). */
   MAX_DAYS_AHEAD?: number;
+  /** When true, cron auto-books clear rental slots (>24h lead). */
+  AUTO_BOOK: boolean;
+  /** Max reservations to create per cron invocation. */
+  AUTO_BOOK_MAX_PER_RUN: number;
+  /**
+   * Minutes from local midnight after which personal-calendar busy is ignored
+   * for auto-book (still enforces FSP same-day). Default 15:30 → 930.
+   */
+  AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES: number;
 };
 
 /** Worker env bindings used to build runtime config. */
@@ -75,6 +81,10 @@ export interface WorkerEnvInput {
   RESERVATION_TYPE_ID?: string;
   MAX_DAYS_AHEAD?: string;
   DAYS_AHEAD?: string;
+  AUTO_BOOK?: string;
+  AUTO_BOOK_MAX_PER_RUN?: string;
+  /** HH:MM local (e.g. "15:30") — ignore iCal busy for slots starting then or later. */
+  AUTO_BOOK_IGNORE_CALENDAR_AFTER?: string;
 }
 
 /**
@@ -92,9 +102,8 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
         return `  - ${field}: ${issue.message}`;
       });
       throw new Error(
-        `Environment variable validation failed:\n${missingOrInvalid.join(
-          "\n",
-        )}\n\n` + `Please ensure all required environment variables are set.`,
+        `Environment variable validation failed:\n${missingOrInvalid.join("\n")}\n\n` +
+          `Please ensure all required environment variables are set.`,
         { cause: error },
       );
     }
@@ -122,10 +131,9 @@ export function createConfig(envObj: Record<string, unknown>): ConfigType {
 
 export function createWorkerConfig(env: WorkerEnvInput): WorkerConfigType {
   if (env.DAYS_AHEAD !== undefined && env.DAYS_AHEAD.trim() !== "") {
-    log.warn(
-      "DAYS_AHEAD is ignored by the worker; set MAX_DAYS_AHEAD to cap calendar lookahead",
-      { daysAhead: env.DAYS_AHEAD },
-    );
+    log.warn("DAYS_AHEAD is ignored by the worker; set MAX_DAYS_AHEAD to cap calendar lookahead", {
+      daysAhead: env.DAYS_AHEAD,
+    });
   }
 
   const config = createConfig({
@@ -142,11 +150,50 @@ export function createWorkerConfig(env: WorkerEnvInput): WorkerConfigType {
 
   const { DAYS_AHEAD: _daysAhead, ...workerConfig } = config;
   const maxDaysAhead = parseOptionalPositiveInt(env.MAX_DAYS_AHEAD);
+  const autoBookMax = parseOptionalPositiveInt(env.AUTO_BOOK_MAX_PER_RUN) ?? 1;
 
   return {
     ...workerConfig,
+    AUTO_BOOK: parseTruthyFlag(env.AUTO_BOOK),
+    AUTO_BOOK_MAX_PER_RUN: autoBookMax,
+    AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES: parseLocalHhMmToMinutes(
+      env.AUTO_BOOK_IGNORE_CALENDAR_AFTER,
+      15 * 60 + 30,
+    ),
     ...(maxDaysAhead !== undefined ? { MAX_DAYS_AHEAD: maxDaysAhead } : {}),
   };
+}
+
+/** Parse "15:30" / "15.5" into minutes from midnight. */
+export function parseLocalHhMmToMinutes(
+  value: string | undefined,
+  fallbackMinutes: number,
+): number {
+  if (value === undefined || value.trim() === "") {
+    return fallbackMinutes;
+  }
+  const trimmed = value.trim();
+  const hhmm = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
+  if (hhmm) {
+    const hours = Number(hhmm[1]);
+    const minutes = Number(hhmm[2]);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return hours * 60 + minutes;
+    }
+  }
+  const asNumber = Number(trimmed);
+  if (Number.isFinite(asNumber) && asNumber >= 0 && asNumber < 24) {
+    return Math.round(asNumber * 60);
+  }
+  throw new Error(`AUTO_BOOK_IGNORE_CALENDAR_AFTER must be HH:MM (e.g. 15:30), got "${value}"`);
+}
+
+function parseTruthyFlag(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
 }
 
 function parseOptionalPositiveInt(value?: string): number | undefined {
@@ -156,9 +203,7 @@ function parseOptionalPositiveInt(value?: string): number | undefined {
 
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(
-      `MAX_DAYS_AHEAD must be a positive integer, got "${value}"`,
-    );
+    throw new Error(`Expected a positive integer, got "${value}"`);
   }
 
   return parsed;

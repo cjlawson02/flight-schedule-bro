@@ -17,8 +17,7 @@ import {
 const LA = "America/Los_Angeles";
 
 function makeSlot(
-  overrides: Partial<BookableAvailability> &
-    Pick<BookableAvailability, "startDateTime">,
+  overrides: Partial<BookableAvailability> & Pick<BookableAvailability, "startDateTime">,
 ): BookableAvailability {
   return {
     date: "1/20/2024",
@@ -35,12 +34,8 @@ describe("slot start time filters", () => {
   const now = new Date("2024-01-20T18:00:00.000Z");
 
   it("detects past slot starts", () => {
-    expect(isSlotStartInPast(new Date("2024-01-20T17:59:59.999Z"), now)).toBe(
-      true,
-    );
-    expect(isSlotStartInPast(new Date("2024-01-20T18:00:00.000Z"), now)).toBe(
-      false,
-    );
+    expect(isSlotStartInPast(new Date("2024-01-20T17:59:59.999Z"), now)).toBe(true);
+    expect(isSlotStartInPast(new Date("2024-01-20T18:00:00.000Z"), now)).toBe(false);
   });
 
   it("detects slots starting within the Discord lead window", () => {
@@ -51,12 +46,8 @@ describe("slot start time filters", () => {
       now.getTime() + DISCORD_NOTIFICATION_MIN_LEAD_HOURS * 60 * 60 * 1000,
     );
 
-    expect(
-      isSlotStartTooSoonForDiscordNotification(withinLead, undefined, now),
-    ).toBe(true);
-    expect(
-      isSlotStartTooSoonForDiscordNotification(afterLead, undefined, now),
-    ).toBe(false);
+    expect(isSlotStartTooSoonForDiscordNotification(withinLead, undefined, now)).toBe(true);
+    expect(isSlotStartTooSoonForDiscordNotification(afterLead, undefined, now)).toBe(false);
   });
 
   it("filters past slots from CLI suggestions", () => {
@@ -84,12 +75,8 @@ describe("slot start time filters", () => {
   });
 
   it("detects slots starting within the booking lead window", () => {
-    const withinLead = new Date(
-      now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000 - 1,
-    );
-    const afterLead = new Date(
-      now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000,
-    );
+    const withinLead = new Date(now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000 - 1);
+    const afterLead = new Date(now.getTime() + BOOKING_MIN_LEAD_HOURS * 60 * 60 * 1000);
 
     expect(isSlotStartTooSoonForBooking(withinLead, undefined, now)).toBe(true);
     expect(isSlotStartTooSoonForBooking(afterLead, undefined, now)).toBe(false);
@@ -173,12 +160,7 @@ describe("mergeRefreshedSnapshotSlots", () => {
     ];
     const previous = [...refreshed, ...retained];
 
-    const merged = mergeRefreshedSnapshotSlots(
-      refreshed,
-      previous,
-      "2024-01-25",
-      LA,
-    );
+    const merged = mergeRefreshedSnapshotSlots(refreshed, previous, "2024-01-25", LA);
 
     expect(merged).toHaveLength(2);
     expect(merged.map((slot) => slot.date)).toEqual(["1/20/2024", "1/28/2024"]);

@@ -14,15 +14,15 @@ import * as workerSearchModule from "../shared/blo/workerAvailabilitySearch.js";
 vi.mock("./kv.js");
 vi.mock("./discord.js");
 vi.mock("./runLock.js", () => ({
-  tryAcquireWorkerRunLock: vi.fn().mockResolvedValue(true),
-  releaseWorkerRunLock: vi.fn().mockResolvedValue(undefined),
+  tryAcquireWorkerRunLock: vi.fn<() => Promise<unknown>>().mockResolvedValue(true),
+  releaseWorkerRunLock: vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
 }));
 vi.mock("../shared/dao/auth.js");
 vi.mock("../shared/dao/existingReservations.js");
 vi.mock("./metadata.js");
 vi.mock("../shared/blo/workerAvailabilitySearch.js");
 vi.mock("./utils.js", () => ({
-  initializeWorker: vi.fn(),
+  initializeWorker: vi.fn<() => void>(),
 }));
 
 const mockSession: AuthSession = {
@@ -83,21 +83,13 @@ describe("runScheduledTask", () => {
         trackedThroughDate: "2024-01-29",
       },
     });
-    vi.mocked(kvModule.cleanPastSlotsFromSnapshot).mockImplementation(
-      (snapshot) => snapshot,
-    );
+    vi.mocked(kvModule.cleanPastSlotsFromSnapshot).mockImplementation((snapshot) => snapshot);
     vi.mocked(kvModule.getSlotsFromSnapshot).mockReturnValue([]);
     vi.mocked(kvModule.setSnapshot).mockResolvedValue(undefined);
     vi.mocked(authModule.fetchAuth).mockResolvedValue(mockSession);
-    vi.mocked(
-      existingReservationsModule.getExistingReservations,
-    ).mockResolvedValue([]);
-    vi.mocked(metadataModule.getOrFetchMetadata).mockResolvedValue(
-      mockMetadata,
-    );
-    vi.mocked(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).mockResolvedValue({
+    vi.mocked(existingReservationsModule.getExistingReservations).mockResolvedValue([]);
+    vi.mocked(metadataModule.getOrFetchMetadata).mockResolvedValue(mockMetadata);
+    vi.mocked(workerSearchModule.executeWorkerAvailabilitySearch).mockResolvedValue({
       validResults: [makeSlot("ac-1")],
       search: {
         results: [makeSlot("ac-1")],
@@ -111,12 +103,10 @@ describe("runScheduledTask", () => {
       } as never,
       today: new Date("2024-01-15T08:00:00.000Z"),
     });
-    vi.mocked(discordModule.sendAvailabilityNotification).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(discordModule.sendAutoBookNotification).mockResolvedValue(undefined);
   });
 
-  it("updates the snapshot before sending Discord notifications", async () => {
+  it("updates the snapshot and does not send availability Discord", async () => {
     const callOrder: string[] = [];
     const now = new Date("2024-01-20T12:00:00.000Z");
     vi.useFakeTimers();
@@ -128,9 +118,7 @@ describe("runScheduledTask", () => {
       endDateTime: new Date("2024-01-21T14:00:00.000Z"),
     };
 
-    vi.mocked(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).mockResolvedValue({
+    vi.mocked(workerSearchModule.executeWorkerAvailabilitySearch).mockResolvedValue({
       validResults: [notifyableSlot],
       search: {
         results: [notifyableSlot],
@@ -140,7 +128,7 @@ describe("runScheduledTask", () => {
       },
       reservationType: {
         reservationTypeId: "11111111-1111-4111-8111-111111111111",
-        reservationTypeName: "Dual",
+        reservationTypeName: "Rental",
       } as never,
       today: new Date("2024-01-20T08:00:00.000Z"),
     });
@@ -148,25 +136,25 @@ describe("runScheduledTask", () => {
     vi.mocked(kvModule.setSnapshot).mockImplementation(async () => {
       callOrder.push("setSnapshot");
     });
-    vi.mocked(discordModule.sendAvailabilityNotification).mockImplementation(
-      async () => {
-        callOrder.push("sendAvailabilityNotification");
-      },
-    );
+    vi.mocked(discordModule.sendAutoBookNotification).mockImplementation(async () => {
+      callOrder.push("sendAutoBookNotification");
+    });
+    vi.mocked(discordModule.sendAvailabilityNotification).mockImplementation(async () => {
+      callOrder.push("sendAvailabilityNotification");
+    });
 
     await runScheduledTask(mockEnv);
 
     vi.useRealTimers();
 
-    expect(callOrder).toEqual(["setSnapshot", "sendAvailabilityNotification"]);
+    expect(callOrder).toEqual(["setSnapshot"]);
+    expect(discordModule.sendAvailabilityNotification).not.toHaveBeenCalled();
   });
 
   it("passes explicit auth context into worker availability search", async () => {
     await runScheduledTask(mockEnv);
 
-    expect(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).toHaveBeenCalledWith(
+    expect(workerSearchModule.executeWorkerAvailabilitySearch).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: {
           locationId: mockSession.defaultLocationId,
@@ -178,17 +166,16 @@ describe("runScheduledTask", () => {
   it("throws when no snapshot exists", async () => {
     vi.mocked(kvModule.getSnapshot).mockResolvedValue(null);
 
-    await expect(runScheduledTask(mockEnv)).rejects.toThrow(
-      /No snapshot found in KV/,
-    );
+    await expect(runScheduledTask(mockEnv)).rejects.toThrow(/No snapshot found in KV/);
   });
 
   it("passes operator timezone to existing reservation lookup", async () => {
     await runScheduledTask(mockEnv);
 
-    expect(
-      existingReservationsModule.getExistingReservations,
-    ).toHaveBeenCalledWith(mockSession.operatorId, "America/Los_Angeles");
+    expect(existingReservationsModule.getExistingReservations).toHaveBeenCalledWith(
+      mockSession.operatorId,
+      "America/Los_Angeles",
+    );
   });
 
   it("does not send Discord when new slots start within 24 hours", async () => {
@@ -202,9 +189,7 @@ describe("runScheduledTask", () => {
       endDateTime: new Date("2024-01-20T22:00:00.000Z"),
     };
 
-    vi.mocked(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).mockResolvedValue({
+    vi.mocked(workerSearchModule.executeWorkerAvailabilitySearch).mockResolvedValue({
       validResults: [soonSlot],
       search: {
         results: [soonSlot],
@@ -227,9 +212,7 @@ describe("runScheduledTask", () => {
   });
 
   it("skips snapshot update when no complete days were fetched", async () => {
-    vi.mocked(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).mockResolvedValue({
+    vi.mocked(workerSearchModule.executeWorkerAvailabilitySearch).mockResolvedValue({
       validResults: [],
       search: {
         results: [],

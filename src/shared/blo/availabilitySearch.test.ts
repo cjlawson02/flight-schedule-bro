@@ -7,16 +7,25 @@ import {
   prepareScheduleSearch,
 } from "./availabilitySearch.js";
 import { SchedulerBLO } from "./scheduler.js";
-import {
-  createSubrequestBudget,
-  subrequestsRemaining,
-} from "../util/subrequestBudget.js";
-import {
-  dualFlightTraining,
-  groundTraining,
-  rental,
-} from "../dao/reservationTypes.fixtures.js";
+import { createSubrequestBudget, subrequestsRemaining } from "../util/subrequestBudget.js";
+import { dualFlightTraining, groundTraining, rental } from "../dao/reservationTypes.fixtures.js";
 import { parseFspLocal } from "../util/flightTime.js";
+import type { BookableAvailability } from "../dao/availability.js";
+
+type GetBookableAvailabilityForDay = SchedulerBLO["getBookableAvailabilityForDay"];
+type GetBookableAvailability = SchedulerBLO["getBookableAvailability"];
+
+function availabilityStub(date: string): BookableAvailability {
+  return {
+    date,
+    startTime: "10:00:00",
+    endTime: "12:00:00",
+    instructorId: "inst-1",
+    aircraftId: "ac-1",
+    startDateTime: new Date("2024-07-15T17:00:00.000Z"),
+    endDateTime: new Date("2024-07-15T19:00:00.000Z"),
+  };
+}
 
 describe("fetchScheduleDaysWithinBudget", () => {
   it("fetches days sequentially until the subrequest budget is exhausted", async () => {
@@ -24,13 +33,13 @@ describe("fetchScheduleDaysWithinBudget", () => {
     budget.used = 2;
 
     const getBookableAvailabilityForDay = vi
-      .fn()
+      .fn<GetBookableAvailabilityForDay>()
       .mockResolvedValueOnce({
-        availability: [{ date: "2024-07-15" }],
+        availability: [availabilityStub("2024-07-15")],
         complete: true,
       })
       .mockResolvedValueOnce({
-        availability: [{ date: "2024-07-16" }],
+        availability: [availabilityStub("2024-07-16")],
         complete: true,
       })
       .mockResolvedValueOnce({
@@ -69,8 +78,8 @@ describe("fetchScheduleDaysWithinBudget", () => {
   it("stops after maxDaysAhead even when budget remains", async () => {
     const budget = createSubrequestBudget(50, 0);
 
-    const getBookableAvailabilityForDay = vi.fn().mockResolvedValue({
-      availability: [{ date: "2024-07-15" }],
+    const getBookableAvailabilityForDay = vi.fn<GetBookableAvailabilityForDay>().mockResolvedValue({
+      availability: [availabilityStub("2024-07-15")],
       complete: true,
     });
 
@@ -104,7 +113,7 @@ describe("fetchScheduleDaysWithinBudget", () => {
   it("returns null trackedThroughDate when the first day is incomplete", async () => {
     const budget = createSubrequestBudget(50, 0);
 
-    const getBookableAvailabilityForDay = vi.fn().mockResolvedValue({
+    const getBookableAvailabilityForDay = vi.fn<GetBookableAvailabilityForDay>().mockResolvedValue({
       availability: [],
       complete: false,
     });
@@ -139,8 +148,8 @@ describe("fetchScheduleDaysWithinBudget", () => {
     const budget = createSubrequestBudget(3, 0);
     budget.used = 2;
 
-    const getBookableAvailabilityForDay = vi.fn().mockResolvedValue({
-      availability: [{ date: "2024-07-15" }],
+    const getBookableAvailabilityForDay = vi.fn<GetBookableAvailabilityForDay>().mockResolvedValue({
+      availability: [availabilityStub("2024-07-15")],
       complete: true,
     });
 
@@ -174,7 +183,7 @@ describe("fetchScheduleDaysWithinBudget", () => {
   it("throws when failFast is enabled and a day is incomplete", async () => {
     const budget = createSubrequestBudget(50, 0);
 
-    const getBookableAvailabilityForDay = vi.fn().mockResolvedValue({
+    const getBookableAvailabilityForDay = vi.fn<GetBookableAvailabilityForDay>().mockResolvedValue({
       availability: [],
       complete: false,
     });
@@ -265,12 +274,12 @@ describe("buildScheduleFetchTasks", () => {
 
   it("passes selected duration to schedule snapshot search", () => {
     const reservationType = { ...dualFlightTraining, defaultLength: 90 };
-    const getBookableAvailability = vi.fn().mockResolvedValue([]);
+    const getBookableAvailability = vi.fn<GetBookableAvailability>().mockResolvedValue([]);
     const scheduler = {
       getBookableAvailability,
     } as Pick<SchedulerBLO, "getBookableAvailability"> as SchedulerBLO;
 
-    buildScheduleFetchTasks(scheduler, {
+    void buildScheduleFetchTasks(scheduler, {
       params: {
         ...baseParams,
         reservationType,
@@ -317,22 +326,19 @@ describe("filterValidAvailabilityBlocks", () => {
       endDateTime: parseFspLocal("2024-07-15T17:00:00", testConfig.TIMEZONE),
     };
 
-    expect(
-      filterValidAvailabilityBlocks([validSlot, invalidSlot], testConfig, 90),
-    ).toEqual([validSlot]);
+    expect(filterValidAvailabilityBlocks([validSlot, invalidSlot], testConfig, 90)).toEqual([
+      validSlot,
+    ]);
   });
 });
 
 describe("fetchAllAvailability", () => {
   it("throws when failFast is enabled and any request rejects", async () => {
-    const tasks = [
-      Promise.resolve([]),
-      Promise.reject(new Error("availability failed")),
-    ];
+    const tasks = [Promise.resolve([]), Promise.reject(new Error("availability failed"))];
 
-    await expect(
-      fetchAllAvailability(tasks, { failFast: true }),
-    ).rejects.toThrow("availability failed");
+    await expect(fetchAllAvailability(tasks, { failFast: true })).rejects.toThrow(
+      "availability failed",
+    );
   });
 
   it("returns partial results when failFast is disabled", async () => {
@@ -346,10 +352,7 @@ describe("fetchAllAvailability", () => {
       endDateTime: new Date("2026-05-25T15:00:00"),
     };
 
-    const tasks = [
-      Promise.resolve([slot]),
-      Promise.reject(new Error("failed")),
-    ];
+    const tasks = [Promise.resolve([slot]), Promise.reject(new Error("failed"))];
 
     await expect(fetchAllAvailability(tasks)).resolves.toEqual([slot]);
   });

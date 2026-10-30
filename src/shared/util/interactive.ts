@@ -1,8 +1,5 @@
 import { checkbox, select, confirm, input } from "@inquirer/prompts";
-import {
-  selectPreferredAircraftIds,
-  type AircraftMetadata,
-} from "../dao/aircraft.js";
+import { selectPreferredAircraftIds, type AircraftMetadata } from "../dao/aircraft.js";
 import { selectPreferredInstructorIds } from "../dao/instructors.js";
 import type { ReservationType } from "../dao/reservationTypes.js";
 import { getFieldState, pickReservationType } from "../dao/reservationTypes.js";
@@ -13,28 +10,17 @@ import {
   FLIGHT_TYPE_LOCAL,
   type ActivityFlightDetails,
 } from "../dao/reservationFlightDetails.js";
-import {
-  groupAvailabilitiesByTimeSlot,
-  type BookableAvailability,
-} from "../dao/availability.js";
+import { groupAvailabilitiesByTimeSlot, type BookableAvailability } from "../dao/availability.js";
 import type { CancellationReason } from "../dao/reservationManagement.js";
 import type { ExistingReservation } from "../dao/existingReservations.js";
-import {
-  getReservationEnd,
-  getReservationStart,
-} from "../dao/existingReservations.js";
-import {
-  formatOperatorDisplayDate,
-  formatOperatorDisplayTime,
-} from "../util/flightTime.js";
+import { getReservationEnd, getReservationStart } from "../dao/existingReservations.js";
+import { formatOperatorDisplayDate, formatOperatorDisplayTime } from "../util/flightTime.js";
 
 export type CliMainAction = "book" | "manage-existing-activity" | "exit";
 export type ManageActivityAction = "change-activity-type" | "cancel" | "back";
 
 /** Common reservation lengths offered in the CLI duration prompt (minutes). */
-export const CLI_DURATION_OPTIONS_MINUTES = [
-  210, 180, 150, 120, 90, 60, 45, 30,
-];
+export const CLI_DURATION_OPTIONS_MINUTES = [210, 180, 150, 120, 90, 60, 45, 30];
 
 export function formatDurationChoice(minutes: number): string {
   const wholeHours = Math.floor(minutes / 60);
@@ -51,9 +37,7 @@ export function formatDurationChoice(minutes: number): string {
   return `${minutes} minutes`;
 }
 
-export function buildDurationChoices(
-  defaultLength: number,
-): { name: string; value: number }[] {
+export function buildDurationChoices(defaultLength: number): { name: string; value: number }[] {
   const optionSet = new Set([defaultLength, ...CLI_DURATION_OPTIONS_MINUTES]);
 
   return [...optionSet]
@@ -137,17 +121,12 @@ export class InteractiveCLI {
     const formattedStart = this.formatTime(startTime);
     const formattedEnd = this.formatTime(endTime);
 
-    return `${formattedDate.padEnd(12)} │ ${(
-      formattedStart +
-      " - " +
-      formattedEnd
-    ).padEnd(20)} │ ${aircraft.padEnd(20)} │ ${instructor}`;
+    return `${formattedDate.padEnd(12)} │ ${(formattedStart + " - " + formattedEnd).padEnd(
+      20,
+    )} │ ${aircraft.padEnd(20)} │ ${instructor}`;
   }
 
-  formatExistingActivity(
-    reservation: ExistingReservation,
-    timeZone: string,
-  ): string {
+  formatExistingActivity(reservation: ExistingReservation, timeZone: string): string {
     const start = getReservationStart(reservation, timeZone);
     const end = getReservationEnd(reservation, timeZone);
 
@@ -185,12 +164,8 @@ export class InteractiveCLI {
     endTime: string;
     availabilities: BookableAvailability[];
   }): string {
-    const instructorList = [
-      ...new Set(group.availabilities.map((a) => a.instructor)),
-    ].join(", ");
-    const aircraftList = [
-      ...new Set(group.availabilities.map((a) => a.aircraft)),
-    ].join(", ");
+    const instructorList = [...new Set(group.availabilities.map((a) => a.instructor))].join(", ");
+    const aircraftList = [...new Set(group.availabilities.map((a) => a.aircraft))].join(", ");
 
     return this.formatActivityRow(
       group.date,
@@ -225,8 +200,7 @@ export class InteractiveCLI {
       return [];
     }
 
-    const { timeSlotGroups, choices } =
-      this.buildTimeSlotChoices(availabilities);
+    const { timeSlotGroups, choices } = this.buildTimeSlotChoices(availabilities);
 
     try {
       const selectedIndices = await checkbox({
@@ -318,8 +292,7 @@ export class InteractiveCLI {
 
     // Get unique instructors (dedupe by instructor name)
     const uniqueInstructors = availableInstructors.filter(
-      (avail, index, self) =>
-        index === self.findIndex((a) => a.instructor === avail.instructor),
+      (avail, index, self) => index === self.findIndex((a) => a.instructor === avail.instructor),
     );
 
     // If only one option, return it directly (no need to prompt)
@@ -377,9 +350,7 @@ export class InteractiveCLI {
   /**
    * Select reservation duration in minutes.
    */
-  async selectDurationMinutes(
-    reservationType: ReservationType,
-  ): Promise<number | null> {
+  async selectDurationMinutes(reservationType: ReservationType): Promise<number | null> {
     const choices = buildDurationChoices(reservationType.defaultLength);
 
     try {
@@ -405,10 +376,7 @@ export class InteractiveCLI {
       return null;
     }
 
-    const defaultSelectedIds = selectPreferredInstructorIds(
-      instructors,
-      preferredRegex,
-    );
+    const defaultSelectedIds = selectPreferredInstructorIds(instructors, preferredRegex);
     const choices = buildInstructorChoices(instructors, defaultSelectedIds);
 
     try {
@@ -417,8 +385,7 @@ export class InteractiveCLI {
         choices,
         pageSize: 15,
         loop: false,
-        validate: (selected) =>
-          selected.length > 0 || "Select at least one instructor",
+        validate: (selected) => selected.length > 0 || "Select at least one instructor",
       });
     } catch {
       return null;
@@ -436,10 +403,7 @@ export class InteractiveCLI {
       return null;
     }
 
-    const defaultSelectedIds = selectPreferredAircraftIds(
-      aircraft,
-      preferredRegex,
-    );
+    const defaultSelectedIds = selectPreferredAircraftIds(aircraft, preferredRegex);
     const choices = buildTailNumberChoices(aircraft, defaultSelectedIds);
 
     try {
@@ -448,8 +412,7 @@ export class InteractiveCLI {
         choices,
         pageSize: 15,
         loop: false,
-        validate: (selected) =>
-          selected.length > 0 || "Select at least one tail number",
+        validate: (selected) => selected.length > 0 || "Select at least one tail number",
       });
     } catch {
       return null;
@@ -464,18 +427,13 @@ export class InteractiveCLI {
     options?: { preferredTypeId?: string; excludeTypeIds?: string[] },
   ): Promise<ReservationType | null> {
     const excluded = new Set(options?.excludeTypeIds ?? []);
-    const availableTypes = reservationTypes.filter(
-      (type) => !excluded.has(type.reservationTypeId),
-    );
+    const availableTypes = reservationTypes.filter((type) => !excluded.has(type.reservationTypeId));
 
     if (availableTypes.length === 0) {
       return null;
     }
 
-    const preferred = pickReservationType(
-      availableTypes,
-      options?.preferredTypeId,
-    );
+    const preferred = pickReservationType(availableTypes, options?.preferredTypeId);
 
     const choices = availableTypes.map((type) => ({
       name: type.reservationTypeName,
@@ -490,10 +448,7 @@ export class InteractiveCLI {
         default: preferred?.reservationTypeId,
       });
 
-      return (
-        availableTypes.find((type) => type.reservationTypeId === selectedId) ??
-        null
-      );
+      return availableTypes.find((type) => type.reservationTypeId === selectedId) ?? null;
     } catch {
       return null;
     }
@@ -525,11 +480,7 @@ export class InteractiveCLI {
         return null;
       }
 
-      return (
-        reservations.find(
-          (reservation) => reservation.reservationId === selectedId,
-        ) ?? null
-      );
+      return reservations.find((reservation) => reservation.reservationId === selectedId) ?? null;
     } catch {
       return null;
     }
@@ -589,9 +540,7 @@ export class InteractiveCLI {
     if (getFieldState(reservationType, "flightHours").enabled) {
       const required = getFieldState(reservationType, "flightHours").required;
       const estimatedFlightHours = await this.promptText(
-        required
-          ? "Estimated flight hours:"
-          : "Estimated flight hours (optional):",
+        required ? "Estimated flight hours:" : "Estimated flight hours (optional):",
       );
       if (estimatedFlightHours === null) {
         return null;

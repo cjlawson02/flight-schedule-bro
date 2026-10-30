@@ -41,18 +41,14 @@ export async function runCliAvailabilitySearch(options: {
     instructorIds: selectedInstructorIds,
   } = options;
   const today = startOfOperatorDay(new Date(), config.TIMEZONE);
-  const allInstructorIds =
-    selectedInstructorIds ?? scheduler.getInstructorIds();
+  const allInstructorIds = selectedInstructorIds ?? scheduler.getInstructorIds();
   const aircraftIds =
     selectedAircraftIds ??
     selectPreferredAircraftIds(
-      Array.from(
-        scheduler.getAircraftMapEntries(),
-        ([aircraftId, tailNumber]) => ({
-          aircraftId,
-          tailNumber,
-        }),
-      ),
+      Array.from(scheduler.getAircraftMapEntries(), ([aircraftId, tailNumber]) => ({
+        aircraftId,
+        tailNumber,
+      })),
       config.AIRCRAFT_REGEX,
     );
 
@@ -74,10 +70,7 @@ export async function runCliAvailabilitySearch(options: {
   }
 
   log.info("Checking existing reservations");
-  const existingReservations = await getExistingReservations(
-    operatorId,
-    config.TIMEZONE,
-  );
+  const existingReservations = await getExistingReservations(operatorId, config.TIMEZONE);
   log.info("Existing reservations loaded", {
     count: existingReservations.length,
   });
@@ -111,11 +104,7 @@ export async function runCliAvailabilitySearch(options: {
     const allBookableResults = await fetchAllAvailability(trackedPromises);
     progressBar.stop();
 
-    const validResults = filterValidAvailabilityBlocks(
-      allBookableResults,
-      config,
-      durationMinutes,
-    );
+    const validResults = filterValidAvailabilityBlocks(allBookableResults, config, durationMinutes);
 
     const futureResults = filterSlotsBookable(validResults);
     const leadTimeFiltered = validResults.length - futureResults.length;
@@ -127,15 +116,10 @@ export async function runCliAvailabilitySearch(options: {
 
     const availableWithoutConflicts = futureResults.filter(
       (result) =>
-        !hasReservationOnSameDay(
-          result.startDateTime,
-          existingReservations,
-          config.TIMEZONE,
-        ),
+        !hasReservationOnSameDay(result.startDateTime, existingReservations, config.TIMEZONE),
     );
 
-    const conflictsFiltered =
-      futureResults.length - availableWithoutConflicts.length;
+    const conflictsFiltered = futureResults.length - availableWithoutConflicts.length;
     if (conflictsFiltered > 0) {
       console.log(
         `\n⏭️  Filtered out ${conflictsFiltered} time slots on days where you already have reservations`,

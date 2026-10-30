@@ -20,6 +20,9 @@ describe("buildWorkerSearchResources", () => {
         AIRCRAFT_REGEX: /172S/i,
         INSTRUCTOR_REGEX: /Doug Libal/i,
         TIMEZONE: "America/Los_Angeles",
+        AUTO_BOOK: false,
+        AUTO_BOOK_MAX_PER_RUN: 1,
+        AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES: 15 * 60 + 30,
       },
       {
         instructors: [{ instructorId: "inst-1", displayName: "Instructor" }],
@@ -49,6 +52,9 @@ describe("buildWorkerSearchResources", () => {
           AIRCRAFT_REGEX: /172S/i,
           INSTRUCTOR_REGEX: /Doug Libal/i,
           TIMEZONE: "America/Los_Angeles",
+          AUTO_BOOK: false,
+          AUTO_BOOK_MAX_PER_RUN: 1,
+          AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES: 15 * 60 + 30,
         },
         {
           instructors: [],
@@ -63,24 +69,16 @@ describe("buildWorkerSearchResources", () => {
 
 describe("executeWorkerAvailabilitySearch", () => {
   it("uses explicit auth context and subrequest budget", async () => {
-    vi.spyOn(
-      availabilitySearchModule,
-      "fetchScheduleDaysWithinBudget",
-    ).mockResolvedValue({
+    vi.spyOn(availabilitySearchModule, "fetchScheduleDaysWithinBudget").mockResolvedValue({
       results: [],
       trackedThroughDate: "2024-07-15",
       scheduleSubrequests: 3,
       daysFetched: 2,
     });
-    vi.spyOn(
-      availabilitySearchModule,
-      "filterValidAvailabilityBlocks",
-    ).mockReturnValue([]);
-    vi.spyOn(availabilitySearchModule, "prepareScheduleSearch").mockReturnValue(
-      {
-        searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
-      },
-    );
+    vi.spyOn(availabilitySearchModule, "filterValidAvailabilityBlocks").mockReturnValue([]);
+    vi.spyOn(availabilitySearchModule, "prepareScheduleSearch").mockReturnValue({
+      searchResources: { instructors: ["inst-1"], aircraftIds: ["ac-1"] },
+    });
 
     const scheduler = new SchedulerBLO(123, "America/Los_Angeles");
     const budget = createSubrequestBudget();
@@ -95,6 +93,9 @@ describe("executeWorkerAvailabilitySearch", () => {
         AIRCRAFT_REGEX: /172S/i,
         INSTRUCTOR_REGEX: /Doug Libal/i,
         TIMEZONE: "America/Los_Angeles",
+        AUTO_BOOK: false,
+        AUTO_BOOK_MAX_PER_RUN: 1,
+        AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES: 15 * 60 + 30,
       },
       fspMetadata: {
         instructors: [{ instructorId: "inst-1", displayName: "Instructor" }],
@@ -111,9 +112,7 @@ describe("executeWorkerAvailabilitySearch", () => {
       failFast: true,
     });
 
-    expect(
-      availabilitySearchModule.fetchScheduleDaysWithinBudget,
-    ).toHaveBeenCalledWith(
+    expect(availabilitySearchModule.fetchScheduleDaysWithinBudget).toHaveBeenCalledWith(
       expect.objectContaining({
         scheduler,
         budget,

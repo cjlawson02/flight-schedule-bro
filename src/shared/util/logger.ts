@@ -36,9 +36,7 @@ function defaultConfig(
   runtime: LogRuntime,
 ): Required<Pick<LoggerConfig, "runtime" | "type" | "minLevel">> {
   const envLevel =
-    typeof process !== "undefined"
-      ? parseLogLevel(process.env.LOG_LEVEL)
-      : undefined;
+    typeof process !== "undefined" ? parseLogLevel(process.env.LOG_LEVEL) : undefined;
 
   if (runtime === "test") {
     return { runtime, type: "hidden", minLevel: 6 };

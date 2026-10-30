@@ -4,12 +4,8 @@ import {
   loadWorkerMetadata,
   runWorkerAvailabilitySearchFlow,
 } from "./workerPipeline.js";
+import { formatOperatorIsoDate, startOfOperatorDay } from "../shared/util/flightTime.js";
 import {
-  formatOperatorIsoDate,
-  startOfOperatorDay,
-} from "../shared/util/flightTime.js";
-import {
-  filterSlotsForDiscordNotification,
   filterSlotsNotInPast,
   findNewSlots,
   maxIsoDate,
@@ -24,30 +20,26 @@ import {
 import { setActiveAuthSession } from "../shared/dao/auth.js";
 import { getErrorMessage } from "../shared/util/errors.js";
 import { getExistingReservations } from "../shared/dao/existingReservations.js";
+import { fetchCalendarBusyFromIcalUrl, type BusyInterval } from "../shared/util/calendarBusy.js";
 import {
   getSnapshot,
   getSlotsFromSnapshot,
   setSnapshot,
   cleanPastSlotsFromSnapshot,
 } from "./kv.js";
-import { sendAvailabilityNotification } from "./discord.js";
+import { sendAutoBookNotification } from "./discord.js";
+import { autoBookSlots, selectAutoBookCandidates } from "./autoBook.js";
 import { releaseWorkerRunLock, tryAcquireWorkerRunLock } from "./runLock.js";
 import { createLogger } from "../shared/util/logger.js";
 import type { Env } from "./types.js";
 
 const log = createLogger("scheduled");
 
-export async function runScheduledTask(
-  env: Env,
-  ctx?: ExecutionContext,
-): Promise<void> {
+export async function runScheduledTask(env: Env, _ctx?: ExecutionContext): Promise<void> {
   log.info("Scheduled task started", { timestamp: new Date().toISOString() });
 
   const runId = `scheduled-${Date.now()}`;
-  const lockAcquired = await tryAcquireWorkerRunLock(
-    env.FSP_AVAILABILITY_KV,
-    runId,
-  );
+  const lockAcquired = await tryAcquireWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
   if (!lockAcquired) {
     return;
   }
@@ -59,50 +51,44 @@ export async function runScheduledTask(
   try {
     const snapshot = await getSnapshot(env);
     if (!snapshot) {
-      throw new Error(
-        "No snapshot found in KV. Please run setup first by visiting /setup",
-      );
+      throw new Error("No snapshot found in KV. Please run setup first by visiting /setup");
     }
 
     const { config, session } = await bootstrapWorker(env);
     const now = new Date();
     const today = startOfOperatorDay(now, config.TIMEZONE);
     const { metadata } = snapshot;
-    const previousTrackedThroughDate = resolveTrackedThroughDate(
-      metadata,
-      config.TIMEZONE,
-    );
+    const previousTrackedThroughDate = resolveTrackedThroughDate(metadata, config.TIMEZONE);
+
+    const icalUrl = env.CALENDAR_ICAL_URL?.trim() || "";
+    const icalConfigured = icalUrl.length > 0;
+    budget.reserve =
+      (icalConfigured ? 1 : 0) + (config.AUTO_BOOK ? config.AUTO_BOOK_MAX_PER_RUN + 1 : 0); // books + book Discord
 
     log.info("Rolling window state", {
       lastSearchDate: metadata.lastSearchDate,
       previousTrackedThroughDate,
       today: formatOperatorIsoDate(today, config.TIMEZONE),
+      autoBook: config.AUTO_BOOK,
+      calendarIcal: icalConfigured,
       subrequestsUsed: budget.used,
+      reserve: budget.reserve,
     });
 
-    const cleanedSnapshot = cleanPastSlotsFromSnapshot(
-      snapshot,
-      now,
-      config.TIMEZONE,
-    );
+    const cleanedSnapshot = cleanPastSlotsFromSnapshot(snapshot, now, config.TIMEZONE);
     const previousSlots = getSlotsFromSnapshot(cleanedSnapshot);
     log.info("Previous snapshot loaded", { slotCount: previousSlots.length });
 
     log.info("Fetching existing reservations");
-    const existingReservations = await getExistingReservations(
-      session.operatorId,
-      config.TIMEZONE,
-    );
+    const existingReservations = await getExistingReservations(session.operatorId, config.TIMEZONE);
     log.info("Existing reservations loaded", {
       count: existingReservations.length,
       subrequestsUsed: budget.used,
     });
 
-    const fspMetadata = await loadWorkerMetadata(
-      session,
-      env.FSP_AVAILABILITY_KV,
-      { allowApiRefresh: false },
-    );
+    const fspMetadata = await loadWorkerMetadata(session, env.FSP_AVAILABILITY_KV, {
+      allowApiRefresh: false,
+    });
     log.info("FSP metadata loaded", {
       instructors: fspMetadata.instructors.length,
       reservationTypes: fspMetadata.reservationTypes.length,
@@ -110,13 +96,9 @@ export async function runScheduledTask(
       subrequestsUsed: budget.used,
     });
 
-    const scheduler = createHydratedScheduler(
-      session,
-      fspMetadata,
-      config.TIMEZONE,
-    );
+    const scheduler = createHydratedScheduler(session, fspMetadata, config.TIMEZONE);
 
-    const { validResults, search } = await runWorkerAvailabilitySearchFlow({
+    const { validResults, search, reservationType } = await runWorkerAvailabilitySearchFlow({
       config,
       session,
       fspMetadata,
@@ -124,6 +106,11 @@ export async function runScheduledTask(
       budget,
       today,
       failFast: true,
+    });
+
+    log.info("Monitoring reservation type", {
+      reservationTypeName: reservationType.reservationTypeName,
+      reservationTypeId: reservationType.reservationTypeId,
     });
 
     const bookableSlots = filterSlotsNotInPast(validResults, now);
@@ -163,11 +150,19 @@ export async function runScheduledTask(
     );
     log.info("New slots within tracked window", { count: newSlots.length });
 
-    const slotsToNotify = filterSlotsForDiscordNotification(newSlots, now);
-
-    log.info("Slots selected for notification", {
-      count: slotsToNotify.length,
-    });
+    let busyIntervals: BusyInterval[] = [];
+    let icalFetchFailed = false;
+    if (icalConfigured) {
+      try {
+        busyIntervals = await fetchCalendarBusyFromIcalUrl(icalUrl, config.TIMEZONE);
+      } catch (error) {
+        icalFetchFailed = true;
+        log.error("Failed to load calendar iCal", {
+          message: getErrorMessage(error),
+          error,
+        });
+      }
+    }
 
     const updatedMetadata = {
       lastSearchDate: formatOperatorIsoDate(today, config.TIMEZONE),
@@ -177,38 +172,68 @@ export async function runScheduledTask(
 
     await setSnapshot(env, mergedSlots, updatedMetadata);
 
-    if (slotsToNotify.length > 0) {
-      log.info("Sending Discord notification");
-      const notify = () =>
-        sendAvailabilityNotification(
-          env,
-          slotsToNotify,
-          fspMetadata,
-          existingReservations,
-          config.TIMEZONE,
-        );
+    const bookedKeys = new Set<string>();
+    if (config.AUTO_BOOK) {
+      if (icalConfigured && icalFetchFailed) {
+        log.warn("Skipping auto-book: calendar iCal fetch failed");
+      } else {
+        if (!icalConfigured) {
+          log.warn("AUTO_BOOK without CALENDAR_ICAL_URL — using FSP same-day conflicts only");
+        }
 
-      try {
-        await notify();
-      } catch (error) {
-        log.error("Failed to send Discord notification", {
-          message: getErrorMessage(error),
-          error,
+        const candidates = selectAutoBookCandidates({
+          slots: bookableSlots,
+          existingReservations,
+          busyIntervals,
+          metadata: fspMetadata,
+          timeZone: config.TIMEZONE,
+          maxPerRun: config.AUTO_BOOK_MAX_PER_RUN,
+          now,
+          ignoreCalendarBusyAfterMinutes: config.AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES,
         });
-        if (ctx) {
-          ctx.waitUntil(
-            notify().catch((retryError: unknown) => {
-              log.error("Discord notification retry failed", {
-                message: getErrorMessage(retryError),
-                error: retryError,
-              });
-            }),
-          );
+
+        log.info("Auto-book candidates", { count: candidates.length });
+
+        const booked = await autoBookSlots({
+          scheduler,
+          reservationType,
+          locationId: session.defaultLocationId,
+          candidates,
+          budget,
+        });
+
+        for (const result of booked) {
+          bookedKeys.add(`${result.slot.date}|${result.slot.startTime}|${result.slot.aircraftId}`);
+        }
+
+        if (booked.length > 0) {
+          try {
+            await sendAutoBookNotification(
+              env,
+              booked.map(({ slot, response }) => ({
+                date: slot.date,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                aircraftTail: slot.aircraftTail,
+                reservationId: response.id,
+              })),
+              config.TIMEZONE,
+            );
+          } catch (error) {
+            log.error("Failed to send auto-book Discord notification", {
+              message: getErrorMessage(error),
+              error,
+            });
+          }
         }
       }
-    } else if (newSlots.length > 0) {
-      log.info("Skipping notification: no slots within Discord window", {
+    }
+
+    // Availability Discord disabled — only auto-book successes notify.
+    if (newSlots.length > 0) {
+      log.info("New slots found (no availability Discord)", {
         newSlotCount: newSlots.length,
+        autoBooked: bookedKeys.size,
       });
     }
 

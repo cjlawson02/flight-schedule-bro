@@ -7,10 +7,7 @@ export const DISCORD_NOTIFICATION_MIN_LEAD_HOURS = 24;
 /** Minimum hours before slot start before a reservation can be booked. */
 export const BOOKING_MIN_LEAD_HOURS = 24;
 
-export function isSlotStartInPast(
-  startDateTime: Date,
-  now: Date = new Date(),
-): boolean {
+export function isSlotStartInPast(startDateTime: Date, now: Date = new Date()): boolean {
   return startDateTime.getTime() < now.getTime();
 }
 
@@ -57,11 +54,7 @@ export function filterSlotsForDiscordNotification(
   return slots.filter(
     (slot) =>
       !isSlotStartInPast(slot.startDateTime, now) &&
-      !isSlotStartTooSoonForDiscordNotification(
-        slot.startDateTime,
-        undefined,
-        now,
-      ),
+      !isSlotStartTooSoonForDiscordNotification(slot.startDateTime, undefined, now),
   );
 }
 

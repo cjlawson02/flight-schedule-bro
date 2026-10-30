@@ -1,15 +1,32 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import {
-  sendAvailabilityNotification,
-  sendSimpleNotification,
-} from "./discord.js";
+import { sendAvailabilityNotification, sendSimpleNotification } from "./discord.js";
 import type { Env, FspMetadata } from "./types.js";
 import type { BookableAvailability } from "../shared/dao/availability.js";
 import { createReservationTypeFixture } from "../shared/dao/reservationTypes.fixtures.js";
 
 // Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+function mockFetchResponse(options: {
+  ok: boolean;
+  status: number;
+  text?: () => Promise<string>;
+}): Response {
+  return {
+    ok: options.ok,
+    status: options.status,
+    text: options.text ?? (async () => ""),
+  } as Response;
+}
+
+const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
+global.fetch = mockFetch;
+
+function fetchInitBody(callIndex: number): string {
+  const init = mockFetch.mock.calls[callIndex]?.[1];
+  const body = init?.body;
+  expect(body).toBeDefined();
+  expect(typeof body).toBe("string");
+  return body as string;
+}
 
 const createMockEnv = (): Env => ({
   FSP_AVAILABILITY_KV: {} as any,
@@ -100,11 +117,7 @@ describe("Discord Integration", () => {
     });
 
     it("sends notification for single slot", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       const slots: BookableAvailability[] = [
         {
@@ -132,7 +145,7 @@ describe("Discord Integration", () => {
         }),
       );
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       expect(body.username).toBe("Flight Schedule Bro");
       expect(body.content).toContain("New flight slot");
       expect(body.allowed_mentions).toEqual({ parse: [] });
@@ -143,11 +156,7 @@ describe("Discord Integration", () => {
     });
 
     it("sends notification for multiple slots", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       const slots: BookableAvailability[] = [
         {
@@ -174,35 +183,28 @@ describe("Discord Integration", () => {
 
       await sendAvailabilityNotification(env, slots, metadata);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       expect(body.embeds[0].description).toContain("2 new time slot");
       expect(body.embeds[0].fields).toHaveLength(2);
     });
 
     it("splits into multiple embeds for many slots", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       // Create 15 slots (should split into 2 embeds: 10 + 5)
-      const slots: BookableAvailability[] = Array.from(
-        { length: 15 },
-        (_, i) => ({
-          date: `1/${15 + i}/2024`,
-          startTime: "5:00:00 PM",
-          endTime: "7:00:00 PM",
-          instructorId: "123e4567-e89b-12d3-a456-426614174000",
-          aircraftId: "223e4567-e89b-12d3-a456-426614174000",
-          startDateTime: new Date(`2024-01-${15 + i}T17:00:00.000Z`),
-          endDateTime: new Date(`2024-01-${15 + i}T19:00:00.000Z`),
-        }),
-      );
+      const slots: BookableAvailability[] = Array.from({ length: 15 }, (_, i) => ({
+        date: `1/${15 + i}/2024`,
+        startTime: "5:00:00 PM",
+        endTime: "7:00:00 PM",
+        instructorId: "123e4567-e89b-12d3-a456-426614174000",
+        aircraftId: "223e4567-e89b-12d3-a456-426614174000",
+        startDateTime: new Date(`2024-01-${15 + i}T17:00:00.000Z`),
+        endDateTime: new Date(`2024-01-${15 + i}T19:00:00.000Z`),
+      }));
 
       await sendAvailabilityNotification(env, slots, metadata);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       expect(body.embeds).toHaveLength(2);
       expect(body.embeds[0].fields).toHaveLength(10);
       expect(body.embeds[1].fields).toHaveLength(5);
@@ -210,11 +212,7 @@ describe("Discord Integration", () => {
     });
 
     it("includes aircraft and instructor in embed fields", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       const slots: BookableAvailability[] = [
         {
@@ -231,7 +229,7 @@ describe("Discord Integration", () => {
 
       await sendAvailabilityNotification(env, slots, metadata);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       const field = body.embeds[0].fields[0];
       expect(field.value).toContain("N12345");
       expect(field.value).toContain("John Doe");
@@ -239,11 +237,13 @@ describe("Discord Integration", () => {
     });
 
     it("throws error when Discord API returns error", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        text: async () => "Bad Request",
-      });
+      mockFetch.mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: false,
+          status: 400,
+          text: async () => "Bad Request",
+        }),
+      );
 
       const slots: BookableAvailability[] = [
         {
@@ -258,17 +258,13 @@ describe("Discord Integration", () => {
         },
       ];
 
-      await expect(
-        sendAvailabilityNotification(env, slots, metadata),
-      ).rejects.toThrow("Discord API error");
+      await expect(sendAvailabilityNotification(env, slots, metadata)).rejects.toThrow(
+        "Discord API error",
+      );
     });
 
     it("includes timestamp and footer in embeds", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       const slots: BookableAvailability[] = [
         {
@@ -285,7 +281,7 @@ describe("Discord Integration", () => {
 
       await sendAvailabilityNotification(env, slots, metadata);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       expect(body.embeds[0].timestamp).toBeDefined();
       expect(body.embeds[0].footer).toEqual({
         text: "Flight Schedule Bro",
@@ -295,31 +291,27 @@ describe("Discord Integration", () => {
 
   describe("sendSimpleNotification", () => {
     it("sends simple text message", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValueOnce(mockFetchResponse({ ok: true, status: 204 }));
 
       await sendSimpleNotification(env, "Test message");
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(fetchInitBody(0));
       expect(body.content).toBe("Test message");
       expect(body.username).toBe("Flight Schedule Bro");
     });
 
     it("does not throw on error", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        text: async () => "Bad Request",
-      });
+      mockFetch.mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: false,
+          status: 400,
+          text: async () => "Bad Request",
+        }),
+      );
 
       // Should not throw - simple notifications are not critical
-      await expect(
-        sendSimpleNotification(env, "Test message"),
-      ).resolves.toBeUndefined();
+      await expect(sendSimpleNotification(env, "Test message")).resolves.toBeUndefined();
     });
   });
 
@@ -334,11 +326,7 @@ describe("Discord Integration", () => {
     });
 
     it("uses different colors for weekday vs weekend", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 204 }));
 
       // Monday (weekday)
       const weekdaySlots: BookableAvailability[] = [
@@ -355,7 +343,7 @@ describe("Discord Integration", () => {
       ];
 
       await sendAvailabilityNotification(env, weekdaySlots, metadata);
-      const weekdayBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const weekdayBody = JSON.parse(fetchInitBody(0));
       const weekdayColor = weekdayBody.embeds[0].color;
 
       mockFetch.mockClear();
@@ -375,7 +363,7 @@ describe("Discord Integration", () => {
       ];
 
       await sendAvailabilityNotification(env, weekendSlots, metadata);
-      const weekendBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const weekendBody = JSON.parse(fetchInitBody(0));
       const weekendColor = weekendBody.embeds[0].color;
 
       // Colors should be different
@@ -394,11 +382,7 @@ describe("Discord Integration", () => {
     });
 
     it("shows warning when new slot is on same day as existing reservation", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 204 }));
 
       const newSlot: BookableAvailability = {
         date: "1/15/2024",
@@ -432,7 +416,7 @@ describe("Discord Integration", () => {
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const requestBody = JSON.parse(fetchInitBody(0));
       const fieldValue = requestBody.embeds[0].fields[0].value;
 
       // Should include warning about existing reservation
@@ -444,11 +428,7 @@ describe("Discord Integration", () => {
     });
 
     it("shows no warning when new slot has no conflict", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 204 }));
 
       const newSlot: BookableAvailability = {
         date: "1/15/2024",
@@ -480,7 +460,7 @@ describe("Discord Integration", () => {
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const requestBody = JSON.parse(fetchInitBody(0));
       const fieldValue = requestBody.embeds[0].fields[0].value;
 
       // Should not include warning
@@ -489,11 +469,7 @@ describe("Discord Integration", () => {
     });
 
     it("handles missing instructor and aircraft in existing reservation", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
+      mockFetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 204 }));
 
       const newSlot: BookableAvailability = {
         date: "1/15/2024",
@@ -524,7 +500,7 @@ describe("Discord Integration", () => {
       );
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const requestBody = JSON.parse(fetchInitBody(0));
       const fieldValue = requestBody.embeds[0].fields[0].value;
 
       // Should include warning but without instructor/aircraft details

@@ -1,14 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
-import {
-  FspRateLimitError,
-  resetRequestQueueForTests,
-  safeFetch,
-} from "./api_wrapper.js";
-import {
-  createSubrequestBudget,
-  setActiveSubrequestBudget,
-} from "../util/subrequestBudget.js";
+import { FspRateLimitError, resetRequestQueueForTests, safeFetch } from "./api_wrapper.js";
+import { createSubrequestBudget, setActiveSubrequestBudget } from "../util/subrequestBudget.js";
 
 vi.mock("./auth.js", () => ({
   getAuthToken: () => "token",
@@ -18,11 +11,7 @@ vi.mock("./auth.js", () => ({
 const ResponseSchema = z.object({ ok: z.boolean() });
 const EmptyResponseSchema = z.object({});
 
-function mockFetchResponse(options: {
-  ok: boolean;
-  status: number;
-  body: string;
-}): Response {
+function mockFetchResponse(options: { ok: boolean; status: number; body: string }): Response {
   return {
     ok: options.ok,
     status: options.status,
@@ -35,13 +24,11 @@ describe("safeFetch", () => {
     resetRequestQueueForTests();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
+      vi.fn<() => Promise<unknown>>().mockResolvedValue(
         mockFetchResponse({
           ok: false,
           status: 400,
-          body: JSON.stringify([
-            { code: 1011, message: "Instructor is not valid." },
-          ]),
+          body: JSON.stringify([{ code: 1011, message: "Instructor is not valid." }]),
         }),
       ),
     );
@@ -56,13 +43,7 @@ describe("safeFetch", () => {
 
   it("does not retry 4xx client errors", async () => {
     await expect(
-      safeFetch(
-        "https://example.com/test",
-        "POST",
-        { foo: "bar" },
-        ResponseSchema,
-        0,
-      ),
+      safeFetch("https://example.com/test", "POST", { foo: "bar" }, ResponseSchema, 0),
     ).rejects.toMatchObject({ name: "FspHttpError", status: 400 });
 
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -89,13 +70,7 @@ describe("safeFetch", () => {
       );
 
     await expect(
-      safeFetch(
-        "https://example.com/test",
-        "POST",
-        { foo: "bar" },
-        ResponseSchema,
-        0,
-      ),
+      safeFetch("https://example.com/test", "POST", { foo: "bar" }, ResponseSchema, 0),
     ).resolves.toEqual({ ok: true });
 
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -114,13 +89,7 @@ describe("safeFetch", () => {
     );
 
     await expect(
-      safeFetch(
-        "https://example.com/test",
-        "POST",
-        { foo: "bar" },
-        ResponseSchema,
-        0,
-      ),
+      safeFetch("https://example.com/test", "POST", { foo: "bar" }, ResponseSchema, 0),
     ).rejects.toBeInstanceOf(FspRateLimitError);
 
     expect(fetch).toHaveBeenCalledTimes(8);
@@ -136,13 +105,7 @@ describe("safeFetch", () => {
     );
 
     await expect(
-      safeFetch(
-        "https://example.com/test",
-        "DELETE",
-        { foo: "bar" },
-        EmptyResponseSchema,
-        0,
-      ),
+      safeFetch("https://example.com/test", "DELETE", { foo: "bar" }, EmptyResponseSchema, 0),
     ).resolves.toEqual({});
   });
 
@@ -156,13 +119,7 @@ describe("safeFetch", () => {
     );
 
     await expect(
-      safeFetch(
-        "https://example.com/test",
-        "DELETE",
-        { foo: "bar" },
-        ResponseSchema,
-        0,
-      ),
+      safeFetch("https://example.com/test", "DELETE", { foo: "bar" }, ResponseSchema, 0),
     ).rejects.toThrow(/Failed to parse response body/);
   });
 
@@ -189,13 +146,7 @@ describe("safeFetch", () => {
         }),
       );
 
-    await safeFetch(
-      "https://example.com/test",
-      "POST",
-      { foo: "bar" },
-      ResponseSchema,
-      0,
-    );
+    await safeFetch("https://example.com/test", "POST", { foo: "bar" }, ResponseSchema, 0);
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(budget.used).toBe(1);

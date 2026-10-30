@@ -7,10 +7,7 @@ const LOCK_KEY = "worker_run_lock";
 /** Longer than a cron period so stale locks expire if a run crashes. */
 const LOCK_TTL_SECONDS = 45 * 60;
 
-export async function tryAcquireWorkerRunLock(
-  kv: KVNamespace,
-  runId: string,
-): Promise<boolean> {
+export async function tryAcquireWorkerRunLock(kv: KVNamespace, runId: string): Promise<boolean> {
   recordActiveKvSubrequest();
   const holder = await kv.get(LOCK_KEY);
   if (holder !== null) {
@@ -23,10 +20,7 @@ export async function tryAcquireWorkerRunLock(
   return true;
 }
 
-export async function releaseWorkerRunLock(
-  kv: KVNamespace,
-  runId: string,
-): Promise<void> {
+export async function releaseWorkerRunLock(kv: KVNamespace, runId: string): Promise<void> {
   recordActiveKvSubrequest();
   const holder = await kv.get(LOCK_KEY);
   if (holder === runId) {

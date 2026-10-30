@@ -18,35 +18,28 @@ const INSTRUCTOR_ID_2 = "223e4567-e89b-12d3-a456-426614174001";
 
 // Mock the DAO modules
 vi.mock("../shared/dao/instructors.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../shared/dao/instructors.js")>();
+  const actual = await importOriginal<typeof import("../shared/dao/instructors.js")>();
   return {
     ...actual,
-    getInstructors: vi.fn(),
+    getInstructors: vi.fn<typeof actual.getInstructors>(),
   };
 });
 vi.mock("../shared/dao/reservationTypes.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../shared/dao/reservationTypes.js")>();
+  const actual = await importOriginal<typeof import("../shared/dao/reservationTypes.js")>();
   return {
     ...actual,
-    getReservationTypes: vi.fn(),
+    getReservationTypes: vi.fn<typeof actual.getReservationTypes>(),
   };
 });
 vi.mock("../shared/dao/aircraft.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../shared/dao/aircraft.js")>();
+  const actual = await importOriginal<typeof import("../shared/dao/aircraft.js")>();
   return {
     ...actual,
-    getAircraft: vi.fn(),
+    getAircraft: vi.fn<typeof actual.getAircraft>(),
   };
 });
 
-function mockReservationType(
-  id: string,
-  name: string,
-  overrides: Record<string, unknown> = {},
-) {
+function mockReservationType(id: string, name: string, overrides: Record<string, unknown> = {}) {
   return createReservationTypeFixture({
     reservationTypeId: id,
     reservationTypeName: name,
@@ -66,8 +59,8 @@ describe("Worker Metadata", () => {
 
     // Create mock KV namespace
     mockKV = {
-      get: vi.fn(),
-      put: vi.fn(),
+      get: vi.fn<(key: string) => Promise<unknown>>(),
+      put: vi.fn<(key: string, value: string) => Promise<void>>(),
     };
   });
 
@@ -83,12 +76,8 @@ describe("Worker Metadata", () => {
 
     it("returns parsed metadata when valid data in KV", async () => {
       const mockMetadata: FspMetadata = {
-        instructors: [
-          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
-        ],
-        reservationTypes: [
-          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
-        ],
+        instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" }],
+        reservationTypes: [mockReservationType("11111111-1111-4111-8111-111111111111", "Dual")],
         aircraft: [
           {
             aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -125,12 +114,8 @@ describe("Worker Metadata", () => {
   describe("setMetadataInKV", () => {
     it("stores valid metadata in KV", async () => {
       const metadata: FspMetadata = {
-        instructors: [
-          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
-        ],
-        reservationTypes: [
-          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
-        ],
+        instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" }],
+        reservationTypes: [mockReservationType("11111111-1111-4111-8111-111111111111", "Dual")],
         aircraft: [
           {
             aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -142,17 +127,14 @@ describe("Worker Metadata", () => {
 
       await setMetadataInKV(mockKV, metadata);
 
-      expect(mockKV.put).toHaveBeenCalledWith(
-        "fsp-metadata",
-        expect.any(String),
-      );
+      expect(mockKV.put).toHaveBeenCalledWith("fsp-metadata", expect.any(String));
       expect(JSON.parse(String(mockKV.put.mock.calls[0][1]))).toEqual(metadata);
     });
 
     it("throws error when metadata is invalid", async () => {
       const invalidMetadata = { invalid: "data" } as any;
 
-      await expect(setMetadataInKV(mockKV, invalidMetadata)).rejects.toThrow();
+      await expect(setMetadataInKV(mockKV, invalidMetadata)).rejects.toThrow(/Invalid/);
       expect(mockKV.put).not.toHaveBeenCalled();
     });
   });
@@ -189,12 +171,8 @@ describe("Worker Metadata", () => {
         ],
       };
 
-      vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
-        mockInstructors,
-      );
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        mockReservationTypes,
-      );
+      vi.mocked(instructorsDao.getInstructors).mockResolvedValue(mockInstructors);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(mockReservationTypes);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await refreshMetadata(123, mockKV);
@@ -297,9 +275,7 @@ describe("Worker Metadata", () => {
       expect(
         metadataNeedsRefresh({
           instructors: [],
-          reservationTypes: [
-            mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
-          ],
+          reservationTypes: [mockReservationType("11111111-1111-4111-8111-111111111111", "Dual")],
           aircraft: [],
           lastUpdated: "2024-01-01T00:00:00Z",
         }),
@@ -310,12 +286,8 @@ describe("Worker Metadata", () => {
   describe("getOrFetchMetadata", () => {
     it("returns cached metadata when available", async () => {
       const cachedMetadata: FspMetadata = {
-        instructors: [
-          { instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" },
-        ],
-        reservationTypes: [
-          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
-        ],
+        instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John Doe" }],
+        reservationTypes: [mockReservationType("11111111-1111-4111-8111-111111111111", "Dual")],
         aircraft: [
           {
             aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -355,9 +327,7 @@ describe("Worker Metadata", () => {
 
       const refreshed = {
         instructors: [{ instructorId: INSTRUCTOR_ID_1, displayName: "John" }],
-        reservationTypes: [
-          mockReservationType("11111111-1111-4111-8111-111111111111", "Dual"),
-        ],
+        reservationTypes: [mockReservationType("11111111-1111-4111-8111-111111111111", "Dual")],
         aircraft: [
           {
             aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -409,12 +379,8 @@ describe("Worker Metadata", () => {
         ],
       };
 
-      vi.mocked(instructorsDao.getInstructors).mockResolvedValue(
-        mockInstructors,
-      );
-      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(
-        mockReservationTypes,
-      );
+      vi.mocked(instructorsDao.getInstructors).mockResolvedValue(mockInstructors);
+      vi.mocked(reservationTypesDao.getReservationTypes).mockResolvedValue(mockReservationTypes);
       vi.mocked(aircraftDao.getAircraft).mockResolvedValue(mockAircraft);
 
       const result = await getOrFetchMetadata(123, mockKV);

@@ -1,7 +1,0 @@
-node_modules
-coverage
-.wrangler
-cache
-cache-test
-test-cache
-package-lock.json

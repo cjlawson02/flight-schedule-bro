@@ -6,10 +6,7 @@ import {
   parseOperatorDateString,
 } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
-import {
-  canMakeSubrequest,
-  type SubrequestBudget,
-} from "../util/subrequestBudget.js";
+import { canMakeSubrequest, type SubrequestBudget } from "../util/subrequestBudget.js";
 
 const log = createLogger("schedule");
 
@@ -70,9 +67,7 @@ export const SchedulePageResponseSchema = z.object({
 export type SchedulePageResponse = z.infer<typeof SchedulePageResponseSchema>;
 export type ScheduleResource = z.infer<typeof ScheduleResourceSchema>;
 export type ScheduleEvent = z.infer<typeof ScheduleEventSchema>;
-export type ScheduleUnavailability = z.infer<
-  typeof ScheduleUnavailabilitySchema
->;
+export type ScheduleUnavailability = z.infer<typeof ScheduleUnavailabilitySchema>;
 export type ScheduleClosing = z.infer<typeof ScheduleClosingSchema>;
 export type ScheduleResults = z.infer<typeof ScheduleResultsSchema>;
 
@@ -133,10 +128,7 @@ function closingDedupeKey(closing: ScheduleClosing): string {
   return `${closing.StartDate}|${closing.EndDate}`;
 }
 
-export function mergeScheduleSnapshot(
-  merged: ScheduleDaySnapshot,
-  page: ScheduleResults,
-): void {
+export function mergeScheduleSnapshot(merged: ScheduleDaySnapshot, page: ScheduleResults): void {
   const resourceMap = new Map(merged.resources.map((r) => [r.Id, r]));
   for (const resource of page.resources) {
     resourceMap.set(resource.Id, resource);
@@ -152,9 +144,7 @@ export function mergeScheduleSnapshot(
     }
   }
 
-  const unavailabilityKeys = new Set(
-    merged.unavailability.map(unavailabilityDedupeKey),
-  );
+  const unavailabilityKeys = new Set(merged.unavailability.map(unavailabilityDedupeKey));
   for (const block of page.unavailability) {
     const key = unavailabilityDedupeKey(block);
     if (!unavailabilityKeys.has(key)) {
@@ -174,10 +164,7 @@ export function mergeScheduleSnapshot(
 }
 
 /** Exclusive end date for a schedule day query (next calendar day in operator TZ). */
-export function scheduleExclusiveEndDate(
-  start: string,
-  timeZone: string,
-): string {
+export function scheduleExclusiveEndDate(start: string, timeZone: string): string {
   const dayStart = parseOperatorDateString(start, timeZone);
   const nextDay = addOperatorDays(dayStart, 1, timeZone);
   return formatOperatorIsoDate(nextDay, timeZone);

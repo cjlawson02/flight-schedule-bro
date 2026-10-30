@@ -11,10 +11,7 @@ function parseErrorEntry(entry: unknown): FspValidationError | null {
     return null;
   }
 
-  const message =
-    "message" in entry && typeof entry.message === "string"
-      ? entry.message
-      : null;
+  const message = "message" in entry && typeof entry.message === "string" ? entry.message : null;
   if (!message) {
     return null;
   }
@@ -23,9 +20,7 @@ function parseErrorEntry(entry: unknown): FspValidationError | null {
     message,
     overridable: "overridable" in entry && entry.overridable === true,
     groupLabel:
-      "groupLabel" in entry && typeof entry.groupLabel === "string"
-        ? entry.groupLabel
-        : undefined,
+      "groupLabel" in entry && typeof entry.groupLabel === "string" ? entry.groupLabel : undefined,
   };
 }
 
@@ -55,9 +50,7 @@ export function areAllErrorsOverridable(errors: FspValidationError[]): boolean {
   return errors.length > 0 && errors.every((error) => error.overridable);
 }
 
-export function formatFspValidationErrors(
-  errors: FspValidationError[],
-): string {
+export function formatFspValidationErrors(errors: FspValidationError[]): string {
   return errors
     .map((error) => {
       const prefix = error.groupLabel ? `${error.groupLabel}: ` : "";

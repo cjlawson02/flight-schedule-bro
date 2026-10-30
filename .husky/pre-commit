@@ -1,4 +1,4 @@
 npx lint-staged
-npm run format:check
+npm run fmt:check
 npm run typecheck
 npm test

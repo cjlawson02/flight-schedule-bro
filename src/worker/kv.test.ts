@@ -13,14 +13,20 @@ import type { BookableAvailability } from "../shared/dao/availability.js";
 const createMockKV = () => {
   const store = new Map<string, string>();
   return {
-    get: vi.fn(async (key: string) => store.get(key) || null),
-    put: vi.fn(async (key: string, value: string) => {
-      store.set(key, value);
-    }),
-    delete: vi.fn(async (key: string) => {
+    get: vi.fn<(key: string) => Promise<string | null>>(
+      async (key: string) => store.get(key) || null,
+    ),
+    put: vi.fn<(key: string, value: string) => Promise<void>>(
+      async (key: string, value: string) => {
+        store.set(key, value);
+      },
+    ),
+    delete: vi.fn<(key: string) => Promise<void>>(async (key: string) => {
       store.delete(key);
     }),
-    list: vi.fn(),
+    list: vi.fn<
+      (options?: KVNamespaceListOptions) => Promise<KVNamespaceListResult<unknown, string>>
+    >(),
     _store: store, // For test inspection
   };
 };
@@ -67,20 +73,15 @@ describe("Worker KV Operations", () => {
     });
 
     it("throws error for invalid snapshot data", async () => {
-      mockKV._store.set(
-        "availability_snapshot",
-        JSON.stringify({ invalid: "data" }),
-      );
+      mockKV._store.set("availability_snapshot", JSON.stringify({ invalid: "data" }));
 
-      await expect(getSnapshot(env)).rejects.toThrow(
-        "Invalid snapshot data in KV",
-      );
+      await expect(getSnapshot(env)).rejects.toThrow("Invalid snapshot data in KV");
     });
 
     it("throws error for malformed JSON", async () => {
       mockKV._store.set("availability_snapshot", "not valid json");
 
-      await expect(getSnapshot(env)).rejects.toThrow();
+      await expect(getSnapshot(env)).rejects.toThrow(/JSON|parse|Unexpected/i);
     });
   });
 
@@ -193,9 +194,7 @@ describe("Worker KV Operations", () => {
       expect(result).toHaveLength(1);
       expect(result[0].startDateTime).toBeInstanceOf(Date);
       expect(result[0].endDateTime).toBeInstanceOf(Date);
-      expect(result[0].startDateTime.toISOString()).toBe(
-        "2024-01-15T17:00:00.000Z",
-      );
+      expect(result[0].startDateTime.toISOString()).toBe("2024-01-15T17:00:00.000Z");
     });
   });
 
@@ -243,9 +242,7 @@ describe("Worker KV Operations", () => {
       const result = cleanPastSlotsFromSnapshot(snapshot, now);
       expect(result).not.toBeNull();
       expect(result!.slots).toHaveLength(1);
-      expect(result!.slots[0].aircraftId).toBe(
-        "323e4567-e89b-12d3-a456-426614174000",
-      );
+      expect(result!.slots[0].aircraftId).toBe("323e4567-e89b-12d3-a456-426614174000");
       expect(result!.metadata).toEqual(snapshot.metadata);
     });
 
@@ -286,9 +283,7 @@ describe("Worker KV Operations", () => {
       const result = cleanPastSlotsFromSnapshot(snapshot, now);
       expect(result).not.toBeNull();
       expect(result!.slots).toHaveLength(1);
-      expect(result!.slots[0].aircraftId).toBe(
-        "323e4567-e89b-12d3-a456-426614174000",
-      );
+      expect(result!.slots[0].aircraftId).toBe("323e4567-e89b-12d3-a456-426614174000");
     });
 
     it("preserves all slots when all are in the future", () => {

@@ -21,15 +21,10 @@ export const FSP_NIL_RESOURCE_ID = "00000000-0000-0000-0000-000000000000";
 export function isReservableAircraft(
   aircraft: Pick<Aircraft, "aircraftId" | "tailNumber">,
 ): boolean {
-  return (
-    aircraft.aircraftId !== FSP_NIL_RESOURCE_ID &&
-    aircraft.tailNumber.trim() !== ""
-  );
+  return aircraft.aircraftId !== FSP_NIL_RESOURCE_ID && aircraft.tailNumber.trim() !== "";
 }
 
-export function nilToOptionalResourceId(
-  id: string | null | undefined,
-): string | undefined {
+export function nilToOptionalResourceId(id: string | null | undefined): string | undefined {
   if (id === undefined || id === null || id === FSP_NIL_RESOURCE_ID) {
     return undefined;
   }
@@ -62,9 +57,7 @@ export function selectPreferredAircraftIds(
   aircraft: Pick<AircraftMetadata, "aircraftId" | "tailNumber">[],
   regex: RegExp,
 ): string[] {
-  const preferred = aircraft
-    .filter((a) => regex.test(a.tailNumber))
-    .map((a) => a.aircraftId);
+  const preferred = aircraft.filter((a) => regex.test(a.tailNumber)).map((a) => a.aircraftId);
 
   return preferred.length > 0 ? preferred : aircraft.map((a) => a.aircraftId);
 }

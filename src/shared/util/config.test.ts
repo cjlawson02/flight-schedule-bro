@@ -44,7 +44,7 @@ describe("config", () => {
       FSP_PASSWORD: "",
     };
 
-    expect(() => createConfig(invalidEnv)).toThrow();
+    expect(() => createConfig(invalidEnv)).toThrow(/FSP_PASSWORD/);
   });
 
   it("uses default values for optional config", async () => {
@@ -103,6 +103,24 @@ describe("config", () => {
     expect(config.MAX_HOUR).toBe(19);
     expect(config).not.toHaveProperty("DAYS_AHEAD");
     expect(config.MAX_DAYS_AHEAD).toBeUndefined();
+    expect(config.AUTO_BOOK).toBe(false);
+    expect(config.AUTO_BOOK_MAX_PER_RUN).toBe(1);
+    expect(config.AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES).toBe(15 * 60 + 30);
+  });
+
+  it("createWorkerConfig parses AUTO_BOOK flags", () => {
+    const config = createWorkerConfig({
+      FSP_EMAIL: "worker@example.com",
+      FSP_PASSWORD: "worker-password",
+      AIRCRAFT_REGEX: "172S",
+      AUTO_BOOK: "true",
+      AUTO_BOOK_MAX_PER_RUN: "2",
+      AUTO_BOOK_IGNORE_CALENDAR_AFTER: "15:30",
+    });
+
+    expect(config.AUTO_BOOK).toBe(true);
+    expect(config.AUTO_BOOK_MAX_PER_RUN).toBe(2);
+    expect(config.AUTO_BOOK_IGNORE_CALENDAR_AFTER_MINUTES).toBe(15 * 60 + 30);
   });
 
   it("createWorkerConfig parses MAX_DAYS_AHEAD", () => {
@@ -123,9 +141,7 @@ describe("config", () => {
       TIMEZONE: "America/Los_Angles",
     };
 
-    expect(() => createConfig(invalidEnv)).toThrow(
-      "TIMEZONE must be a valid IANA timezone",
-    );
+    expect(() => createConfig(invalidEnv)).toThrow("TIMEZONE must be a valid IANA timezone");
   });
 
   it("accepts valid IANA timezone values", () => {
@@ -146,8 +162,6 @@ describe("config", () => {
       RESERVATION_TYPE_ID: "09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
     });
 
-    expect(config.RESERVATION_TYPE_ID).toBe(
-      "09c58400-bd2a-49a3-a35e-9ab0e81fcebc",
-    );
+    expect(config.RESERVATION_TYPE_ID).toBe("09c58400-bd2a-49a3-a35e-9ab0e81fcebc");
   });
 });

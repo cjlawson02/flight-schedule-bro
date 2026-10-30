@@ -1,10 +1,6 @@
 import { createWorkerConfig } from "../shared/util/config.js";
 import { getErrorMessage } from "../shared/util/errors.js";
-import {
-  fetchAuth,
-  getOperatorId,
-  setActiveAuthSession,
-} from "../shared/dao/auth.js";
+import { fetchAuth, getOperatorId, setActiveAuthSession } from "../shared/dao/auth.js";
 import { runSetup } from "./setup.js";
 import { refreshMetadata } from "./metadata.js";
 import { getSnapshot } from "./kv.js";
@@ -20,11 +16,7 @@ const log = createLogger("worker");
  * Main scheduled handler - runs every 30 minutes
  */
 export default {
-  async scheduled(
-    event: ScheduledEvent,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     try {
       await runScheduledTask(env, ctx);
     } catch (error) {
@@ -39,11 +31,7 @@ export default {
   /**
    * HTTP handler for setup and health checks
    */
-  async fetch(
-    request: Request,
-    env: Env,
-    _ctx: ExecutionContext,
-  ): Promise<Response> {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Setup endpoint
@@ -54,10 +42,7 @@ export default {
     // Refresh metadata endpoint
     if (url.pathname === "/refresh-metadata") {
       const runId = `refresh-metadata-${Date.now()}`;
-      const lockAcquired = await tryAcquireWorkerRunLock(
-        env.FSP_AVAILABILITY_KV,
-        runId,
-      );
+      const lockAcquired = await tryAcquireWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
       if (!lockAcquired) {
         return new Response(
           JSON.stringify({
@@ -76,10 +61,7 @@ export default {
 
         setActiveAuthSession(await fetchAuth(config.EMAIL, config.PASSWORD));
 
-        const metadata = await refreshMetadata(
-          getOperatorId(),
-          env.FSP_AVAILABILITY_KV,
-        );
+        const metadata = await refreshMetadata(getOperatorId(), env.FSP_AVAILABILITY_KV);
 
         return new Response(
           JSON.stringify({
@@ -136,8 +118,7 @@ export default {
         message: "Flight Schedule Bro Worker",
         endpoints: {
           "/setup": "Initialize the availability snapshot",
-          "/refresh-metadata":
-            "Refresh cached FSP metadata (instructors, aircraft, types)",
+          "/refresh-metadata": "Refresh cached FSP metadata (instructors, aircraft, types)",
           "/health": "Check worker health and snapshot status",
         },
       }),

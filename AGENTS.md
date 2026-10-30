@@ -7,7 +7,7 @@ This file provides guidance to agents when working with code in this repository.
 Flight Schedule Bro is an automated flight training scheduler for Flight Schedule Pro that runs in two modes:
 
 1. **CLI** - Interactive booking tool for local development
-2. **Worker** - Cloudflare Worker that monitors availability and sends Discord notifications every 30 minutes
+2. **Worker** - Cloudflare Worker that monitors **rental** availability every 30 minutes, Discord-notifies on new slots, and can auto-book calendar-clear solos (≥24h lead) when `AUTO_BOOK=true`
 
 ## Common Commands
 
@@ -48,13 +48,16 @@ npm run worker:tail
 ### Quality checks
 
 ```bash
-npm run check          # format + lint + typecheck + test (same as CI)
-npm run lint           # ESLint
+npm run check          # fmt:check + lint + typecheck + test (same as CI)
+npm run lint           # Oxlint (type-aware via oxlint-tsgolint)
+npm run lint:fix      # Oxlint autofix
 npm run typecheck      # tsc --noEmit
-npm run format:check   # Prettier (no writes)
+npm run fmt            # Oxfmt
+npm run fmt:check      # Oxfmt (no writes)
+npm run fix            # lint:fix + fmt
 ```
 
-Husky runs on every commit: `lint-staged` (ESLint + Prettier on staged files), then `typecheck` and `test`.
+Config: root `.oxlintrc.json` / `.oxfmtrc.json`. Husky runs `lint-staged` (Oxfmt + Oxlint on staged files), then `fmt:check`, `typecheck`, and `test`.
 
 ## Architecture
 

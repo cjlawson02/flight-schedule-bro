@@ -5,8 +5,7 @@ export const CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT = 50;
 export const CLOUDFLARE_PAID_SUBREQUEST_LIMIT = 10_000;
 
 /** @deprecated Use CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT */
-export const CLOUDFLARE_SUBREQUEST_LIMIT =
-  CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT;
+export const CLOUDFLARE_SUBREQUEST_LIMIT = CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT;
 
 export interface SubrequestBudget {
   limit: number;
@@ -43,9 +42,7 @@ export function createWorkerSubrequestBudget(
   const paidMode = options.paidMode ?? false;
   const limit =
     options.limit ??
-    (paidMode
-      ? CLOUDFLARE_PAID_SUBREQUEST_LIMIT
-      : CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT);
+    (paidMode ? CLOUDFLARE_PAID_SUBREQUEST_LIMIT : CLOUDFLARE_FREE_EXTERNAL_SUBREQUEST_LIMIT);
 
   return {
     limit,
@@ -63,9 +60,7 @@ export function createSubrequestBudget(
   return { limit, used: 0, reserve, countKvSubrequests };
 }
 
-export function setActiveSubrequestBudget(
-  budget: SubrequestBudget | null,
-): void {
+export function setActiveSubrequestBudget(budget: SubrequestBudget | null): void {
   activeBudget = budget;
 }
 

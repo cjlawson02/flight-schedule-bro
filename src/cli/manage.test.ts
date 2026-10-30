@@ -17,36 +17,29 @@ vi.mock("../shared/dao/auth.js", () => ({
 }));
 
 vi.mock("../shared/dao/existingReservations.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../shared/dao/existingReservations.js")
-    >();
+  const actual = await importOriginal<typeof import("../shared/dao/existingReservations.js")>();
   return {
     ...actual,
-    getExistingReservations: vi.fn(),
+    getExistingReservations: vi.fn<typeof actual.getExistingReservations>(),
   };
 });
 
 vi.mock("./resolveUpgradeResources.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./resolveUpgradeResources.js")>();
+  const actual = await importOriginal<typeof import("./resolveUpgradeResources.js")>();
   return {
     ...actual,
-    resolveMissingInstructorForUpgrade: vi.fn(),
+    resolveMissingInstructorForUpgrade: vi.fn<typeof actual.resolveMissingInstructorForUpgrade>(),
   };
 });
 
 vi.mock("../shared/dao/reservationManagement.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../shared/dao/reservationManagement.js")
-    >();
+  const actual = await importOriginal<typeof import("../shared/dao/reservationManagement.js")>();
   return {
     ...actual,
-    getCancellationReasons: vi.fn(),
-    getReservationById: vi.fn(),
-    updateReservation: vi.fn(),
-    cancelReservation: vi.fn(),
+    getCancellationReasons: vi.fn<typeof actual.getCancellationReasons>(),
+    getReservationById: vi.fn<typeof actual.getReservationById>(),
+    updateReservation: vi.fn<typeof actual.updateReservation>(),
+    cancelReservation: vi.fn<typeof actual.cancelReservation>(),
   };
 });
 
@@ -70,9 +63,7 @@ const reservation = {
   instructor: "Doug Libal",
 };
 
-function buildReservationDetail(
-  overrides: Partial<ReservationDetail> = {},
-): ReservationDetail {
+function buildReservationDetail(overrides: Partial<ReservationDetail> = {}): ReservationDetail {
   return {
     reservationId: reservation.reservationId,
     reservationTypeId: dualFlightTraining.reservationTypeId,
@@ -100,9 +91,7 @@ describe("runManageExistingActivityWorkflow", () => {
     cli = new InteractiveCLI();
     vi.clearAllMocks();
     vi.spyOn(cli, "selectExistingActivity").mockResolvedValue(reservation);
-    vi.mocked(
-      existingReservationsModule.getExistingReservations,
-    ).mockResolvedValue([reservation]);
+    vi.mocked(existingReservationsModule.getExistingReservations).mockResolvedValue([reservation]);
   });
 
   it("stops before confirm when validate-only update fails", async () => {
@@ -111,9 +100,7 @@ describe("runManageExistingActivityWorkflow", () => {
     };
     const confirmSpy = vi.spyOn(cli, "confirmAction");
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
     vi.spyOn(cli, "selectReservationType").mockResolvedValue(rental);
     vi.spyOn(cli, "collectActivityFlightDetails").mockResolvedValue({
       flightType: 1,
@@ -126,17 +113,10 @@ describe("runManageExistingActivityWorkflow", () => {
       new Error("Reservation update failed: Aircraft unavailable"),
     );
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(reservationManagementModule.updateReservation).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(reservationManagementModule.updateReservation).toHaveBeenCalledTimes(1);
     expect(reservationManagementModule.updateReservation).toHaveBeenCalledWith(
       expect.objectContaining({ validateOnly: true }),
     );
@@ -147,9 +127,7 @@ describe("runManageExistingActivityWorkflow", () => {
       getReservationTypes: () => [dualFlightTraining, rental],
     };
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
     vi.spyOn(cli, "selectReservationType").mockResolvedValue(rental);
     vi.spyOn(cli, "collectActivityFlightDetails").mockResolvedValue({
       flightType: 1,
@@ -159,26 +137,15 @@ describe("runManageExistingActivityWorkflow", () => {
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
       buildReservationDetail(),
     );
-    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(undefined);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
-    expect(
-      reservationManagementModule.updateReservation,
-    ).toHaveBeenNthCalledWith(
+    expect(reservationManagementModule.updateReservation).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ validateOnly: true }),
     );
-    expect(
-      reservationManagementModule.updateReservation,
-    ).toHaveBeenNthCalledWith(
+    expect(reservationManagementModule.updateReservation).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ validateOnly: false }),
     );
@@ -189,12 +156,8 @@ describe("runManageExistingActivityWorkflow", () => {
       getReservationTypes: () => [dualFlightTraining, rental],
     };
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
-    vi.spyOn(cli, "selectReservationType").mockResolvedValue(
-      dualFlightTraining,
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
+    vi.spyOn(cli, "selectReservationType").mockResolvedValue(dualFlightTraining);
     vi.spyOn(cli, "confirmAction").mockResolvedValue(true);
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
       buildReservationDetail({
@@ -202,26 +165,15 @@ describe("runManageExistingActivityWorkflow", () => {
         instructor: undefined,
       }),
     );
-    vi.mocked(
-      resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade,
-    ).mockResolvedValue({
+    vi.mocked(resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade).mockResolvedValue({
       instructorId: "bc8dbb05-d939-4539-bdf6-d4633333a169",
       instructorName: "Doug Libal",
     });
-    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(undefined);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
-    expect(
-      resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade,
-    ).toHaveBeenCalledWith(
+    expect(resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade).toHaveBeenCalledWith(
       cli,
       scheduler,
       expect.objectContaining({
@@ -243,9 +195,7 @@ describe("runManageExistingActivityWorkflow", () => {
     };
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
     vi.spyOn(cli, "selectReservationType").mockResolvedValue(groundTraining);
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
       buildReservationDetail(),
@@ -256,16 +206,9 @@ describe("runManageExistingActivityWorkflow", () => {
       }),
     );
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid aircraft provided"),
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Invalid aircraft provided"));
     logSpy.mockRestore();
   });
 
@@ -274,28 +217,17 @@ describe("runManageExistingActivityWorkflow", () => {
       getReservationTypes: () => [dualFlightTraining, groundTraining],
     };
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
     vi.spyOn(cli, "selectReservationType").mockResolvedValue(groundTraining);
     vi.spyOn(cli, "confirmAction").mockResolvedValue(false);
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
       buildReservationDetail(),
     );
-    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(undefined);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
-    expect(reservationManagementModule.updateReservation).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(reservationManagementModule.updateReservation).toHaveBeenCalledTimes(1);
     expect(reservationManagementModule.updateReservation).toHaveBeenCalledWith(
       expect.objectContaining({ validateOnly: true }),
     );
@@ -311,18 +243,14 @@ describe("runManageExistingActivityWorkflow", () => {
       requiresExplanation: false,
     });
     vi.spyOn(cli, "confirmAction").mockResolvedValue(true);
-    vi.mocked(
-      reservationManagementModule.getCancellationReasons,
-    ).mockResolvedValue([
+    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue([
       {
         id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
         name: "Scheduling Conflict (Customer)",
         requiresExplanation: false,
       },
     ]);
-    vi.mocked(reservationManagementModule.cancelReservation).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(reservationManagementModule.cancelReservation).mockResolvedValue(undefined);
 
     await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
@@ -346,9 +274,7 @@ describe("runManageExistingActivityWorkflow", () => {
       requiresExplanation: true,
     });
     vi.spyOn(cli, "promptText").mockResolvedValue("   ");
-    vi.mocked(
-      reservationManagementModule.getCancellationReasons,
-    ).mockResolvedValue([
+    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue([
       {
         id: "f69bc957-035a-4beb-9125-e8b0c2686f3e",
         name: "Other",
@@ -358,12 +284,8 @@ describe("runManageExistingActivityWorkflow", () => {
 
     await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
-    expect(
-      reservationManagementModule.cancelReservation,
-    ).not.toHaveBeenCalled();
-    expect(logSpy).toHaveBeenCalledWith(
-      "❌ Cancellation explanation is required.",
-    );
+    expect(reservationManagementModule.cancelReservation).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith("❌ Cancellation explanation is required.");
     logSpy.mockRestore();
   });
 
@@ -371,18 +293,12 @@ describe("runManageExistingActivityWorkflow", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("cancel");
-    vi.mocked(
-      reservationManagementModule.getCancellationReasons,
-    ).mockResolvedValue([]);
+    vi.mocked(reservationManagementModule.getCancellationReasons).mockResolvedValue([]);
 
     await runManageExistingActivityWorkflow(cli, {} as never, config, 191057);
 
-    expect(
-      reservationManagementModule.cancelReservation,
-    ).not.toHaveBeenCalled();
-    expect(logSpy).toHaveBeenCalledWith(
-      "❌ No cancellation reasons are available.",
-    );
+    expect(reservationManagementModule.cancelReservation).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith("❌ No cancellation reasons are available.");
     logSpy.mockRestore();
   });
 
@@ -391,9 +307,7 @@ describe("runManageExistingActivityWorkflow", () => {
       getReservationTypes: () => [dualFlightTraining, rental, groundTraining],
     };
 
-    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue(
-      "change-activity-type",
-    );
+    vi.spyOn(cli, "selectManageActivityAction").mockResolvedValue("change-activity-type");
     vi.spyOn(cli, "selectReservationType").mockResolvedValue(groundTraining);
     vi.spyOn(cli, "confirmAction").mockResolvedValue(true);
     vi.mocked(reservationManagementModule.getReservationById).mockResolvedValue(
@@ -402,26 +316,15 @@ describe("runManageExistingActivityWorkflow", () => {
         instructor: undefined,
       }),
     );
-    vi.mocked(
-      resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade,
-    ).mockResolvedValue({
+    vi.mocked(resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade).mockResolvedValue({
       instructorId: "bc8dbb05-d939-4539-bdf6-d4633333a169",
       instructorName: "Doug Libal",
     });
-    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(
-      undefined,
-    );
+    vi.mocked(reservationManagementModule.updateReservation).mockResolvedValue(undefined);
 
-    await runManageExistingActivityWorkflow(
-      cli,
-      scheduler as never,
-      config,
-      191057,
-    );
+    await runManageExistingActivityWorkflow(cli, scheduler as never, config, 191057);
 
-    expect(
-      resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade,
-    ).toHaveBeenCalledWith(
+    expect(resolveUpgradeResourcesModule.resolveMissingInstructorForUpgrade).toHaveBeenCalledWith(
       cli,
       scheduler,
       expect.objectContaining({

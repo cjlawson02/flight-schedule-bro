@@ -11,11 +11,7 @@ import {
   validateActivityFlightDetails,
 } from "../shared/dao/reservationFlightDetails.js";
 import { InteractiveCLI } from "../shared/util/interactive.js";
-import {
-  fetchAuth,
-  getOperatorId,
-  setActiveAuthSession,
-} from "../shared/dao/auth.js";
+import { fetchAuth, getOperatorId, setActiveAuthSession } from "../shared/dao/auth.js";
 import { setCacheAdapter } from "../shared/dao/api_wrapper.js";
 import { cliCacheAdapter } from "./cache.js";
 import { configureLogger, createLogger } from "../shared/util/logger.js";
@@ -34,10 +30,9 @@ async function runBookWorkflow(
   config: ConfigType,
   operatorId: number,
 ): Promise<void> {
-  const reservationType = await cli.selectReservationType(
-    scheduler.getReservationTypes(),
-    { preferredTypeId: config.RESERVATION_TYPE_ID },
-  );
+  const reservationType = await cli.selectReservationType(scheduler.getReservationTypes(), {
+    preferredTypeId: config.RESERVATION_TYPE_ID,
+  });
 
   if (!reservationType) {
     console.log("❌ No activity type selected.");
@@ -58,17 +53,11 @@ async function runBookWorkflow(
 
   let aircraftIds: string[] | undefined;
   if (reservationTypeUsesAircraft(reservationType)) {
-    const aircraft = Array.from(
-      scheduler.getAircraftMapEntries(),
-      ([aircraftId, tailNumber]) => ({
-        aircraftId,
-        tailNumber,
-      }),
-    );
-    const selectedTailNumbers = await cli.selectTailNumbers(
-      aircraft,
-      config.AIRCRAFT_REGEX,
-    );
+    const aircraft = Array.from(scheduler.getAircraftMapEntries(), ([aircraftId, tailNumber]) => ({
+      aircraftId,
+      tailNumber,
+    }));
+    const selectedTailNumbers = await cli.selectTailNumbers(aircraft, config.AIRCRAFT_REGEX);
     if (selectedTailNumbers === null) {
       return;
     }
@@ -84,10 +73,7 @@ async function runBookWorkflow(
         displayName,
       }),
     );
-    const selectedInstructors = await cli.selectInstructors(
-      instructors,
-      config.INSTRUCTOR_REGEX,
-    );
+    const selectedInstructors = await cli.selectInstructors(instructors, config.INSTRUCTOR_REGEX);
     if (selectedInstructors === null) {
       return;
     }
@@ -101,10 +87,7 @@ async function runBookWorkflow(
       return;
     }
 
-    const validationError = validateActivityFlightDetails(
-      reservationType,
-      flightDetails,
-    );
+    const validationError = validateActivityFlightDetails(reservationType, flightDetails);
     if (validationError) {
       console.log(`❌ ${validationError}`);
       return;
@@ -133,9 +116,7 @@ async function runBookWorkflow(
       );
     } else {
       console.log("❌ No availability found for the specified criteria.");
-      console.log(
-        "💡 Try adjusting your time preferences in the configuration.",
-      );
+      console.log("💡 Try adjusting your time preferences in the configuration.");
     }
   } catch (error) {
     logCliSearchError(error);
@@ -164,12 +145,7 @@ async function main() {
     }
 
     if (action === "manage-existing-activity") {
-      await runManageExistingActivityWorkflow(
-        cli,
-        scheduler,
-        config,
-        operatorId,
-      );
+      await runManageExistingActivityWorkflow(cli, scheduler, config, operatorId);
       continue;
     }
 

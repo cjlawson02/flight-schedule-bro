@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { formatInTimeZone } from "date-fns-tz";
-import {
-  nilToOptionalResourceId,
-  resolveMutationResourceId,
-} from "./aircraft.js";
+import { nilToOptionalResourceId, resolveMutationResourceId } from "./aircraft.js";
 import { DEFAULT_TIMEZONE, parseFspLocal } from "../util/flightTime.js";
 import type { ActivityFlightDetails } from "./reservationFlightDetails.js";
 import { getFieldState, type ReservationType } from "./reservationTypes.js";
@@ -96,18 +93,11 @@ export function buildUpdateReservationRequest(
     locationId: params.locationId,
     pilotId: params.pilotId,
     aircraftId: resolveMutationResourceId(aircraft.enabled, params.aircraftId),
-    instructorId: resolveMutationResourceId(
-      instructor.enabled,
-      params.instructorId,
-    ),
+    instructorId: resolveMutationResourceId(instructor.enabled, params.instructorId),
     start: formatInTimeZone(params.startTime, timeZone, "yyyy-MM-dd'T'HH:mm"),
     end: formatInTimeZone(params.endTime, timeZone, "yyyy-MM-dd'T'HH:mm"),
-    schedulingGroupId: aircraft.enabled
-      ? (params.schedulingGroupId ?? null)
-      : null,
-    schedulingGroupSlotId: aircraft.enabled
-      ? (params.schedulingGroupSlotId ?? null)
-      : null,
+    schedulingGroupId: aircraft.enabled ? (params.schedulingGroupId ?? null) : null,
+    schedulingGroupSlotId: aircraft.enabled ? (params.schedulingGroupSlotId ?? null) : null,
     additionalEmailNotifications: [],
     additionalUserNotifications: [],
     application: 2,
@@ -117,9 +107,7 @@ export function buildUpdateReservationRequest(
     estimatedFlightHours: flightHours.enabled
       ? (flightDetails.estimatedFlightHours ?? "")
       : undefined,
-    flightRoute: flightRoute.enabled
-      ? (flightDetails.flightRoute ?? "")
-      : undefined,
+    flightRoute: flightRoute.enabled ? (flightDetails.flightRoute ?? "") : undefined,
     flightRules: flightRules.enabled ? (flightDetails.flightRules ?? "") : "",
     flightType: flightType.enabled ? (flightDetails.flightType ?? "") : "",
     internalComments: "",
@@ -169,9 +157,7 @@ export async function getReservationById(
   );
 }
 
-export async function getCancellationReasons(
-  operatorId: number,
-): Promise<CancellationReason[]> {
+export async function getCancellationReasons(operatorId: number): Promise<CancellationReason[]> {
   return safeFetch(
     `https://api-external.flightschedulepro.com/api/V2/operator/${operatorId}/operators/cancellationreasons`,
     "GET",
@@ -189,15 +175,11 @@ function assertNoMutationErrors(
     return;
   }
 
-  const errorMessages = response.errors
-    .map((error) => error.message ?? "Unknown error")
-    .join(", ");
+  const errorMessages = response.errors.map((error) => error.message ?? "Unknown error").join(", ");
   throw new Error(`Reservation ${action} failed: ${errorMessages}`);
 }
 
-export async function updateReservation(
-  params: UpdateReservationParams,
-): Promise<void> {
+export async function updateReservation(params: UpdateReservationParams): Promise<void> {
   const requestData = buildUpdateReservationRequest(params);
 
   const response = await safeFetch(
@@ -257,9 +239,7 @@ export function resolveUpdateResourcesForType(
   const current = getReservationResourceIds(detail);
 
   return {
-    aircraftId: getFieldState(reservationType, "aircraft").enabled
-      ? current.aircraftId
-      : undefined,
+    aircraftId: getFieldState(reservationType, "aircraft").enabled ? current.aircraftId : undefined,
     instructorId: getFieldState(reservationType, "instructor").enabled
       ? current.instructorId
       : undefined,
@@ -272,10 +252,7 @@ export function validateUpdateResourcesForType(
 ): string | null {
   const resources = resolveUpdateResourcesForType(detail, reservationType);
 
-  if (
-    getFieldState(reservationType, "aircraft").required &&
-    !resources.aircraftId
-  ) {
+  if (getFieldState(reservationType, "aircraft").required && !resources.aircraftId) {
     return "The new activity type requires an aircraft, but this activity has none.";
   }
 

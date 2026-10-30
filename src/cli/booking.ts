@@ -44,14 +44,10 @@ async function bookSelectionWithOverridePrompt(
       throw error;
     }
 
-    console.log(
-      `\n⚠️  ${selection.date} ${selection.startTime} - FSP warnings:`,
-    );
+    console.log(`\n⚠️  ${selection.date} ${selection.startTime} - FSP warnings:`);
     console.log(`   ${formatFspValidationErrors(validationErrors)}`);
 
-    const shouldOverride = await cli.confirmAction(
-      "   Override warnings and book anyway? (y/n): ",
-    );
+    const shouldOverride = await cli.confirmAction("   Override warnings and book anyway? (y/n): ");
     if (!shouldOverride) {
       throw error;
     }
@@ -72,17 +68,13 @@ export async function handleBookingFlow(
   flightDetails?: ActivityFlightDetails,
 ): Promise<void> {
   try {
-    const selectedAvailabilities =
-      await cli.selectMultipleTimeSlots(availabilities);
+    const selectedAvailabilities = await cli.selectMultipleTimeSlots(availabilities);
 
     if (selectedAvailabilities.length === 0) {
       return;
     }
 
-    const finalSelections = await resolveSlotSelections(
-      cli,
-      selectedAvailabilities,
-    );
+    const finalSelections = await resolveSlotSelections(cli, selectedAvailabilities);
 
     if (finalSelections.length === 0) {
       console.log("\n❌ No time slots selected for booking.");
@@ -100,9 +92,7 @@ export async function handleBookingFlow(
       );
     });
 
-    const confirmed = await cli.confirmAction(
-      "\n✅ Confirm and proceed with booking? (y/n): ",
-    );
+    const confirmed = await cli.confirmAction("\n✅ Confirm and proceed with booking? (y/n): ");
     if (!confirmed) {
       return;
     }
@@ -185,9 +175,7 @@ export async function handleBookingFlow(
     console.log("═".repeat(60));
 
     if (results.success.length > 0) {
-      const bookingsWithIds = results.success.filter(
-        (booking) => booking.reservationId,
-      );
+      const bookingsWithIds = results.success.filter((booking) => booking.reservationId);
 
       if (bookingsWithIds.length > 0) {
         const addToCalendarChoice = await cli.confirmAction(

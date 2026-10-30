@@ -16,19 +16,18 @@ import * as authDAO from "../dao/auth.js";
 vi.mock("./fspMetadata.js");
 vi.mock("../dao/schedule.js");
 vi.mock("./scheduleAvailability.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./scheduleAvailability.js")>();
+  const actual = await importOriginal<typeof import("./scheduleAvailability.js")>();
   return {
     ...actual,
-    computeBookableAvailabilityFromSnapshot: vi.fn(),
+    computeBookableAvailabilityFromSnapshot:
+      vi.fn<typeof actual.computeBookableAvailabilityFromSnapshot>(),
   };
 });
 vi.mock("../dao/reservations.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../dao/reservations.js")>();
+  const actual = await importOriginal<typeof import("../dao/reservations.js")>();
   return {
     ...actual,
-    createReservation: vi.fn(),
+    createReservation: vi.fn<typeof actual.createReservation>(),
   };
 });
 vi.mock("../dao/auth.js");
@@ -120,16 +119,12 @@ describe("SchedulerBLO", () => {
     });
 
     it("loads instructors, aircraft, and activity types successfully", async () => {
-      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(
-        createMockMetadata(),
-      );
+      vi.mocked(fspMetadataModule.fetchFspMetadata).mockResolvedValue(createMockMetadata());
       vi.mocked(authDAO.getPilotId).mockReturnValue("pilot-123");
 
       await scheduler.initialize();
 
-      expect(fspMetadataModule.fetchFspMetadata).toHaveBeenCalledWith(
-        mockOperatorId,
-      );
+      expect(fspMetadataModule.fetchFspMetadata).toHaveBeenCalledWith(mockOperatorId);
       expect(scheduler.getInstructorIds()).toEqual(["inst-1", "inst-2"]);
       expect(scheduler.getAircraftIds()).toEqual(["ac-1", "ac-2"]);
     });
@@ -227,9 +222,9 @@ describe("SchedulerBLO", () => {
         endDateTime: parseFspLocal("2024-07-15T12:00:00", LA),
       };
 
-      vi.mocked(
-        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
-      ).mockReturnValue([slot]);
+      vi.mocked(scheduleAvailability.computeBookableAvailabilityFromSnapshot).mockReturnValue([
+        slot,
+      ]);
 
       const result = await scheduler.getBookableAvailability({
         locationId: 1,
@@ -247,9 +242,7 @@ describe("SchedulerBLO", () => {
           timeZone: LA,
         }),
       );
-      expect(
-        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
-      ).toHaveBeenCalledWith(
+      expect(scheduleAvailability.computeBookableAvailabilityFromSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
           day: "2024-07-15",
           aircraftIds: ["ac-1"],
@@ -261,9 +254,7 @@ describe("SchedulerBLO", () => {
     });
 
     it("passes explicit lengthOfReservationInMinutes", async () => {
-      vi.mocked(
-        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
-      ).mockReturnValue([]);
+      vi.mocked(scheduleAvailability.computeBookableAvailabilityFromSnapshot).mockReturnValue([]);
 
       const workerScheduler = new SchedulerBLO(mockOperatorId, LA);
       workerScheduler.hydrateFromMetadata(
@@ -281,9 +272,9 @@ describe("SchedulerBLO", () => {
         lengthOfReservationInMinutes: 90,
       });
 
-      expect(
-        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
-      ).toHaveBeenCalledWith(expect.objectContaining({ durationMinutes: 90 }));
+      expect(scheduleAvailability.computeBookableAvailabilityFromSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ durationMinutes: 90 }),
+      );
     });
   });
 
@@ -293,9 +284,9 @@ describe("SchedulerBLO", () => {
         typeof import("./scheduleAvailability.js")
       >("./scheduleAvailability.js");
 
-      vi.mocked(
-        scheduleAvailability.computeBookableAvailabilityFromSnapshot,
-      ).mockImplementation(computeBookableAvailabilityFromSnapshot);
+      vi.mocked(scheduleAvailability.computeBookableAvailabilityFromSnapshot).mockImplementation(
+        computeBookableAvailabilityFromSnapshot,
+      );
 
       vi.mocked(scheduleDAO.fetchScheduleDay).mockResolvedValue({
         snapshot: {
@@ -364,9 +355,7 @@ describe("SchedulerBLO", () => {
         errors: [],
       };
 
-      vi.mocked(reservationsDAO.createReservation).mockResolvedValue(
-        mockResponse,
-      );
+      vi.mocked(reservationsDAO.createReservation).mockResolvedValue(mockResponse);
 
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -414,16 +403,13 @@ describe("SchedulerBLO", () => {
 
       await scheduler.bookReservation(params);
 
-      const call = vi.mocked(reservationsDAO.createReservation).mock
-        .calls[0][1];
+      const call = vi.mocked(reservationsDAO.createReservation).mock.calls[0][1];
       expect(call.start).toBe("2030-07-15T14:30");
       expect(call.end).toBe("2030-07-15T16:30");
     });
 
     it("wraps errors with BOOKING_FAILED code", async () => {
-      vi.mocked(reservationsDAO.createReservation).mockRejectedValue(
-        new Error("Network error"),
-      );
+      vi.mocked(reservationsDAO.createReservation).mockRejectedValue(new Error("Network error"));
 
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -438,20 +424,16 @@ describe("SchedulerBLO", () => {
         "Failed to book reservation: Network error",
       );
 
-      try {
-        await scheduler.bookReservation(params);
-      } catch (error: any) {
-        expect(error.code).toBe("BOOKING_FAILED");
-      }
+      await expect(scheduler.bookReservation(params)).rejects.toMatchObject({
+        code: "BOOKING_FAILED",
+      });
     });
 
     it("preserves error code if already present", async () => {
       const customError = new Error("Validation failed") as any;
       customError.code = "VALIDATION_ERROR";
 
-      vi.mocked(reservationsDAO.createReservation).mockRejectedValue(
-        customError,
-      );
+      vi.mocked(reservationsDAO.createReservation).mockRejectedValue(customError);
 
       const params = {
         aircraftId: "33333333-3333-4333-8333-333333333333",
@@ -462,12 +444,10 @@ describe("SchedulerBLO", () => {
         locationId: 1,
       };
 
-      try {
-        await scheduler.bookReservation(params);
-      } catch (error: any) {
-        expect(error.code).toBe("VALIDATION_ERROR");
-        expect(error.message).toBe("Validation failed");
-      }
+      await expect(scheduler.bookReservation(params)).rejects.toMatchObject({
+        code: "VALIDATION_ERROR",
+        message: "Validation failed",
+      });
     });
 
     it("rejects bookings within 24 hours of start time", async () => {

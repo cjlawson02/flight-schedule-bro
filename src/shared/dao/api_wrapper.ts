@@ -71,9 +71,7 @@ export class FspHttpError extends Error {
   readonly response: unknown;
 
   constructor(status: number, response: unknown) {
-    super(
-      `HTTP error! status: ${status}, response: ${JSON.stringify(response)}`,
-    );
+    super(`HTTP error! status: ${status}, response: ${JSON.stringify(response)}`);
     this.name = "FspHttpError";
     this.status = status;
     this.response = response;
@@ -162,9 +160,7 @@ const RateLimitErrorSchema = z.object({
   message: z.string(),
 });
 
-function isRateLimitResponse(
-  data: unknown,
-): data is z.infer<typeof RateLimitErrorSchema> {
+function isRateLimitResponse(data: unknown): data is z.infer<typeof RateLimitErrorSchema> {
   return RateLimitErrorSchema.safeParse(data).success;
 }
 
@@ -187,9 +183,7 @@ export async function safeFetch<T extends z.ZodType>(
 ): Promise<z.infer<T>> {
   // Use consistent cache key (params object is sorted during serialization)
   const cacheKey = { url, method, params };
-  let data = cacheAdapter
-    ? await cacheAdapter.getCachedResult(cacheKey, cacheTtlMs)
-    : null;
+  let data = cacheAdapter ? await cacheAdapter.getCachedResult(cacheKey, cacheTtlMs) : null;
   const wasCacheHit = !!data;
 
   if (!wasCacheHit) {
@@ -215,7 +209,7 @@ export async function safeFetch<T extends z.ZodType>(
               "content-type": "application/json",
               "x-subscription-key": getSubscriptionKey(),
             },
-            body: params ? JSON.stringify(params) : undefined,
+            ...(params && method !== "GET" ? { body: JSON.stringify(params) } : {}),
           });
 
           const responseText = await res.text();
@@ -274,8 +268,7 @@ export async function safeFetch<T extends z.ZodType>(
             log.error("HTTP error from FSP API", {
               status: res.status,
               url: url.split("?")[0],
-              response:
-                typeof data === "object" && data !== null ? "[redacted]" : data,
+              response: typeof data === "object" && data !== null ? "[redacted]" : data,
             });
             throw new FspHttpError(res.status, data);
           }
@@ -298,10 +291,7 @@ export async function safeFetch<T extends z.ZodType>(
           }
 
           // Exponential backoff for other errors
-          const backoffMs = Math.min(
-            Math.pow(2, attemptCount - 1) * 1000,
-            30000,
-          );
+          const backoffMs = Math.min(Math.pow(2, attemptCount - 1) * 1000, 30000);
 
           await sleep(backoffMs);
         }

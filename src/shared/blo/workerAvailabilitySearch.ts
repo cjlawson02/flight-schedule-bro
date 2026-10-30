@@ -43,26 +43,16 @@ export function buildWorkerSearchResources(
   );
 
   if (!reservationType) {
-    throw new Error(
-      "No reservation types available for automated monitoring search.",
-    );
+    throw new Error("No reservation types available for automated monitoring search.");
   }
 
   const allInstructorIds = fspMetadata.instructors.map((i) => i.instructorId);
 
-  if (
-    reservationTypeUsesInstructor(reservationType) &&
-    allInstructorIds.length === 0
-  ) {
-    throw new Error(
-      "No instructors found in metadata. Cannot fetch availability.",
-    );
+  if (reservationTypeUsesInstructor(reservationType) && allInstructorIds.length === 0) {
+    throw new Error("No instructors found in metadata. Cannot fetch availability.");
   }
 
-  const aircraftIds = selectPreferredAircraftIds(
-    fspMetadata.aircraft,
-    config.AIRCRAFT_REGEX,
-  );
+  const aircraftIds = selectPreferredAircraftIds(fspMetadata.aircraft, config.AIRCRAFT_REGEX);
 
   return { reservationType, allInstructorIds, aircraftIds };
 }
@@ -76,18 +66,12 @@ export async function executeWorkerAvailabilitySearch(options: {
   today?: Date;
   failFast?: boolean;
 }): Promise<WorkerAvailabilitySearchResult> {
-  const {
+  const { config, fspMetadata, scheduler, auth, budget, failFast = false } = options;
+  const today = options.today ?? startOfOperatorDay(new Date(), config.TIMEZONE);
+  const { reservationType, allInstructorIds, aircraftIds } = buildWorkerSearchResources(
     config,
     fspMetadata,
-    scheduler,
-    auth,
-    budget,
-    failFast = false,
-  } = options;
-  const today =
-    options.today ?? startOfOperatorDay(new Date(), config.TIMEZONE);
-  const { reservationType, allInstructorIds, aircraftIds } =
-    buildWorkerSearchResources(config, fspMetadata);
+  );
 
   const searchParams = {
     locationId: auth.locationId,
@@ -103,7 +87,9 @@ export async function executeWorkerAvailabilitySearch(options: {
     throw new Error("No instructors or aircraft available for search.");
   }
 
-  budget.reserve = 1;
+  // Keep any reserve already set by the caller (Discord / iCal / auto-book).
+  const previousReserve = budget.reserve;
+  budget.reserve = Math.max(previousReserve, 1);
 
   const pagesPerDayEstimate = estimateSchedulePagesPerDay(
     fspMetadata.instructors.length,
@@ -123,7 +109,7 @@ export async function executeWorkerAvailabilitySearch(options: {
       failFast,
     });
   } finally {
-    budget.reserve = 0;
+    budget.reserve = previousReserve;
   }
 
   const validResults = filterValidAvailabilityBlocks(

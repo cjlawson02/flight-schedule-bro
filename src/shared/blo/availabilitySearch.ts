@@ -1,18 +1,12 @@
 import { BookableAvailability } from "../dao/availability.js";
-import {
-  getAvailabilitySearchResources,
-  type ReservationType,
-} from "../dao/reservationTypes.js";
+import { getAvailabilitySearchResources, type ReservationType } from "../dao/reservationTypes.js";
 import { estimatePagesPerDay } from "../dao/schedule.js";
 import { SchedulerBLO } from "./scheduler.js";
 import { type ConfigType } from "../util/config.js";
 import { isValidBlock } from "../util/dates.js";
 import { addOperatorDays, formatOperatorIsoDate } from "../util/flightTime.js";
 import { createLogger } from "../util/logger.js";
-import {
-  type SubrequestBudget,
-  subrequestsRemaining,
-} from "../util/subrequestBudget.js";
+import { type SubrequestBudget, subrequestsRemaining } from "../util/subrequestBudget.js";
 
 const log = createLogger("availability-search");
 
@@ -42,10 +36,7 @@ export function prepareScheduleSearch(
     params.aircraftIds,
   );
 
-  if (
-    searchResources.instructors.length === 0 &&
-    searchResources.aircraftIds.length === 0
-  ) {
+  if (searchResources.instructors.length === 0 && searchResources.aircraftIds.length === 0) {
     return null;
   }
 
@@ -89,8 +80,7 @@ export async function fetchScheduleDaysWithinBudget(options: {
     pagesPerDayEstimate = 1,
     failFast = false,
   } = options;
-  const durationMinutes =
-    params.durationMinutes ?? params.reservationType.defaultLength;
+  const durationMinutes = params.durationMinutes ?? params.reservationType.defaultLength;
   const results: BookableAvailability[] = [];
   const scheduleStartUsed = budget.used;
   let trackedThroughDate: string | null = null;
@@ -107,16 +97,15 @@ export async function fetchScheduleDaysWithinBudget(options: {
 
     const day = addOperatorDays(today, offset, params.timeZone);
     const dayISO = formatOperatorIsoDate(day, params.timeZone);
-    const { availability, complete } =
-      await scheduler.getBookableAvailabilityForDay({
-        locationId: params.locationId,
-        activityTypeId: params.activityTypeId,
-        instructorIds: prepared.searchResources.instructors,
-        aircraftIds: prepared.searchResources.aircraftIds,
-        startDate: dayISO,
-        lengthOfReservationInMinutes: durationMinutes,
-        budget,
-      });
+    const { availability, complete } = await scheduler.getBookableAvailabilityForDay({
+      locationId: params.locationId,
+      activityTypeId: params.activityTypeId,
+      instructorIds: prepared.searchResources.instructors,
+      aircraftIds: prepared.searchResources.aircraftIds,
+      startDate: dayISO,
+      lengthOfReservationInMinutes: durationMinutes,
+      budget,
+    });
 
     if (!complete) {
       if (failFast) {
@@ -150,10 +139,7 @@ export async function fetchScheduleDaysWithinBudget(options: {
   };
 }
 
-function canFetchAnotherScheduleDay(
-  budget: SubrequestBudget,
-  pagesPerDay: number,
-): boolean {
+function canFetchAnotherScheduleDay(budget: SubrequestBudget, pagesPerDay: number): boolean {
   return subrequestsRemaining(budget) >= pagesPerDay;
 }
 
@@ -167,8 +153,7 @@ export function buildScheduleFetchTasks(
   },
 ): Promise<BookableAvailability[]>[] {
   const { params, prepared, today, daysAhead } = options;
-  const durationMinutes =
-    params.durationMinutes ?? params.reservationType.defaultLength;
+  const durationMinutes = params.durationMinutes ?? params.reservationType.defaultLength;
   const tasks: Promise<BookableAvailability[]>[] = [];
 
   for (let offset = 0; offset <= daysAhead; offset++) {
@@ -210,25 +195,15 @@ export async function fetchAllAvailability(
     }
   }
 
-  return settledResults.flatMap((result) =>
-    result.status === "fulfilled" ? result.value : [],
-  );
+  return settledResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
 }
 
 export function filterValidAvailabilityBlocks(
   results: BookableAvailability[],
-  config: Pick<
-    ConfigType,
-    "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "WEEKEND_MIN_HOUR" | "MAX_HOUR"
-  >,
+  config: Pick<ConfigType, "TIMEZONE" | "WEEKDAY_MIN_HOUR" | "WEEKEND_MIN_HOUR" | "MAX_HOUR">,
   expectedDurationMinutes: number,
 ): BookableAvailability[] {
   return results.filter((result) =>
-    isValidBlock(
-      result.startDateTime,
-      result.endDateTime,
-      config,
-      expectedDurationMinutes,
-    ),
+    isValidBlock(result.startDateTime, result.endDateTime, config, expectedDurationMinutes),
   );
 }

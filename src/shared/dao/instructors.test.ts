@@ -49,15 +49,10 @@ describe("selectPreferredInstructorIds", () => {
   ];
 
   it("returns regex matches when found", () => {
-    expect(selectPreferredInstructorIds(instructors, /Doug Libal/i)).toEqual([
-      "inst-1",
-    ]);
+    expect(selectPreferredInstructorIds(instructors, /Doug Libal/i)).toEqual(["inst-1"]);
   });
 
   it("falls back to all instructors when no matches", () => {
-    expect(selectPreferredInstructorIds(instructors, /Nobody/i)).toEqual([
-      "inst-1",
-      "inst-2",
-    ]);
+    expect(selectPreferredInstructorIds(instructors, /Nobody/i)).toEqual(["inst-1", "inst-2"]);
   });
 });

@@ -1,23 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createReservation } from "./reservations.js";
 import { dualFlightTraining as mockReservationType } from "./reservationTypes.fixtures.js";
-import { setCacheAdapter, invalidateCache } from "./api_wrapper.js";
+import { setCacheAdapter, invalidateCache, type CacheAdapter } from "./api_wrapper.js";
 
 // Mock the safeFetch and invalidateCache function
 vi.mock("./api_wrapper.js", async () => {
-  const actual = await vi.importActual("./api_wrapper.js");
+  const actual = await vi.importActual<typeof import("./api_wrapper.js")>("./api_wrapper.js");
   return {
     ...actual,
-    safeFetch: vi.fn(),
-    invalidateCache: vi.fn(),
+    safeFetch:
+      vi.fn<
+        (
+          url: string,
+          method: "GET" | "POST" | "PUT" | "DELETE",
+          params: Record<string, unknown> | null,
+          parser: import("zod").ZodType,
+          cacheTtlMs: number,
+        ) => Promise<unknown>
+      >(),
+    invalidateCache: vi.fn<(pattern?: string) => Promise<void>>(),
   };
 });
 
 describe("createReservation", () => {
-  const mockCacheAdapter = {
-    getCachedResult: vi.fn(),
-    setCachedResult: vi.fn(),
-    invalidateCache: vi.fn(),
+  const mockCacheAdapter: CacheAdapter = {
+    getCachedResult: vi.fn<(key: object, ttlMs: number) => Promise<unknown>>(),
+    setCachedResult: vi.fn<(key: object, data: unknown) => Promise<void>>(),
+    invalidateCache: vi.fn<(pattern?: string) => Promise<void>>(),
   };
 
   beforeEach(() => {
@@ -52,9 +61,7 @@ describe("createReservation", () => {
     await createReservation(mockReservationType, reservationData);
 
     // Verify that cache invalidation was called with the correct pattern
-    expect(invalidateCache).toHaveBeenCalledWith(
-      "api/V2/Reservation?dateTypeFilter=1",
-    );
+    expect(invalidateCache).toHaveBeenCalledWith("api/V2/Reservation?dateTypeFilter=1");
   });
 
   it("should not invalidate cache if reservation creation fails", async () => {
@@ -77,9 +84,9 @@ describe("createReservation", () => {
       reservationTypeId: "00000000-0000-0000-0000-000000000000",
     };
 
-    await expect(
-      createReservation(mockReservationType, reservationData),
-    ).rejects.toThrow("Reservation creation failed");
+    await expect(createReservation(mockReservationType, reservationData)).rejects.toThrow(
+      "Reservation creation failed",
+    );
 
     // Verify that cache invalidation was not called
     expect(invalidateCache).not.toHaveBeenCalled();
@@ -102,9 +109,9 @@ describe("createReservation", () => {
       reservationTypeId: "00000000-0000-0000-0000-000000000000",
     };
 
-    await expect(
-      createReservation(mockReservationType, reservationData),
-    ).rejects.toThrow();
+    await expect(createReservation(mockReservationType, reservationData)).rejects.toThrow(
+      "Network error",
+    );
 
     // Verify that cache invalidation was not called
     expect(invalidateCache).not.toHaveBeenCalled();
@@ -148,8 +155,7 @@ describe("createReservation", () => {
     (safeFetch as any).mockResolvedValue({
       errors: [
         {
-          message:
-            "The time based maintenance reminder (100Hr Inspection) is expired.",
+          message: "The time based maintenance reminder (100Hr Inspection) is expired.",
         },
       ],
       id: "reservation-123",
@@ -166,17 +172,12 @@ describe("createReservation", () => {
       reservationTypeId: "00000000-0000-0000-0000-000000000000",
     };
 
-    const result = await createReservation(
-      mockReservationType,
-      reservationData,
-      undefined,
-      { overrideExceptions: true },
-    );
+    const result = await createReservation(mockReservationType, reservationData, undefined, {
+      overrideExceptions: true,
+    });
 
     expect(result.id).toBe("reservation-123");
-    expect(invalidateCache).toHaveBeenCalledWith(
-      "api/V2/Reservation?dateTypeFilter=1",
-    );
+    expect(invalidateCache).toHaveBeenCalledWith("api/V2/Reservation?dateTypeFilter=1");
   });
 
   it("should rethrow FspHttpError without wrapping", async () => {
@@ -198,8 +199,6 @@ describe("createReservation", () => {
       reservationTypeId: "00000000-0000-0000-0000-000000000000",
     };
 
-    await expect(
-      createReservation(mockReservationType, reservationData),
-    ).rejects.toBe(apiError);
+    await expect(createReservation(mockReservationType, reservationData)).rejects.toBe(apiError);
   });
 });

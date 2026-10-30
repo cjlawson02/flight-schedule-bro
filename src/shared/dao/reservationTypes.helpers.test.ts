@@ -10,11 +10,7 @@ import {
   selectMonitoringReservationType,
   supportsAvailabilitySearch,
 } from "./reservationTypes.js";
-import {
-  dualFlightTraining,
-  groundTraining,
-  rental,
-} from "./reservationTypes.fixtures.js";
+import { dualFlightTraining, groundTraining, rental } from "./reservationTypes.fixtures.js";
 
 describe("reservation type helpers", () => {
   it("derives field state from reservation type metadata", () => {
@@ -41,35 +37,32 @@ describe("reservation type helpers", () => {
   });
 
   it("builds availability search resources per reservation type", () => {
-    expect(
-      getAvailabilitySearchResources(dualFlightTraining, ["inst-1"], ["ac-1"]),
-    ).toEqual({
+    expect(getAvailabilitySearchResources(dualFlightTraining, ["inst-1"], ["ac-1"])).toEqual({
       instructors: ["inst-1"],
       aircraftIds: ["ac-1"],
     });
 
-    expect(
-      getAvailabilitySearchResources(groundTraining, ["inst-1"], ["ac-1"]),
-    ).toEqual({
+    expect(getAvailabilitySearchResources(groundTraining, ["inst-1"], ["ac-1"])).toEqual({
       instructors: ["inst-1"],
       aircraftIds: [],
     });
 
-    expect(
-      getAvailabilitySearchResources(rental, ["inst-1"], ["ac-1"]),
-    ).toEqual({
+    expect(getAvailabilitySearchResources(rental, ["inst-1"], ["ac-1"])).toEqual({
       instructors: [],
       aircraftIds: ["ac-1"],
     });
   });
 
-  it("prefers instructor-and-aircraft types for automated monitoring", () => {
+  it("prefers aircraft-only rental types for automated monitoring", () => {
     expect(
-      selectMonitoringReservationType([
-        groundTraining,
-        dualFlightTraining,
-        rental,
-      ])?.reservationTypeName,
+      selectMonitoringReservationType([groundTraining, dualFlightTraining, rental])
+        ?.reservationTypeName,
+    ).toBe("Rental");
+  });
+
+  it("falls back to dual when no rental-like type exists", () => {
+    expect(
+      selectMonitoringReservationType([groundTraining, dualFlightTraining])?.reservationTypeName,
     ).toBe("Dual Flight Training");
   });
 
@@ -102,9 +95,7 @@ describe("reservation type helpers", () => {
 
     expect(supportsAvailabilitySearch(rentalFromApi)).toBe(true);
     expect(supportsAvailabilitySearch(groundFromApi)).toBe(true);
-    expect(
-      getAvailabilitySearchResources(rentalFromApi, ["inst-1"], ["ac-1"]),
-    ).toEqual({
+    expect(getAvailabilitySearchResources(rentalFromApi, ["inst-1"], ["ac-1"])).toEqual({
       instructors: [],
       aircraftIds: ["ac-1"],
     });

@@ -4,10 +4,7 @@ import { getSessionCookies } from "./auth.js";
  * Fetches iCal content from the API for a given reservation.
  * Requires cookie-based authentication from the login session.
  */
-export async function fetchICalContent(
-  operatorId: number,
-  reservationId: string,
-): Promise<string> {
+export async function fetchICalContent(operatorId: number, reservationId: string): Promise<string> {
   const iCalUrl = `https://app.flightschedulepro.com/AddToCalendar/iCal/${reservationId}?operatorId=${operatorId}`;
 
   const cookies = getSessionCookies();

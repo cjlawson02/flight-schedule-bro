@@ -12,9 +12,7 @@ export interface ActivityFlightDetails {
   flightRoute?: string;
 }
 
-export function reservationTypeUsesFlightDetails(
-  reservationType: ReservationType,
-): boolean {
+export function reservationTypeUsesFlightDetails(reservationType: ReservationType): boolean {
   return (
     getFieldState(reservationType, "flightType").enabled ||
     getFieldState(reservationType, "flightRules").enabled ||
@@ -66,20 +64,12 @@ export function validateActivityFlightDetails(
   }
 
   const flightHours = getFieldState(reservationType, "flightHours");
-  if (
-    flightHours.enabled &&
-    flightHours.required &&
-    !details.estimatedFlightHours?.trim()
-  ) {
+  if (flightHours.enabled && flightHours.required && !details.estimatedFlightHours?.trim()) {
     return "Estimated flight hours are required.";
   }
 
   const flightRoute = getFieldState(reservationType, "flightRoute");
-  if (
-    flightRoute.enabled &&
-    flightRoute.required &&
-    !details.flightRoute?.trim()
-  ) {
+  if (flightRoute.enabled && flightRoute.required && !details.flightRoute?.trim()) {
     return "Flight route is required.";
   }
 

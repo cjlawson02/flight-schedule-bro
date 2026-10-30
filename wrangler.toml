@@ -28,14 +28,19 @@ remote = true
 
 # Environment variables (non-sensitive)
 [vars]
-AIRCRAFT_REGEX = "65411|737BC"
+AIRCRAFT_REGEX = "65411|737BC|734UZ"
 TIMEZONE = "America/Los_Angeles"
 WEEKDAY_MIN_HOUR = "15"
 WEEKEND_MIN_HOUR = "8"
 MAX_HOUR = "19"
+# Auto-book clear rental slots (≥24h lead, FSP same-day clear). Max 1/run.
+# Personal calendar busy is ignored for slots starting at/after 15:30 (Work OK).
+AUTO_BOOK = "true"
+AUTO_BOOK_MAX_PER_RUN = "1"
+AUTO_BOOK_IGNORE_CALENDAR_AFTER = "15:30"
 
-# Optional: override automated monitoring reservation type (UUID from FSP)
-# RESERVATION_TYPE_ID = "09c58400-bd2a-49a3-a35e-9ab0e81fcebc"
+# Pin monitoring to Rental (not Dual)
+RESERVATION_TYPE_ID = "7e90b30b-8a42-4d5c-99e3-07fe34140356"
 
 # Optional: cap days searched even when subrequest budget allows more (today + N)
 # MAX_DAYS_AHEAD = "60"
@@ -47,3 +52,4 @@ MAX_HOUR = "19"
 # wrangler secret put FSP_EMAIL
 # wrangler secret put FSP_PASSWORD
 # wrangler secret put DISCORD_WEBHOOK_URL
+# wrangler secret put CALENDAR_ICAL_URL

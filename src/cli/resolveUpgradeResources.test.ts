@@ -112,21 +112,17 @@ describe("resolveMissingInstructorForUpgrade", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const scheduler = {
       getInstructorIds: () => [instructorA],
-      getBookableAvailability: vi.fn().mockResolvedValue([]),
+      getBookableAvailability: vi.fn<() => Promise<unknown>>().mockResolvedValue([]),
     };
 
-    const result = await resolveMissingInstructorForUpgrade(
-      cli,
-      scheduler as never,
-      {
-        locationId: 20852,
-        reservationType: dualFlightTraining,
-        aircraftId,
-        startTime,
-        endTime,
-        timeZone: LA,
-      },
-    );
+    const result = await resolveMissingInstructorForUpgrade(cli, scheduler as never, {
+      locationId: 20852,
+      reservationType: dualFlightTraining,
+      aircraftId,
+      startTime,
+      endTime,
+      timeZone: LA,
+    });
 
     expect(result).toBeNull();
     expect(logSpy).toHaveBeenCalledWith(
@@ -140,25 +136,19 @@ describe("resolveMissingInstructorForUpgrade", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const scheduler = {
       getInstructorIds: () => [instructorA],
-      getBookableAvailability: vi.fn().mockResolvedValue([]),
+      getBookableAvailability: vi.fn<() => Promise<unknown>>().mockResolvedValue([]),
     };
 
-    const result = await resolveMissingInstructorForUpgrade(
-      cli,
-      scheduler as never,
-      {
-        locationId: 20852,
-        reservationType: dualFlightTraining,
-        startTime,
-        endTime,
-        timeZone: LA,
-      },
-    );
+    const result = await resolveMissingInstructorForUpgrade(cli, scheduler as never, {
+      locationId: 20852,
+      reservationType: dualFlightTraining,
+      startTime,
+      endTime,
+      timeZone: LA,
+    });
 
     expect(result).toBeNull();
-    expect(logSpy).toHaveBeenCalledWith(
-      "❌ No instructors are available at this time.",
-    );
+    expect(logSpy).toHaveBeenCalledWith("❌ No instructors are available at this time.");
     logSpy.mockRestore();
   });
 });

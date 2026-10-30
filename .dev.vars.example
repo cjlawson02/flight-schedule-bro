@@ -7,3 +7,6 @@
 FSP_EMAIL=your-email@example.com
 FSP_PASSWORD=your-password-here
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-webhook-id/your-webhook-token
+# Google Calendar → Settings → Integrate calendar → Secret address in iCal format
+# webcal:// links are fine (worker rewrites them to https://)
+CALENDAR_ICAL_URL=webcal://calendar.google.com/calendar/ical/example/private-xxxxx/basic.ics

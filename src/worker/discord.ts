@@ -7,10 +7,7 @@ import {
 } from "./types.js";
 import { BookableAvailability } from "../shared/dao/availability.js";
 import type { ExistingReservation } from "../shared/dao/existingReservations.js";
-import {
-  getReservationEnd,
-  getReservationStart,
-} from "../shared/dao/existingReservations.js";
+import { getReservationEnd, getReservationStart } from "../shared/dao/existingReservations.js";
 import {
   createOperatorDateKey,
   DEFAULT_TIMEZONE,
@@ -112,7 +109,10 @@ function formatSlotField(
 
   // Resolve instructor ID to name using map (O(1) lookup)
   const instructorName =
-    instructorMap.get(slot.instructorId) ?? slot.instructorId;
+    instructorMap.get(slot.instructorId) ??
+    (slot.instructorId && slot.instructorId !== "00000000-0000-0000-0000-000000000000"
+      ? slot.instructorId
+      : null);
 
   // Check if there's an existing booking on the same day using map (O(1) lookup)
   const dateKey = createOperatorDateKey(slot.startDateTime, timeZone);
@@ -133,9 +133,11 @@ function formatSlotField(
     }
   }
 
+  const whoLine = instructorName ? `\n👨‍✈️ ${instructorName}` : "\n🧍 Solo rental";
+
   return {
     name: dateStr,
-    value: `**${timeStr}**\n✈️ ${aircraftName}\n👨‍✈️ ${instructorName}${conflictInfo}`,
+    value: `**${timeStr}**\n✈️ ${aircraftName}${whoLine}${conflictInfo}`,
     inline: true,
   };
 }
@@ -174,25 +176,14 @@ function createAvailabilityEmbeds(
 
     const embed: DiscordEmbed = {
       author: { name: "Flight Schedule Bro" },
-      title:
-        i === 0
-          ? `🎉 New Flight Slots Available!`
-          : `🎉 New Flight Slots (continued)`,
+      title: i === 0 ? `🎉 New Flight Slots Available!` : `🎉 New Flight Slots (continued)`,
       description:
         i === 0
-          ? `Found ${slots.length} new time slot${
-              slots.length > 1 ? "s" : ""
-            } for scheduling:`
+          ? `Found ${slots.length} new time slot${slots.length > 1 ? "s" : ""} for scheduling:`
           : undefined,
       color: getColorForDay(firstSlot.startDateTime, timeZone),
       fields: chunk.map((slot) =>
-        formatSlotField(
-          slot,
-          aircraftMap,
-          instructorMap,
-          reservationsByDate,
-          timeZone,
-        ),
+        formatSlotField(slot, aircraftMap, instructorMap, reservationsByDate, timeZone),
       ),
       timestamp: new Date().toISOString(),
       footer: {
@@ -209,32 +200,15 @@ function createAvailabilityEmbeds(
 /**
  * Short preview line for mobile push notifications (shown outside the embed).
  */
-function buildAvailabilityContent(
-  slots: BookableAvailability[],
-  timeZone: string,
-): string {
+function buildAvailabilityContent(slots: BookableAvailability[], timeZone: string): string {
   if (slots.length === 1) {
-    const dateStr = formatInTimeZone(
-      slots[0].startDateTime,
-      timeZone,
-      "EEE, MMM d",
-    );
+    const dateStr = formatInTimeZone(slots[0].startDateTime, timeZone, "EEE, MMM d");
     return `🎉 New flight slot · ${dateStr}`;
   }
 
-  const sorted = [...slots].sort(
-    (a, b) => a.startDateTime.getTime() - b.startDateTime.getTime(),
-  );
-  const firstDate = formatInTimeZone(
-    sorted[0].startDateTime,
-    timeZone,
-    "MMM d",
-  );
-  const lastDate = formatInTimeZone(
-    sorted[sorted.length - 1].startDateTime,
-    timeZone,
-    "MMM d",
-  );
+  const sorted = [...slots].sort((a, b) => a.startDateTime.getTime() - b.startDateTime.getTime());
+  const firstDate = formatInTimeZone(sorted[0].startDateTime, timeZone, "MMM d");
+  const lastDate = formatInTimeZone(sorted[sorted.length - 1].startDateTime, timeZone, "MMM d");
   const range = firstDate === lastDate ? firstDate : `${firstDate}–${lastDate}`;
   return `🎉 ${slots.length} new flight slots · ${range}`;
 }
@@ -282,9 +256,7 @@ export async function sendAvailabilityNotification(
   } catch (error) {
     log.error("Failed to validate Discord payload", { error });
     throw new Error(
-      `Invalid Discord payload: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
+      `Invalid Discord payload: ${error instanceof Error ? error.message : "Unknown error"}`,
       { cause: error },
     );
   }
@@ -319,14 +291,79 @@ export async function sendAvailabilityNotification(
 }
 
 /**
+ * Notify Discord that the worker auto-booked one or more rental slots.
+ */
+export async function sendAutoBookNotification(
+  env: Env,
+  bookings: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+    aircraftTail: string;
+    reservationId?: string | null;
+  }>,
+  timeZone: string = DEFAULT_TIMEZONE,
+): Promise<void> {
+  if (bookings.length === 0) {
+    return;
+  }
+
+  const fields = bookings.map((booking) => {
+    const start = booking.startTime;
+    const end = booking.endTime;
+    return {
+      name: booking.date,
+      value: `**${start} - ${end}**\n✈️ ${booking.aircraftTail}${
+        booking.reservationId ? `\n🆔 \`${booking.reservationId.slice(0, 8)}\`` : ""
+      }`,
+      inline: true,
+    };
+  });
+
+  const payload: DiscordPayload = {
+    username: "Flight Schedule Bro",
+    content:
+      bookings.length === 1
+        ? `✅ Auto-booked rental · ${bookings[0].date}`
+        : `✅ Auto-booked ${bookings.length} rentals`,
+    embeds: [
+      {
+        author: { name: "Flight Schedule Bro" },
+        title: "✅ Auto-booked solo rental",
+        description: `Booked ${bookings.length} slot${
+          bookings.length > 1 ? "s" : ""
+        } (≥${24}h lead, calendar-clear).`,
+        color: COLORS.SUCCESS,
+        fields,
+        timestamp: new Date().toISOString(),
+        footer: { text: `Timezone ${timeZone}` },
+      },
+    ],
+    allowed_mentions: ALLOWED_MENTIONS_NONE,
+  };
+
+  DiscordPayloadSchema.parse(payload);
+  recordActiveSubrequest();
+  const response = await fetch(env.DISCORD_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Discord API error (${response.status}): ${errorText}`);
+  }
+  log.info("Auto-book Discord notification sent", {
+    count: bookings.length,
+  });
+}
+
+/**
  * Send a simple text notification to Discord (for setup/status messages)
  * @param env - Worker environment with webhook URL
  * @param message - Message to send
  */
-export async function sendSimpleNotification(
-  env: Env,
-  message: string,
-): Promise<void> {
+export async function sendSimpleNotification(env: Env, message: string): Promise<void> {
   const payload: DiscordPayload = {
     content: message,
     username: "Flight Schedule Bro",

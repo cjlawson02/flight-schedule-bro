@@ -107,12 +107,8 @@ describe("isIntervalFree", () => {
 
 describe("dual intersection", () => {
   it("finds slots where aircraft and instructor are both free", () => {
-    const aircraftFree = [
-      interval("2026-07-06T15:00:00", "2026-07-06T19:00:00"),
-    ];
-    const instructorFree = [
-      interval("2026-07-06T16:30:00", "2026-07-06T18:00:00"),
-    ];
+    const aircraftFree = [interval("2026-07-06T15:00:00", "2026-07-06T19:00:00")];
+    const instructorFree = [interval("2026-07-06T16:30:00", "2026-07-06T18:00:00")];
     const durationMs = 90 * 60 * 1000;
     const stepMs = 30 * 60 * 1000;
 

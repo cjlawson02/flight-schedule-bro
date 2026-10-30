@@ -99,9 +99,7 @@ describe("getReservationStart", () => {
       startUtc: "2025-11-05T01:00:00",
     };
 
-    expect(getReservationStart(reservation, LA).toISOString()).toBe(
-      "2025-11-05T01:00:00.000Z",
-    );
+    expect(getReservationStart(reservation, LA).toISOString()).toBe("2025-11-05T01:00:00.000Z");
   });
 });
 
@@ -110,44 +108,32 @@ describe("hasReservationOnSameDay", () => {
 
   it("returns true when slot is on same operator calendar day (same time)", () => {
     const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      true,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(true);
   });
 
   it("returns true for a different time on the same day", () => {
     const slotStart = parseFspLocal("2025-11-04T09:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      true,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(true);
   });
 
   it("returns true when slot is on same day as existing reservation (late in day)", () => {
     const slotStart = parseFspLocal("2025-11-06T20:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      true,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(true);
   });
 
   it("returns false when slot is on a different day with no reservations", () => {
     const slotStart = parseFspLocal("2025-11-05T17:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      false,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(false);
   });
 
   it("returns false when slot is day before existing reservation", () => {
     const slotStart = parseFspLocal("2025-11-03T17:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      false,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(false);
   });
 
   it("returns false when slot is day after existing reservation", () => {
     const slotStart = parseFspLocal("2025-11-07T17:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      false,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(false);
   });
 
   it("returns false when there are no existing reservations", () => {
@@ -157,9 +143,7 @@ describe("hasReservationOnSameDay", () => {
 
   it("returns true when a reservation exists on the same day", () => {
     const slotStart = parseFspLocal("2025-11-04T17:00:00", LA);
-    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(
-      true,
-    );
+    expect(hasReservationOnSameDay(slotStart, existingReservations, LA)).toBe(true);
   });
 });
 
@@ -167,9 +151,7 @@ describe("getUpcomingReservations", () => {
   it("returns only reservations that have not ended yet, sorted by start time", () => {
     const now = parseFspLocal("2025-11-05T12:00:00", LA);
 
-    expect(getUpcomingReservations(sampleReservations, LA, now)).toEqual([
-      sampleReservations[1],
-    ]);
+    expect(getUpcomingReservations(sampleReservations, LA, now)).toEqual([sampleReservations[1]]);
   });
 
   it("includes reservations that are currently in progress", () => {

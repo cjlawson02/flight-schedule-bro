@@ -121,10 +121,7 @@ describe("invalidateCache", () => {
 
   it("should selectively invalidate cache entries matching pattern", async () => {
     // Set up cached data with different patterns
-    await setCachedResult(
-      { url: "api/V2/Reservation?dateTypeFilter=1" },
-      { data: "reservations" },
-    );
+    await setCachedResult({ url: "api/V2/Reservation?dateTypeFilter=1" }, { data: "reservations" });
     await setCachedResult({ url: "api/V2/Aircraft" }, { data: "aircraft" });
 
     // Verify cache files exist
@@ -139,10 +136,7 @@ describe("invalidateCache", () => {
     expect(files2.length).toBe(1);
 
     // Verify the remaining cache still works
-    const aircraftResult = await getCachedResult(
-      { url: "api/V2/Aircraft" },
-      60000,
-    );
+    const aircraftResult = await getCachedResult({ url: "api/V2/Aircraft" }, 60000);
     expect(aircraftResult).toEqual({ data: "aircraft" });
   });
 });
@@ -161,18 +155,12 @@ describe("cliCacheAdapter", () => {
     const testData = { test: "data" };
     await cliCacheAdapter.setCachedResult({ url: "test" }, testData);
 
-    const result = await cliCacheAdapter.getCachedResult(
-      { url: "test" },
-      60000,
-    );
+    const result = await cliCacheAdapter.getCachedResult({ url: "test" }, 60000);
     expect(result).toEqual(testData);
 
     await cliCacheAdapter.invalidateCache();
 
-    const resultAfterClear = await cliCacheAdapter.getCachedResult(
-      { url: "test" },
-      60000,
-    );
+    const resultAfterClear = await cliCacheAdapter.getCachedResult({ url: "test" }, 60000);
     expect(resultAfterClear).toBeNull();
   });
 });

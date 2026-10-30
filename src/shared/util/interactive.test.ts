@@ -13,12 +13,16 @@ import {
   rental,
 } from "../dao/reservationTypes.fixtures.js";
 
-vi.mock("@inquirer/prompts", () => ({
-  checkbox: vi.fn(),
-  select: vi.fn(),
-  confirm: vi.fn(),
-  input: vi.fn(),
-}));
+vi.mock("@inquirer/prompts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@inquirer/prompts")>();
+  return {
+    ...actual,
+    checkbox: vi.fn<typeof actual.checkbox>(),
+    select: vi.fn<typeof actual.select>(),
+    confirm: vi.fn<typeof actual.confirm>(),
+    input: vi.fn<typeof actual.input>(),
+  };
+});
 
 describe("InteractiveCLI", () => {
   let cli: InteractiveCLI;
@@ -159,10 +163,7 @@ describe("InteractiveCLI", () => {
     });
 
     it("returns null if user cancels", async () => {
-      const availabilities = [
-        mockTimeSlot,
-        { ...mockTimeSlot, aircraft: "N67890" },
-      ];
+      const availabilities = [mockTimeSlot, { ...mockTimeSlot, aircraft: "N67890" }];
 
       vi.mocked(select).mockRejectedValue(new Error("Cancelled"));
 
@@ -328,10 +329,7 @@ describe("InteractiveCLI", () => {
       };
       vi.mocked(select).mockResolvedValue(reservation.reservationId);
 
-      const result = await cli.selectExistingActivity(
-        [reservation],
-        "America/Los_Angeles",
-      );
+      const result = await cli.selectExistingActivity([reservation], "America/Los_Angeles");
 
       expect(result).toEqual(reservation);
       expect(select).toHaveBeenCalledWith(
@@ -362,9 +360,7 @@ describe("InteractiveCLI", () => {
 
   describe("selectCancellationReason", () => {
     it("returns the selected cancellation reason", async () => {
-      vi.mocked(select).mockResolvedValue(
-        "f69bc957-035a-4beb-9125-e8b0c2686f3e",
-      );
+      vi.mocked(select).mockResolvedValue("f69bc957-035a-4beb-9125-e8b0c2686f3e");
 
       const result = await cli.selectCancellationReason([
         {
@@ -381,9 +377,7 @@ describe("InteractiveCLI", () => {
   describe("collectActivityFlightDetails", () => {
     it("collects rental flight detail fields", async () => {
       vi.mocked(select).mockResolvedValueOnce(1).mockResolvedValueOnce(1);
-      vi.mocked(input)
-        .mockResolvedValueOnce("1.5")
-        .mockResolvedValueOnce("KSBP-KPRB");
+      vi.mocked(input).mockResolvedValueOnce("1.5").mockResolvedValueOnce("KSBP-KPRB");
 
       const result = await cli.collectActivityFlightDetails(rental);
 
@@ -399,9 +393,7 @@ describe("InteractiveCLI", () => {
       vi.mocked(select).mockResolvedValueOnce(1).mockResolvedValueOnce(1);
       vi.mocked(input).mockRejectedValue(new Error("Cancelled"));
 
-      await expect(
-        cli.collectActivityFlightDetails(rental),
-      ).resolves.toBeNull();
+      await expect(cli.collectActivityFlightDetails(rental)).resolves.toBeNull();
     });
   });
 
@@ -409,9 +401,7 @@ describe("InteractiveCLI", () => {
     it("returns entered text", async () => {
       vi.mocked(input).mockResolvedValue("Weather moved in");
 
-      await expect(cli.promptText("Explain:")).resolves.toBe(
-        "Weather moved in",
-      );
+      await expect(cli.promptText("Explain:")).resolves.toBe("Weather moved in");
     });
 
     it("returns null when user cancels", async () => {
@@ -626,21 +616,15 @@ describe("duration choices", () => {
   it("includes standard duration options sorted longest first", () => {
     const choices = buildDurationChoices(120);
 
-    expect(choices.map((choice) => choice.value)).toEqual([
-      210, 180, 150, 120, 90, 60, 45, 30,
-    ]);
+    expect(choices.map((choice) => choice.value)).toEqual([210, 180, 150, 120, 90, 60, 45, 30]);
     expect(choices[3].name).toBe("2 hours");
   });
 
   it("adds non-standard defaults without duplicating options", () => {
     const choices = buildDurationChoices(75);
 
-    expect(choices.map((choice) => choice.value)).toEqual([
-      210, 180, 150, 120, 90, 75, 60, 45, 30,
-    ]);
-    expect(choices.find((choice) => choice.value === 75)?.name).toBe(
-      "75 minutes",
-    );
+    expect(choices.map((choice) => choice.value)).toEqual([210, 180, 150, 120, 90, 75, 60, 45, 30]);
+    expect(choices.find((choice) => choice.value === 75)?.name).toBe("75 minutes");
   });
 });
 

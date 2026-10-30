@@ -92,10 +92,7 @@ export function buildUserReservationRequest(params: {
   };
 
   const aircraftId = resolveResourceId(aircraft.enabled, params.aircraftId);
-  const instructorId = resolveResourceId(
-    instructor.enabled,
-    params.instructorId,
-  );
+  const instructorId = resolveResourceId(instructor.enabled, params.instructorId);
   if (aircraftId) {
     request.aircraftId = aircraftId;
   }
@@ -126,13 +123,9 @@ export function buildFullReservationRequest(
     client: "V4",
     comments: "",
     equipmentIds: [],
-    estimatedFlightHours: flightHours.enabled
-      ? (details.estimatedFlightHours ?? "")
-      : undefined,
+    estimatedFlightHours: flightHours.enabled ? (details.estimatedFlightHours ?? "") : undefined,
     flightRoute: flightRoute.enabled ? (details.flightRoute ?? "") : undefined,
-    flightRules: flightRules.enabled
-      ? (details.flightRules ?? null)
-      : undefined,
+    flightRules: flightRules.enabled ? (details.flightRules ?? null) : undefined,
     flightType: flightType.enabled ? (details.flightType ?? null) : undefined,
     internalComments: "",
     overrideExceptions,
@@ -209,9 +202,7 @@ export async function createReservation(
 
     // Wrap other errors with code
     const err = new Error(
-      `Failed to create reservation: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
+      `Failed to create reservation: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
     (err as Error & { code: string }).code = "API_ERROR";
     throw err;

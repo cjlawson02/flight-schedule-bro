@@ -28,10 +28,7 @@ function serializeQueryParams(params: object): string {
   return JSON.stringify(sortObject(params));
 }
 
-function cacheEntryMatchesPattern(
-  queryParams: unknown,
-  pattern: string,
-): boolean {
+function cacheEntryMatchesPattern(queryParams: unknown, pattern: string): boolean {
   if (
     typeof queryParams === "object" &&
     queryParams !== null &&
@@ -56,10 +53,7 @@ async function ensureCacheDir(): Promise<void> {
   }
 }
 
-export async function getCachedResult(
-  queryParams: object,
-  ttl: number,
-): Promise<unknown> {
+export async function getCachedResult(queryParams: object, ttl: number): Promise<unknown> {
   await ensureCacheDir();
   const hash = hashQueryParams(queryParams);
   const filePath = path.join(CACHE_DIR, `${hash}.json`);
@@ -82,10 +76,7 @@ export async function getCachedResult(
   }
 }
 
-export async function setCachedResult(
-  queryParams: object,
-  result: unknown,
-): Promise<void> {
+export async function setCachedResult(queryParams: object, result: unknown): Promise<void> {
   await ensureCacheDir();
   const hash = hashQueryParams(queryParams);
   const filePath = path.join(CACHE_DIR, `${hash}.json`);
@@ -109,9 +100,7 @@ export async function invalidateCache(pattern?: string): Promise<void> {
     if (!pattern) {
       // Clear all cache files
       await Promise.all(
-        files.map((file) =>
-          fs.unlink(path.join(CACHE_DIR, file)).catch(() => undefined),
-        ),
+        files.map((file) => fs.unlink(path.join(CACHE_DIR, file)).catch(() => undefined)),
       );
       return;
     }

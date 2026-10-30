@@ -99,9 +99,9 @@ describe("nilToOptionalResourceId", () => {
     expect(nilToOptionalResourceId(FSP_NIL_RESOURCE_ID)).toBeUndefined();
     expect(nilToOptionalResourceId(undefined)).toBeUndefined();
     expect(nilToOptionalResourceId(null)).toBeUndefined();
-    expect(
-      nilToOptionalResourceId("cc20d524-b205-43df-9670-5db41a761f87"),
-    ).toBe("cc20d524-b205-43df-9670-5db41a761f87");
+    expect(nilToOptionalResourceId("cc20d524-b205-43df-9670-5db41a761f87")).toBe(
+      "cc20d524-b205-43df-9670-5db41a761f87",
+    );
   });
 });
 
@@ -117,9 +117,7 @@ describe("resolveResourceId", () => {
 describe("resolveMutationResourceId", () => {
   it("uses null for disabled resources on mutation payloads", () => {
     expect(resolveMutationResourceId(false, "ac-1")).toBeNull();
-    expect(resolveMutationResourceId(true, undefined)).toBe(
-      FSP_NIL_RESOURCE_ID,
-    );
+    expect(resolveMutationResourceId(true, undefined)).toBe(FSP_NIL_RESOURCE_ID);
     expect(resolveMutationResourceId(true, "ac-1")).toBe("ac-1");
   });
 });
@@ -132,17 +130,10 @@ describe("selectPreferredAircraftIds", () => {
   ];
 
   it("returns preferred aircraft when regex matches", () => {
-    expect(selectPreferredAircraftIds(aircraft, /172S|172N/i)).toEqual([
-      "ac-1",
-      "ac-2",
-    ]);
+    expect(selectPreferredAircraftIds(aircraft, /172S|172N/i)).toEqual(["ac-1", "ac-2"]);
   });
 
   it("returns all aircraft when nothing matches", () => {
-    expect(selectPreferredAircraftIds(aircraft, /999/i)).toEqual([
-      "ac-1",
-      "ac-2",
-      "ac-3",
-    ]);
+    expect(selectPreferredAircraftIds(aircraft, /999/i)).toEqual(["ac-1", "ac-2", "ac-3"]);
   });
 });

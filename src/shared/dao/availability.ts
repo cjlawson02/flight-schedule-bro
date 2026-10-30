@@ -27,9 +27,7 @@ export const BookableAvailabilityKvSchema = z.object({
   endDateTime: z.iso.datetime(),
 });
 
-export type BookableAvailabilityKV = z.infer<
-  typeof BookableAvailabilityKvSchema
->;
+export type BookableAvailabilityKV = z.infer<typeof BookableAvailabilityKvSchema>;
 
 interface TimeSlotGroup {
   date: string;

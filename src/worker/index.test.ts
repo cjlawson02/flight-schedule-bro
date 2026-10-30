@@ -6,8 +6,7 @@ import type { BookableAvailability } from "../shared/dao/availability.js";
 const LA = "America/Los_Angeles";
 
 function makeSlot(
-  overrides: Partial<BookableAvailability> &
-    Pick<BookableAvailability, "startDateTime">,
+  overrides: Partial<BookableAvailability> & Pick<BookableAvailability, "startDateTime">,
 ): BookableAvailability {
   return {
     date: "1/20/2024",
@@ -47,12 +46,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        "2024-03-15",
-        LA,
-      );
+      const newSlots = findNewSlots(currentSlots, previousSlots, "2024-03-15", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].aircraftId).toBe("aircraft-789");
@@ -118,12 +112,7 @@ describe("Worker Index - Helper Functions", () => {
         }),
       ];
 
-      const newSlots = findNewSlots(
-        currentSlots,
-        previousSlots,
-        "2024-03-15",
-        LA,
-      );
+      const newSlots = findNewSlots(currentSlots, previousSlots, "2024-03-15", LA);
 
       expect(newSlots).toHaveLength(1);
       expect(newSlots[0].startTime).toBe("3:00:00 PM");
@@ -271,10 +260,12 @@ describe("Worker HTTP Endpoints", () => {
   beforeEach(async () => {
     _mockEnv = {
       FSP_AVAILABILITY_KV: {
-        get: vi.fn().mockResolvedValue(null),
-        put: vi.fn().mockResolvedValue(undefined),
-        delete: vi.fn(),
-        list: vi.fn(),
+        get: vi.fn<() => Promise<unknown>>().mockResolvedValue(null),
+        put: vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
+        delete: vi.fn<() => Promise<void>>(),
+        list: vi.fn<
+          (options?: KVNamespaceListOptions) => Promise<KVNamespaceListResult<unknown, string>>
+        >(),
       } as any,
       FSP_EMAIL: "test@example.com",
       FSP_PASSWORD: "password",

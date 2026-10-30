@@ -1,8 +1,4 @@
-import {
-  addOperatorDays,
-  formatOperatorIsoDate,
-  parseOperatorDateString,
-} from "./flightTime.js";
+import { addOperatorDays, formatOperatorIsoDate, parseOperatorDateString } from "./flightTime.js";
 
 export interface SnapshotTrackingMetadata {
   lastSearchDate: string;
@@ -21,19 +17,10 @@ export function resolveTrackedThroughDate(
 
   const legacyDaysAhead = (metadata as { daysAhead?: number }).daysAhead;
   if (legacyDaysAhead != null) {
-    const lastSearchDate = parseOperatorDateString(
-      metadata.lastSearchDate,
-      timeZone,
-    );
-    const trackedThrough = addOperatorDays(
-      lastSearchDate,
-      legacyDaysAhead,
-      timeZone,
-    );
+    const lastSearchDate = parseOperatorDateString(metadata.lastSearchDate, timeZone);
+    const trackedThrough = addOperatorDays(lastSearchDate, legacyDaysAhead, timeZone);
     return formatOperatorIsoDate(trackedThrough, timeZone);
   }
 
-  throw new Error(
-    "Snapshot metadata must include trackedThroughDate or legacy daysAhead",
-  );
+  throw new Error("Snapshot metadata must include trackedThroughDate or legacy daysAhead");
 }

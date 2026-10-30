@@ -1,8 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  bootstrapWorker,
-  runWorkerAvailabilitySearchFlow,
-} from "./workerPipeline.js";
+import { bootstrapWorker, runWorkerAvailabilitySearchFlow } from "./workerPipeline.js";
 import * as authModule from "../shared/dao/auth.js";
 import * as workerSearchModule from "../shared/blo/workerAvailabilitySearch.js";
 import * as metadataModule from "./metadata.js";
@@ -16,7 +13,7 @@ vi.mock("../shared/dao/auth.js");
 vi.mock("../shared/blo/workerAvailabilitySearch.js");
 vi.mock("./metadata.js");
 vi.mock("./utils.js", () => ({
-  initializeWorker: vi.fn(),
+  initializeWorker: vi.fn<() => void>(),
 }));
 
 const mockSession: AuthSession = {
@@ -49,12 +46,8 @@ describe("workerPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(authModule.fetchAuth).mockResolvedValue(mockSession);
-    vi.mocked(metadataModule.getOrFetchMetadata).mockResolvedValue(
-      mockMetadata,
-    );
-    vi.mocked(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).mockResolvedValue({
+    vi.mocked(metadataModule.getOrFetchMetadata).mockResolvedValue(mockMetadata);
+    vi.mocked(workerSearchModule.executeWorkerAvailabilitySearch).mockResolvedValue({
       validResults: [],
       search: {
         results: [],
@@ -71,10 +64,7 @@ describe("workerPipeline", () => {
     const bootstrap = await bootstrapWorker(mockEnv);
 
     expect(bootstrap.session).toEqual(mockSession);
-    expect(authModule.fetchAuth).toHaveBeenCalledWith(
-      "test@example.com",
-      "password",
-    );
+    expect(authModule.fetchAuth).toHaveBeenCalledWith("test@example.com", "password");
   });
 
   it("threads session auth fields into availability search", async () => {
@@ -91,9 +81,7 @@ describe("workerPipeline", () => {
       failFast: true,
     });
 
-    expect(
-      workerSearchModule.executeWorkerAvailabilitySearch,
-    ).toHaveBeenCalledWith(
+    expect(workerSearchModule.executeWorkerAvailabilitySearch).toHaveBeenCalledWith(
       expect.objectContaining({
         auth: {
           locationId: mockSession.defaultLocationId,

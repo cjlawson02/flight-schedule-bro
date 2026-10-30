@@ -28,16 +28,12 @@ const log = createLogger("setup");
  */
 export async function runSetup(env: Env): Promise<Response> {
   const runId = `setup-${Date.now()}`;
-  const lockAcquired = await tryAcquireWorkerRunLock(
-    env.FSP_AVAILABILITY_KV,
-    runId,
-  );
+  const lockAcquired = await tryAcquireWorkerRunLock(env.FSP_AVAILABILITY_KV, runId);
   if (!lockAcquired) {
     return new Response(
       JSON.stringify({
         success: false,
-        error:
-          "❌ Setup failed: another worker run is in progress. Try again shortly.",
+        error: "❌ Setup failed: another worker run is in progress. Try again shortly.",
       }),
       {
         status: 409,
@@ -56,10 +52,7 @@ export async function runSetup(env: Env): Promise<Response> {
     const { config, session } = await bootstrapWorker(env);
 
     log.info("Loading metadata from KV");
-    const fspMetadata = await loadWorkerMetadata(
-      session,
-      env.FSP_AVAILABILITY_KV,
-    );
+    const fspMetadata = await loadWorkerMetadata(session, env.FSP_AVAILABILITY_KV);
 
     log.info("Metadata loaded", {
       instructors: fspMetadata.instructors.length,
@@ -68,21 +61,16 @@ export async function runSetup(env: Env): Promise<Response> {
       subrequestsUsed: budget.used,
     });
 
-    const scheduler = createHydratedScheduler(
+    const scheduler = createHydratedScheduler(session, fspMetadata, config.TIMEZONE);
+
+    const { validResults, search, reservationType } = await runWorkerAvailabilitySearchFlow({
+      config,
       session,
       fspMetadata,
-      config.TIMEZONE,
-    );
-
-    const { validResults, search, reservationType } =
-      await runWorkerAvailabilitySearchFlow({
-        config,
-        session,
-        fspMetadata,
-        scheduler,
-        budget,
-        failFast: true,
-      });
+      scheduler,
+      budget,
+      failFast: true,
+    });
 
     log.info("Filtered valid time slots", { count: validResults.length });
     log.info("Activity type selected", {
@@ -96,12 +84,7 @@ export async function runSetup(env: Env): Promise<Response> {
       );
     }
 
-    await initializeSnapshot(
-      env,
-      validResults,
-      search.trackedThroughDate,
-      config.TIMEZONE,
-    );
+    await initializeSnapshot(env, validResults, search.trackedThroughDate, config.TIMEZONE);
 
     const successMessage = `✅ Setup complete! Initialized with ${validResults.length} available time slots through ${search.trackedThroughDate}.`;
     log.info("Setup complete", {

@@ -186,9 +186,7 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
       ],
     };
 
-    expect(() =>
-      ExistingReservationsResponseSchema.parse(invalidResponse),
-    ).toThrow();
+    expect(() => ExistingReservationsResponseSchema.parse(invalidResponse)).toThrow(/Invalid/);
   });
 
   it("allows optional instructor and resource fields", () => {
@@ -204,9 +202,7 @@ describe("ExistingReservations Schema Validation - Real API Response", () => {
       ],
     };
 
-    const parsed = ExistingReservationsResponseSchema.parse(
-      responseWithoutOptionals,
-    );
+    const parsed = ExistingReservationsResponseSchema.parse(responseWithoutOptionals);
 
     expect(parsed.results[0]).toEqual({
       reservationId: "7fd24fb6-977f-4b4a-89ac-dc949030d234",

@@ -170,14 +170,7 @@ export function computeBookableAvailabilityFromSnapshot(
     for (const instructorId of instructorIds) {
       instructorFree.set(
         instructorId,
-        freeWindowsForResource(
-          instructorId,
-          snapshot,
-          dayStart,
-          dayEnd,
-          closingBusy,
-          timeZone,
-        ),
+        freeWindowsForResource(instructorId, snapshot, dayStart, dayEnd, closingBusy, timeZone),
       );
     }
 
@@ -194,13 +187,7 @@ export function computeBookableAvailabilityFromSnapshot(
 
       for (const slot of aircraftSlots) {
         for (const instructorId of instructorIds) {
-          if (
-            !isIntervalFree(
-              slot.start,
-              slot.end,
-              instructorFree.get(instructorId) ?? [],
-            )
-          ) {
+          if (!isIntervalFree(slot.start, slot.end, instructorFree.get(instructorId) ?? [])) {
             continue;
           }
 
@@ -289,10 +276,8 @@ export function buildScheduleFilterIds(
   reservationTypeIds: string[];
 } {
   return {
-    aircraftIds:
-      aircraftIds.length > 0 ? [FSP_ALL_FILTER_SENTINEL] : aircraftIds,
-    instructorIds:
-      instructorIds.length > 0 ? [FSP_ALL_FILTER_SENTINEL] : instructorIds,
+    aircraftIds: aircraftIds.length > 0 ? [FSP_ALL_FILTER_SENTINEL] : aircraftIds,
+    instructorIds: instructorIds.length > 0 ? [FSP_ALL_FILTER_SENTINEL] : instructorIds,
     reservationTypeIds: [FSP_ALL_FILTER_SENTINEL],
   };
 }

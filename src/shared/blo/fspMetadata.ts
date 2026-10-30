@@ -1,17 +1,7 @@
 import { z } from "zod";
-import {
-  AircraftMetadataSchema,
-  getAircraft,
-  isReservableAircraft,
-} from "../dao/aircraft.js";
-import {
-  getInstructors,
-  InstructorMetadataSchema,
-} from "../dao/instructors.js";
-import {
-  getReservationTypes,
-  ReservationTypeSchema,
-} from "../dao/reservationTypes.js";
+import { AircraftMetadataSchema, getAircraft, isReservableAircraft } from "../dao/aircraft.js";
+import { getInstructors, InstructorMetadataSchema } from "../dao/instructors.js";
+import { getReservationTypes, ReservationTypeSchema } from "../dao/reservationTypes.js";
 
 export const FspMetadataSchema = z.object({
   instructors: z.array(InstructorMetadataSchema),
@@ -22,9 +12,7 @@ export const FspMetadataSchema = z.object({
 
 export type FspMetadata = z.infer<typeof FspMetadataSchema>;
 
-export async function fetchFspMetadata(
-  operatorId: number,
-): Promise<FspMetadata> {
+export async function fetchFspMetadata(operatorId: number): Promise<FspMetadata> {
   const [instructors, reservationTypes, aircraft] = await Promise.all([
     getInstructors(operatorId),
     getReservationTypes(operatorId),

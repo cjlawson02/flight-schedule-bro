@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildFullReservationRequest,
-  buildUserReservationRequest,
-} from "./reservations.js";
-import {
-  dualFlightTraining,
-  groundTraining,
-  rental,
-} from "./reservationTypes.fixtures.js";
+import { buildFullReservationRequest, buildUserReservationRequest } from "./reservations.js";
+import { dualFlightTraining, groundTraining, rental } from "./reservationTypes.fixtures.js";
 
 describe("buildUserReservationRequest", () => {
   const base = {
@@ -107,9 +100,7 @@ describe("buildFullReservationRequest", () => {
     ) as Record<string, unknown>;
 
     expect(serialized).not.toHaveProperty("aircraftId");
-    expect(serialized.instructorId).toBe(
-      "f046d666-35dd-4ebf-b71b-6feb90677291",
-    );
+    expect(serialized.instructorId).toBe("f046d666-35dd-4ebf-b71b-6feb90677291");
   });
 
   it("omits flight hours when disabled on the reservation type", () => {
@@ -124,10 +115,7 @@ describe("buildFullReservationRequest", () => {
       pilotId: "354ccb15-6534-4c59-851d-c6b4d2694320",
     });
 
-    const fullRequest = buildFullReservationRequest(
-      dualFlightTraining,
-      userRequest,
-    );
+    const fullRequest = buildFullReservationRequest(dualFlightTraining, userRequest);
 
     expect(fullRequest.estimatedFlightHours).toBeUndefined();
   });

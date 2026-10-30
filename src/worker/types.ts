@@ -7,10 +7,7 @@ import type {
   RESTPostAPIWebhookWithTokenJSONBody,
 } from "discord-api-types/v10";
 import { BookableAvailabilityKvSchema } from "../shared/dao/availability.js";
-import {
-  FspMetadataSchema,
-  type FspMetadata,
-} from "../shared/blo/fspMetadata.js";
+import { FspMetadataSchema, type FspMetadata } from "../shared/blo/fspMetadata.js";
 
 /**
  * Metadata schema for tracking snapshot state
@@ -121,6 +118,8 @@ export interface Env {
   FSP_EMAIL: string;
   FSP_PASSWORD: string;
   DISCORD_WEBHOOK_URL: string;
+  /** Private Google Calendar (or other) secret iCal URL for busy checks. */
+  CALENDAR_ICAL_URL?: string;
 
   // Configuration variables
   AIRCRAFT_REGEX: string;
@@ -133,6 +132,12 @@ export interface Env {
   WORKERS_PAID_PLAN?: string;
   /** Optional cap on days searched (today + N). */
   MAX_DAYS_AHEAD?: string;
+  /** Set to "true" to auto-book clear rental slots (>24h lead). */
+  AUTO_BOOK?: string;
+  /** Max auto-bookings per cron run (default 1). */
+  AUTO_BOOK_MAX_PER_RUN?: string;
+  /** HH:MM — ignore personal calendar busy for slots starting then or later. */
+  AUTO_BOOK_IGNORE_CALENDAR_AFTER?: string;
 }
 
 /**

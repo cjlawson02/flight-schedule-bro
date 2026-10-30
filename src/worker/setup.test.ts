@@ -7,10 +7,12 @@ describe("Worker Setup", () => {
 
   beforeEach(() => {
     mockKV = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn(),
-      list: vi.fn(),
+      get: vi.fn<() => Promise<unknown>>().mockResolvedValue(null),
+      put: vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
+      delete: vi.fn<() => Promise<void>>(),
+      list: vi.fn<
+        (options?: KVNamespaceListOptions) => Promise<KVNamespaceListResult<unknown, string>>
+      >(),
     } as unknown as KVNamespace;
 
     mockEnv = {
@@ -73,10 +75,8 @@ describe("Worker Setup", () => {
 
     it("handles missing activity types", () => {
       const emptyActivityTypes: [string, string][] = [];
-      if (emptyActivityTypes.length === 0) {
-        const error = new Error("No activity types found");
-        expect(error.message).toBe("No activity types found");
-      }
+      expect(emptyActivityTypes).toHaveLength(0);
+      expect(new Error("No activity types found").message).toBe("No activity types found");
     });
 
     it("returns error response on failure", () => {
@@ -94,8 +94,7 @@ describe("Worker Setup", () => {
     it("returns success response with slot count", () => {
       const successResponse = {
         success: true,
-        message:
-          "✅ Setup complete! Initialized with 42 available time slots through 2024-03-15.",
+        message: "✅ Setup complete! Initialized with 42 available time slots through 2024-03-15.",
         slotsCount: 42,
         trackedThroughDate: "2024-03-15",
         daysFetched: 39,
@@ -117,9 +116,7 @@ describe("Worker Setup", () => {
       ];
 
       const regex = new RegExp("172S|172N", "i");
-      const filtered = allAircraft
-        .filter(([, callsign]) => regex.test(callsign))
-        .map(([id]) => id);
+      const filtered = allAircraft.filter(([, callsign]) => regex.test(callsign)).map(([id]) => id);
 
       expect(filtered).toHaveLength(2);
       expect(filtered).toContain("aircraft-1");
@@ -134,9 +131,7 @@ describe("Worker Setup", () => {
       const allAircraftIds = allAircraft.map(([id]) => id);
 
       const regex = new RegExp("172S", "i");
-      const filtered = allAircraft
-        .filter(([, callsign]) => regex.test(callsign))
-        .map(([id]) => id);
+      const filtered = allAircraft.filter(([, callsign]) => regex.test(callsign)).map(([id]) => id);
 
       const finalIds = filtered.length > 0 ? filtered : allAircraftIds;
 

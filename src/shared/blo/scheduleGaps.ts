@@ -6,13 +6,8 @@ export interface TimeInterval {
 }
 
 /** Parse FSP schedule grid local timestamp: "2026-07-06 17:00:00". */
-export function parseScheduleLocal(
-  localDateTime: string,
-  timeZone: string,
-): Date {
-  const normalized = localDateTime.includes("T")
-    ? localDateTime
-    : localDateTime.replace(" ", "T");
+export function parseScheduleLocal(localDateTime: string, timeZone: string): Date {
+  const normalized = localDateTime.includes("T") ? localDateTime : localDateTime.replace(" ", "T");
   return parseFspLocal(normalized, timeZone);
 }
 
@@ -26,9 +21,7 @@ export function clipInterval(
   dayStart: Date,
   dayEnd: Date,
 ): TimeInterval | null {
-  const start = new Date(
-    Math.max(interval.start.getTime(), dayStart.getTime()),
-  );
+  const start = new Date(Math.max(interval.start.getTime(), dayStart.getTime()));
   const end = new Date(Math.min(interval.end.getTime(), dayEnd.getTime()));
 
   if (start >= end) {
@@ -114,15 +107,9 @@ export function slotsFromFree(
 }
 
 /** True when [start, end] fits entirely inside a free window. */
-export function isIntervalFree(
-  start: Date,
-  end: Date,
-  free: TimeInterval[],
-): boolean {
+export function isIntervalFree(start: Date, end: Date, free: TimeInterval[]): boolean {
   return free.some(
-    (window) =>
-      start.getTime() >= window.start.getTime() &&
-      end.getTime() <= window.end.getTime(),
+    (window) => start.getTime() >= window.start.getTime() && end.getTime() <= window.end.getTime(),
   );
 }
 

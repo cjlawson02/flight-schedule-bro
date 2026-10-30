@@ -32,15 +32,10 @@ function resourcesFromFixture(fixture: { results: ScheduleDaySnapshot }) {
     .map((resource) => resource.Id);
 
   return {
-    aircraftIds: selectPreferredAircraftIds(
-      aircraft,
-      testConfig.AIRCRAFT_REGEX,
-    ),
+    aircraftIds: selectPreferredAircraftIds(aircraft, testConfig.AIRCRAFT_REGEX),
     instructorIds,
     aircraftMap: new Map(aircraft.map((a) => [a.aircraftId, a.tailNumber])),
-    instructorsMap: new Map(
-      instructorIds.map((id) => [id, `Instructor ${id.slice(0, 8)}`]),
-    ),
+    instructorsMap: new Map(instructorIds.map((id) => [id, `Instructor ${id.slice(0, 8)}`])),
   };
 }
 
@@ -129,9 +124,7 @@ describe("computeBookableAvailabilityFromSnapshot", () => {
     });
 
     const threePm = parseFspLocal("2030-07-15T15:00:00", testConfig.TIMEZONE);
-    const matching = results.filter(
-      (slot) => slot.startDateTime.getTime() === threePm.getTime(),
-    );
+    const matching = results.filter((slot) => slot.startDateTime.getTime() === threePm.getTime());
 
     expect(matching).toHaveLength(2);
     expect(new Set(matching.map((slot) => slot.instructorId))).toEqual(

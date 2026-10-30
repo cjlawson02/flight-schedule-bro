@@ -18,9 +18,7 @@ export function metadataNeedsRefresh(metadata: FspMetadata): boolean {
 /**
  * Fetch metadata from KV store
  */
-export async function getMetadataFromKV(
-  kv: KVNamespace,
-): Promise<FspMetadata | null> {
+export async function getMetadataFromKV(kv: KVNamespace): Promise<FspMetadata | null> {
   try {
     recordActiveKvSubrequest();
     const data = await kv.get(METADATA_KEY, "json");
@@ -44,10 +42,7 @@ export async function getMetadataFromKV(
 /**
  * Store metadata in KV
  */
-export async function setMetadataInKV(
-  kv: KVNamespace,
-  metadata: FspMetadata,
-): Promise<void> {
+export async function setMetadataInKV(kv: KVNamespace, metadata: FspMetadata): Promise<void> {
   try {
     // Validate before storing
     const validated = FspMetadataSchema.parse(metadata);
@@ -63,10 +58,7 @@ export async function setMetadataInKV(
 /**
  * Fetch fresh metadata from FSP API and store in KV
  */
-export async function refreshMetadata(
-  operatorId: number,
-  kv: KVNamespace,
-): Promise<FspMetadata> {
+export async function refreshMetadata(operatorId: number, kv: KVNamespace): Promise<FspMetadata> {
   log.info("Fetching fresh metadata from FSP API");
   const metadata = await fetchFspMetadata(operatorId);
   await setMetadataInKV(kv, metadata);
@@ -102,9 +94,7 @@ export async function getOrFetchMetadata(
         return metadata;
       }
 
-      log.info(
-        "Cached metadata is missing reservation type fields, refreshing",
-      );
+      log.info("Cached metadata is missing reservation type fields, refreshing");
       return await refreshMetadata(operatorId, kv);
     }
 
@@ -115,9 +105,7 @@ export async function getOrFetchMetadata(
   }
 
   if (!allowApiRefresh) {
-    throw new Error(
-      "No metadata in KV. Run /refresh-metadata before scheduled monitoring.",
-    );
+    throw new Error("No metadata in KV. Run /refresh-metadata before scheduled monitoring.");
   }
 
   log.info("No metadata in KV, fetching from API");

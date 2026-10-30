@@ -78,9 +78,7 @@ function findReservationTypeName(
   fallback?: string,
 ): string {
   return (
-    scheduler
-      .getReservationTypes()
-      .find((type) => type.reservationTypeId === reservationTypeId)
+    scheduler.getReservationTypes().find((type) => type.reservationTypeId === reservationTypeId)
       ?.reservationTypeName ??
     fallback ??
     "Unknown"
@@ -99,17 +97,11 @@ async function resolveChangeActivityResources(
 ): Promise<ResolvedChangeResources | null> {
   const aircraftField = getFieldState(reservationType, "aircraft");
   const instructorField = getFieldState(reservationType, "instructor");
-  const resolvedResources = resolveUpdateResourcesForType(
-    detail,
-    reservationType,
-  );
+  const resolvedResources = resolveUpdateResourcesForType(detail, reservationType);
   const aircraftId = resolvedResources.aircraftId;
   let instructorId = resolvedResources.instructorId;
 
-  const resourceValidationError = validateUpdateResourcesForType(
-    detail,
-    reservationType,
-  );
+  const resourceValidationError = validateUpdateResourcesForType(detail, reservationType);
   if (resourceValidationError) {
     console.log(`❌ ${resourceValidationError}`);
     return null;
@@ -171,17 +163,13 @@ function printChangeActivitySummary(
   );
 
   console.log("\n📋 Ready to update:");
-  console.log(
-    `Activity type: ${reservationType.reservationTypeName} (was ${currentTypeName})`,
-  );
+  console.log(`Activity type: ${reservationType.reservationTypeName} (was ${currentTypeName})`);
   console.log(`Time: ${timeSummary} (unchanged)`);
   if (flightDetails?.flightType !== undefined) {
     console.log(`Flight type: ${formatFlightType(flightDetails.flightType)}`);
   }
   if (flightDetails?.flightRules !== undefined) {
-    console.log(
-      `Flight rules: ${formatFlightRules(flightDetails.flightRules)}`,
-    );
+    console.log(`Flight rules: ${formatFlightRules(flightDetails.flightRules)}`);
   }
   if (flightDetails?.estimatedFlightHours) {
     console.log(`Estimated hours: ${flightDetails.estimatedFlightHours}`);
@@ -216,9 +204,7 @@ async function handleCancelActivity(
 
   let reasonText = "";
   if (reason.requiresExplanation) {
-    const explanation = await cli.promptText(
-      "Enter a cancellation explanation:",
-    );
+    const explanation = await cli.promptText("Enter a cancellation explanation:");
     if (explanation === null) {
       return;
     }
@@ -229,9 +215,7 @@ async function handleCancelActivity(
     }
   }
 
-  const confirmed = await cli.confirmAction(
-    `Cancel this activity (${reason.name})?`,
-  );
+  const confirmed = await cli.confirmAction(`Cancel this activity (${reason.name})?`);
   if (!confirmed) {
     return;
   }
@@ -265,9 +249,7 @@ async function handleChangeActivityType(
   try {
     detail = await getReservationById(operatorId, reservation.reservationId);
   } catch (error) {
-    console.log(
-      `❌ Could not load activity details: ${getErrorMessage(error)}`,
-    );
+    console.log(`❌ Could not load activity details: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -278,15 +260,12 @@ async function handleChangeActivityType(
   );
 
   console.log("\n✏️  Change activity type");
-  console.log(
-    `Current: ${cli.formatExistingActivity(reservation, config.TIMEZONE)}`,
-  );
+  console.log(`Current: ${cli.formatExistingActivity(reservation, config.TIMEZONE)}`);
   console.log(`Activity type: ${currentTypeName}`);
 
-  const reservationType = await cli.selectReservationType(
-    scheduler.getReservationTypes(),
-    { excludeTypeIds: [detail.reservationTypeId] },
-  );
+  const reservationType = await cli.selectReservationType(scheduler.getReservationTypes(), {
+    excludeTypeIds: [detail.reservationTypeId],
+  });
 
   if (!reservationType) {
     console.log("❌ No activity type selected.");
@@ -300,20 +279,14 @@ async function handleChangeActivityType(
       return;
     }
 
-    const validationError = validateActivityFlightDetails(
-      reservationType,
-      flightDetails,
-    );
+    const validationError = validateActivityFlightDetails(reservationType, flightDetails);
     if (validationError) {
       console.log(`❌ ${validationError}`);
       return;
     }
   }
 
-  const { startTime, endTime } = parseReservationDetailTimes(
-    detail,
-    config.TIMEZONE,
-  );
+  const { startTime, endTime } = parseReservationDetailTimes(detail, config.TIMEZONE);
   const resources = await resolveChangeActivityResources(
     cli,
     scheduler,
@@ -342,8 +315,7 @@ async function handleChangeActivityType(
     endTime,
     timeZone: config.TIMEZONE,
     schedulingGroupId: detail.aircraftSummary?.schedulingGroupId ?? null,
-    schedulingGroupSlotId:
-      detail.aircraftSummary?.schedulingGroupSlotId ?? null,
+    schedulingGroupSlotId: detail.aircraftSummary?.schedulingGroupSlotId ?? null,
     flightDetails,
     comments: detail.comments ?? "",
     orFor: detail.orFor ?? null,
@@ -354,9 +326,7 @@ async function handleChangeActivityType(
   try {
     await updateReservation(updateParams);
   } catch (error) {
-    console.log(
-      `❌ This update is not available: ${formatUpdateValidationError(error)}`,
-    );
+    console.log(`❌ This update is not available: ${formatUpdateValidationError(error)}`);
     return;
   }
 
@@ -380,9 +350,7 @@ async function handleChangeActivityType(
   try {
     console.log("⏳ Committing your update...");
     await updateReservation({ ...updateParams, validateOnly: false });
-    console.log(
-      `✅ Updated: ${timeSummary} | ${reservationType.reservationTypeName}`,
-    );
+    console.log(`✅ Updated: ${timeSummary} | ${reservationType.reservationTypeName}`);
   } catch (error) {
     log.error("Failed to update activity", {
       reservationId: reservation.reservationId,
@@ -415,10 +383,7 @@ export async function runManageExistingActivityWorkflow(
   }
 
   const upcoming = getUpcomingReservations(reservations, config.TIMEZONE);
-  const selectedActivity = await cli.selectExistingActivity(
-    upcoming,
-    config.TIMEZONE,
-  );
+  const selectedActivity = await cli.selectExistingActivity(upcoming, config.TIMEZONE);
   if (!selectedActivity) {
     return;
   }
@@ -433,11 +398,5 @@ export async function runManageExistingActivityWorkflow(
     return;
   }
 
-  await handleChangeActivityType(
-    cli,
-    scheduler,
-    config,
-    selectedActivity,
-    operatorId,
-  );
+  await handleChangeActivityType(cli, scheduler, config, selectedActivity, operatorId);
 }

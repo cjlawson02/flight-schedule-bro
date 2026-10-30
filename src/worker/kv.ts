@@ -1,13 +1,5 @@
-import {
-  SnapshotSchema,
-  type Snapshot,
-  type Metadata,
-  type Env,
-} from "./types.js";
-import {
-  BookableAvailability,
-  type BookableAvailabilityKV,
-} from "../shared/dao/availability.js";
+import { SnapshotSchema, type Snapshot, type Metadata, type Env } from "./types.js";
+import { BookableAvailability, type BookableAvailabilityKV } from "../shared/dao/availability.js";
 import {
   DEFAULT_TIMEZONE,
   formatOperatorIsoDate,
@@ -23,9 +15,7 @@ const SNAPSHOT_KEY = "availability_snapshot";
 /**
  * Convert BookableAvailability to KV-storable format (with Date objects as ISO strings)
  */
-function serializeAvailability(
-  availability: BookableAvailability,
-): BookableAvailabilityKV {
+function serializeAvailability(availability: BookableAvailability): BookableAvailabilityKV {
   return {
     ...availability,
     startDateTime: availability.startDateTime.toISOString(),
@@ -36,9 +26,7 @@ function serializeAvailability(
 /**
  * Convert KV-stored format back to BookableAvailability (with ISO strings as Date objects)
  */
-function deserializeAvailability(
-  availabilityKV: BookableAvailabilityKV,
-): BookableAvailability {
+function deserializeAvailability(availabilityKV: BookableAvailabilityKV): BookableAvailability {
   return {
     ...availabilityKV,
     startDateTime: new Date(availabilityKV.startDateTime),
@@ -66,9 +54,7 @@ export async function getSnapshot(env: Env): Promise<Snapshot | null> {
   } catch (error) {
     log.error("Failed to parse snapshot from KV", { error });
     throw new Error(
-      `Invalid snapshot data in KV: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
+      `Invalid snapshot data in KV: ${error instanceof Error ? error.message : "Unknown error"}`,
       { cause: error },
     );
   }
@@ -99,9 +85,7 @@ export async function setSnapshot(
   } catch (error) {
     log.error("Failed to validate snapshot before storing", { error });
     throw new Error(
-      `Invalid snapshot data: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
+      `Invalid snapshot data: ${error instanceof Error ? error.message : "Unknown error"}`,
       { cause: error },
     );
   }
@@ -119,9 +103,7 @@ async function putSnapshot(env: Env, snapshot: Snapshot): Promise<void> {
  * @param snapshot - Snapshot object (can be null)
  * @returns Array of BookableAvailability or empty array if snapshot is null
  */
-export function getSlotsFromSnapshot(
-  snapshot: Snapshot | null,
-): BookableAvailability[] {
+export function getSlotsFromSnapshot(snapshot: Snapshot | null): BookableAvailability[] {
   if (!snapshot) {
     return [];
   }
@@ -169,10 +151,7 @@ export async function initializeSnapshot(
   timeZone: string = DEFAULT_TIMEZONE,
 ): Promise<void> {
   const now = new Date();
-  const todayISO = formatOperatorIsoDate(
-    startOfOperatorDay(now, timeZone),
-    timeZone,
-  );
+  const todayISO = formatOperatorIsoDate(startOfOperatorDay(now, timeZone), timeZone);
 
   const metadata: Metadata = {
     lastSearchDate: todayISO,

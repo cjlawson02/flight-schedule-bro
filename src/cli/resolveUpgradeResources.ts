@@ -17,10 +17,7 @@ export function filterAvailabilitiesForSlot(
       return false;
     }
 
-    if (
-      availability.instructorId === FSP_NIL_RESOURCE_ID ||
-      !availability.instructorId
-    ) {
+    if (availability.instructorId === FSP_NIL_RESOURCE_ID || !availability.instructorId) {
       return false;
     }
 
@@ -119,10 +116,7 @@ export async function resolveMissingInstructorForUpgrade(
     return null;
   }
 
-  const selected = await cli.selectInstructor(
-    matchingInstructors[0],
-    matchingInstructors,
-  );
+  const selected = await cli.selectInstructor(matchingInstructors[0], matchingInstructors);
 
   if (!selected) {
     return null;
