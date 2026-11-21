@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260721.1",
-    "@tsconfig/node24": "^24.0.4",
+    "@tsconfig/node26": "^26.0.0",
     "@types/node": "^26.1.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^5.0.0",
